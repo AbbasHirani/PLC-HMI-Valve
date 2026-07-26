@@ -1,0 +1,213 @@
+=== Classes under Dynamization namespace in Siemens.Engineering, Version=20.0.0.0, Culture=neutral, PublicKeyToken=d29ec89bac048f84 ===
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBase
+    BaseType: System.Object
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: DynamizationType               | Type: DynamizationType
+      Property: PropertyName                   | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseCompositionFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+    BaseType: System.Object
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Count                          | Type: Int32
+      Property: IsReadOnly                     | Type: Boolean
+      Property: Item                           | Type: DynamizationBase
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationType
+    BaseType: System.Enum
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.ExpressionDynamizationFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.ExpressionDynamization
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: ValueConverter                 | Type: ValueConverter
+      Property: DynamizationType               | Type: DynamizationType
+      Property: PropertyName                   | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.ResourceListDynamizationFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.ResourceListDynamization
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: ResourceList                   | Type: String
+      Property: Tag                            | Type: String
+      Property: DynamizationType               | Type: DynamizationType
+      Property: PropertyName                   | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.TagDynamizationFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.TagDynamization
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Address                        | Type: String
+      Property: DataType                       | Type: String
+      Property: PlcTag                         | Type: String
+      Property: ReadOnly                       | Type: Boolean
+      Property: Tag                            | Type: String
+      Property: UseIndirectAddressing          | Type: Boolean
+      Property: ValueConverter                 | Type: ValueConverter
+      Property: DynamizationType               | Type: DynamizationType
+      Property: PropertyName                   | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.TagParameterDynamizationFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.TagParameterDynamization
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: DynamicTagName                 | Type: String
+      Property: DynamizationType               | Type: DynamizationType
+      Property: PropertyName                   | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingCondition
+    BaseType: System.Enum
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingDynamizationFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingDynamization
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: AlternateColor                 | Type: Color
+      Property: Color                          | Type: Color
+      Property: FlashingCondition              | Type: FlashingCondition
+      Property: FlashingRate                   | Type: FlashingRate
+      Property: DynamizationType               | Type: DynamizationType
+      Property: PropertyName                   | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate
+    BaseType: System.Enum
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.IHmiScript
+    BaseType: none
+    Properties:
+      Property: Async                          | Type: Boolean
+      Property: GlobalDefinitionAreaScriptCode | Type: String
+      Property: ScriptCode                     | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.ScriptDynamizationFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.ScriptDynamization
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Async                          | Type: Boolean
+      Property: GlobalDefinitionAreaScriptCode | Type: String
+      Property: ScriptCode                     | Type: String
+      Property: Trigger                        | Type: Trigger
+      Property: DynamizationType               | Type: DynamizationType
+      Property: PropertyName                   | Type: String
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.TriggerFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.Trigger
+    BaseType: System.Object
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: CustomDuration                 | Type: String
+      Property: Tags                           | Type: Object
+      Property: Type                           | Type: TriggerType
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.TriggerType
+    BaseType: System.Enum
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.BitDynamizationType
+    BaseType: System.Enum
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.ConditionType
+    BaseType: System.Enum
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTable
+    BaseType: System.Object
+    Properties:
+      Property: Entries                        | Type: MappingTableEntryBaseComposition
+      Property: Parent                         | Type: IEngineeringObject
+      Property: ConditionType                  | Type: ConditionType
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBaseFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBase
+    BaseType: System.Object
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: AlternateValue                 | Type: Object
+      Property: Flashing                       | Type: Boolean
+      Property: FlashingRate                   | Type: FlashingRate
+      Property: Value                          | Type: Object
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBaseCompositionFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBaseComposition
+    BaseType: System.Object
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Count                          | Type: Int32
+      Property: IsReadOnly                     | Type: Boolean
+      Property: Item                           | Type: MappingTableEntryBase
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBitmaskFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBitmask
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: BitDynamizationType            | Type: BitDynamizationType
+      Property: Condition                      | Type: UInt64
+      Property: Relevant                       | Type: UInt64
+      Property: AlternateValue                 | Type: Object
+      Property: Flashing                       | Type: Boolean
+      Property: FlashingRate                   | Type: FlashingRate
+      Property: Value                          | Type: Object
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.Internal.MappingTableEntryBitmaskListFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.Internal.MappingTableEntryBitmaskList
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryRangeFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryRange
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: From                           | Type: Object
+      Property: RangeType                      | Type: RangeType
+      Property: To                             | Type: Object
+      Property: AlternateValue                 | Type: Object
+      Property: Flashing                       | Type: Boolean
+      Property: FlashingRate                   | Type: FlashingRate
+      Property: Value                          | Type: Object
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntrySimpleFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntrySimple
+    BaseType: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.MappingTableEntryBase
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Condition                      | Type: String
+      Property: AlternateValue                 | Type: Object
+      Property: Flashing                       | Type: Boolean
+      Property: FlashingRate                   | Type: FlashingRate
+      Property: Value                          | Type: Object
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.RangeType
+    BaseType: System.Enum
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.ValueConverterFactoryFacade
+    BaseType: System.Object
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Dynamization.Tag.ValueConverter
+    BaseType: System.Object
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Formula                        | Type: String
+      Property: IsFormulaSelected              | Type: Boolean
+      Property: MappingTable                   | Type: MappingTable

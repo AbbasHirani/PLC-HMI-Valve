@@ -1,0 +1,45 @@
+=== HmiFaceplateContainer Properties ===
+  Name: Adaption                            | Type: Siemens.Engineering.HmiUnified.UI.Enum.HmiScreenWindowAdaption
+  Name: Caption                             | Type: Siemens.Engineering.HmiUnified.UI.Parts.HmiTextPart
+  Name: CaptionColor                        | Type: System.Drawing.Color
+  Name: ContainedType                       | Type: System.String
+  Name: CurrentQuality                      | Type: Siemens.Engineering.HmiUnified.UI.Enum.HmiQuality
+  Name: Dynamizations                       | Type: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Name: Enabled                             | Type: System.Boolean
+  Name: EventHandlers                       | Type: Siemens.Engineering.HmiUnified.UI.Events.HmiFaceplateContainerEventHandlerComposition
+  Name: Height                              | Type: System.UInt32
+  Name: Icon                                | Type: System.String
+  Name: Interface                           | Type: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterfaceComposition
+  Name: Left                                | Type: System.Int32
+  Name: Name                                | Type: System.String
+  Name: Parent                              | Type: Siemens.Engineering.IEngineeringObject
+  Name: PropertyEventHandlers               | Type: Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  Name: RotationAngle                       | Type: System.Int16
+  Name: RotationCenterPlacement             | Type: Siemens.Engineering.HmiUnified.UI.Enum.HmiRotationCenterPlacement
+  Name: RotationCenterX                     | Type: System.Single
+  Name: RotationCenterY                     | Type: System.Single
+  Name: ShowFocusVisual                     | Type: System.Boolean
+  Name: StyleItemClass                      | Type: System.String
+  Name: TabIndex                            | Type: System.UInt16
+  Name: Top                                 | Type: System.Int32
+  Name: Visible                             | Type: System.Boolean
+  Name: Width                               | Type: System.UInt32
+  Name: WindowFlags                         | Type: Siemens.Engineering.HmiUnified.UI.Enum.HmiWindowFlag
+
+=== HmiFaceplateContainer Methods ===
+  Method: Equals
+  Method: get_Adaption
+  Method: get_EventHandlers
+  Method: get_Interface
+  Method: get_Parent
+  Method: get_RotationAngle
+  Method: get_RotationCenterPlacement
+  Method: get_RotationCenterX
+  Method: get_RotationCenterY
+  Method: GetHashCode
+  Method: set_Adaption
+  Method: set_RotationAngle
+  Method: set_RotationCenterPlacement
+  Method: set_RotationCenterX
+  Method: set_RotationCenterY
+  Method: ToString

@@ -1,0 +1,23 @@
+=== ScreenItems.Create methods ===
+Method: GetEnumerator
+Method: get_Parent
+Method: get_Count
+Method: get_IsReadOnly
+Method: get_Item
+  Param: index (System.Int32)
+Method: Contains
+  Param: item (Siemens.Engineering.HmiUnified.UI.Base.HmiScreenItemBase)
+Method: IndexOf
+  Param: item (Siemens.Engineering.HmiUnified.UI.Base.HmiScreenItemBase)
+Method: Create
+  Param: name (System.String)
+Method: Create
+  Param: name (System.String)
+  Param: containedTypeValue (System.String)
+Method: Find
+  Param: name (System.String)
+Method: Equals
+  Param: obj (System.Object)
+Method: GetHashCode
+Method: ToString
+Method: GetType

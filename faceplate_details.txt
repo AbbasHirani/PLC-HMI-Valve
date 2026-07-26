@@ -1,0 +1,13 @@
+=== Library Type: Valve_Faceplate ===
+  Author                         String                    = TIA_VM
+  Comment                        MultilingualText          = Siemens.Engineering.MultilingualText
+  DoNotUse                       Boolean                   = False
+  Guid                           Guid                      = fc997862-f133-4f74-aa7f-ec13278e7f42
+  MinimumTargetDeviceVersion     Version                   = 20.0.0.0
+  Name                           String                    = Valve_Faceplate
+  Namespace                      String                    = 
+  Parent                         IEngineeringObject        = Siemens.Engineering.Library.Types.LibraryTypeSystemFolder
+  SetForUpdate                   Boolean                   = True
+  Status                         ConsistencyStatus         = Consistent
+  Versions                       LibraryTypeVersionComposition = Siemens.Engineering.Library.Types.LibraryTypeVersionComposition
+

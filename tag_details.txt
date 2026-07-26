@@ -1,0 +1,76 @@
+=== Tag Table: Default tag table ===
+--- Tag: OpenCmd_V1 ---
+  AccessMode                          HmiAccessMode                  = SymbolicAccess
+  AcquisitionCycle                    String                         = T1s
+  AcquisitionMode                     HmiAcquisitionMode             = CyclicOnUse
+  Address                             String                         = 
+  Comment                             MultilingualText               = Siemens.Engineering.MultilingualText
+  ConfirmationType                    HmiConfirmationType            = None
+  Connection                          String                         = HMI_Connection_1
+  DataType                            String                         = Bool
+  DBNameMultiplexing                  Boolean                        = False
+  GmpRelevant                         Boolean                        = False
+  HmiDataType                         String                         = Bool
+  HmiEndValue                         Object                         = 100
+  HmiStartValue                       Object                         = 0
+  InitialMaxValue                     UpperRange                     = Siemens.Engineering.HmiUnified.HmiTags.UpperRange
+  InitialMinValue                     LowerRange                     = Siemens.Engineering.HmiUnified.HmiTags.LowerRange
+  InitialValue                        Object                         = 
+  LinearScaling                       Boolean                        = False
+  LoggingTags                         HmiLoggingTagComposition       = Siemens.Engineering.HmiUnified.LoggingTags.HmiLoggingTagComposition
+  MandatoryCommenting                 Boolean                        = False
+  MaxLength                           UInt32                         = 1
+  Members                             HmiTagComposition              = Siemens.Engineering.HmiUnified.HmiTags.HmiTagComposition
+  Name                                String                         = OpenCmd_V1
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.HmiTags.HmiTagTable
+  Persistent                          Boolean                        = False
+  PlcEndValue                         Object                         = 10
+  PlcName                             String                         = PLC_1
+  PlcStartValue                       Object                         = 0
+  PlcTag                              String                         = HMI_Interface_DB.OpenCmd
+  RequiredFunctionRights              String                         = 
+  Scope                               HmiTagScope                    = System
+  SubstituteValue                     HmiSubstituteValue             = Siemens.Engineering.HmiUnified.HmiTags.HmiSubstituteValue
+  TagTableName                        String                         = Default tag table
+  TagType                             HmiTagType                     = Simple
+  Thresholds                          HmiThresholdComposition        = Siemens.Engineering.HmiUnified.HmiTags.HmiThresholdComposition
+  UpdateId                            UInt32                         = 0
+
+=== Tag Table: ValveTags ===
+--- Tag: V001_OpenCmd ---
+  AccessMode                          HmiAccessMode                  = SymbolicAccess
+  AcquisitionCycle                    String                         = T1s
+  AcquisitionMode                     HmiAcquisitionMode             = CyclicOnUse
+  Address                             String                         = 
+  Comment                             MultilingualText               = Siemens.Engineering.MultilingualText
+  ConfirmationType                    HmiConfirmationType            = None
+  Connection                          String                         = HMI_Connection_1
+  DataType                            String                         = Int
+  DBNameMultiplexing                  Boolean                        = False
+  GmpRelevant                         Boolean                        = False
+  HmiDataType                         String                         = Int
+  HmiEndValue                         Object                         = 100
+  HmiStartValue                       Object                         = 0
+  InitialMaxValue                     UpperRange                     = Siemens.Engineering.HmiUnified.HmiTags.UpperRange
+  InitialMinValue                     LowerRange                     = Siemens.Engineering.HmiUnified.HmiTags.LowerRange
+  InitialValue                        Object                         = 
+  LinearScaling                       Boolean                        = False
+  LoggingTags                         HmiLoggingTagComposition       = Siemens.Engineering.HmiUnified.LoggingTags.HmiLoggingTagComposition
+  MandatoryCommenting                 Boolean                        = False
+  MaxLength                           UInt32                         = 2
+  Members                             HmiTagComposition              = Siemens.Engineering.HmiUnified.HmiTags.HmiTagComposition
+  Name                                String                         = V001_OpenCmd
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.HmiTags.HmiTagTable
+  Persistent                          Boolean                        = False
+  PlcEndValue                         Object                         = 10
+  PlcName                             String                         = PLC_1
+  PlcStartValue                       Object                         = 0
+  PlcTag                              String                         = 
+  RequiredFunctionRights              String                         = 
+  Scope                               HmiTagScope                    = System
+  SubstituteValue                     HmiSubstituteValue             = Siemens.Engineering.HmiUnified.HmiTags.HmiSubstituteValue
+  TagTableName                        String                         = ValveTags
+  TagType                             HmiTagType                     = Simple
+  Thresholds                          HmiThresholdComposition        = Siemens.Engineering.HmiUnified.HmiTags.HmiThresholdComposition
+  UpdateId                            UInt32                         = 0
+

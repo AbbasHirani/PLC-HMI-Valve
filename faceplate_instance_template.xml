@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SimaticML xmlns="http://www.siemens.com/automation/Openness/SimaticML/Common/v5">
+  <!-- Conceptual SimaticML representation of HmiFaceplateContainer retrieved via TIA Portal V20 Openness -->
+  <HmiFaceplateContainer ID="0">
+    <AttributeList>
+      <Name>Faceplate container_1</Name>
+      <Left>17</Left>
+      <Top>14</Top>
+      <Width>800</Width>
+      <Height>600</Height>
+      <ContainedType>V0.0.2\Valve_Faceplate</ContainedType>
+    </AttributeList>
+    <Interface>
+      <Parameter Name="OpenCmd">
+        <Value>OpenCmd_V1</Value>
+      </Parameter>
+      <Parameter Name="CloseCmd">
+        <Value>CloseCmd_V1</Value>
+      </Parameter>
+      <Parameter Name="OpenFB">
+        <Value>OpenFB_V1</Value>
+      </Parameter>
+      <Parameter Name="ClosedFB">
+        <Value>ClosedFB_V1</Value>
+      </Parameter>
+      <Parameter Name="Healthy">
+        <Value>Healthy_V1</Value>
+      </Parameter>
+      <Parameter Name="LocalMode">
+        <Value>LocalMode_V1</Value>
+      </Parameter>
+    </Interface>
+  </HmiFaceplateContainer>
+</SimaticML>

@@ -1,0 +1,45 @@
+=== Classes in Siemens.Engineering, Version=20.0.0.0, Culture=neutral, PublicKeyToken=d29ec89bac048f84 ===
+  Class: Siemens.Engineering.Hmi.Faceplate.FaceplateLibraryTypeFactoryFacade
+    Properties:
+  Class: Siemens.Engineering.Hmi.Faceplate.FaceplateLibraryType
+    Properties:
+      Property: Name                           | Type: String
+      Property: Comment                        | Type: MultilingualText
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Versions                       | Type: LibraryTypeVersionComposition
+      Property: Author                         | Type: String
+      Property: DoNotUse                       | Type: Boolean
+      Property: Guid                           | Type: Guid
+      Property: MinimumTargetDeviceVersion     | Type: Version
+      Property: Namespace                      | Type: String
+      Property: SetForUpdate                   | Type: Boolean
+      Property: Status                         | Type: ConsistencyStatus
+  Class: Siemens.Engineering.Hmi.Faceplate.FaceplateLibraryTypeVersionFactoryFacade
+    Properties:
+  Class: Siemens.Engineering.Hmi.Faceplate.FaceplateLibraryTypeVersion
+    Properties:
+      Property: Parent                         | Type: IEngineeringObject
+      Property: Comment                        | Type: MultilingualText
+      Property: Author                         | Type: String
+      Property: Dependencies                   | Type: LibraryTypeVersionAssociation
+      Property: Dependents                     | Type: LibraryTypeVersionAssociation
+      Property: Guid                           | Type: Guid
+      Property: IsDefault                      | Type: Boolean
+      Property: MasterCopiesContainingInstances | Type: MasterCopyAssociation
+      Property: ModifiedDate                   | Type: DateTime
+      Property: OriginalLibrary                | Type: String
+      Property: State                          | Type: LibraryTypeVersionState
+      Property: TypeObject                     | Type: LibraryType
+      Property: VersionNumber                  | Type: Version
+  Class: Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainerFactoryFacade
+  Class: Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+  Class: Siemens.Engineering.HmiUnified.UI.Enum.HmiFaceplateContainerEventType
+    Properties:
+  Class: Siemens.Engineering.HmiUnified.UI.Events.HmiFaceplateContainerEventHandlerFactoryFacade
+  Class: Siemens.Engineering.HmiUnified.UI.Events.HmiFaceplateContainerEventHandler
+  Class: Siemens.Engineering.HmiUnified.UI.Events.HmiFaceplateContainerEventHandlerCompositionFactoryFacade
+  Class: Siemens.Engineering.HmiUnified.UI.Events.HmiFaceplateContainerEventHandlerComposition
+  Class: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterfaceFactoryFacade
+  Class: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface
+  Class: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterfaceCompositionFactoryFacade
+  Class: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterfaceComposition

@@ -1,0 +1,6 @@
+=== HmiFaceplateInterface Properties ===
+  Name: Dynamizations                       | Type: Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Name: Parent                              | Type: Siemens.Engineering.IEngineeringObject
+  Name: PropertyEventHandlers               | Type: Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  Name: PropertyName                        | Type: System.String
+  Name: Value                               | Type: System.Object

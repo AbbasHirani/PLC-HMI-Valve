@@ -1,0 +1,30 @@
+=== Trigger Properties ===
+  Property: Parent                    | Type: Siemens.Engineering.IEngineeringObject
+  Property: CustomDuration            | Type: System.String
+  Property: Tags                      | Type: System.Object
+  Property: Type                      | Type: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.TriggerType
+
+=== Trigger.Tags Type Details ===
+  Type Full Name: System.Object
+  Base Type: none
+  Properties:
+  Methods:
+    Method: Equals
+    Method: Equals
+    Method: ReferenceEquals
+    Method: GetHashCode
+    Method: GetType
+    Method: ToString
+
+=== TriggerType Enum Values ===
+  Disabled
+  T1s
+  T2s
+  CustomCycle
+  Tags
+  T5s
+  AutomaticTags
+  T10s
+  T100ms
+  T250ms
+  T500ms

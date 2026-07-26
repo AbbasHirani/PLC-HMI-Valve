@@ -1,0 +1,154 @@
+=== HmiRectangle ===
+  AlternateBackColor                  Color                          = Color [A=255, R=0, G=255, B=0]
+  AlternateBorderColor                Color                          = Color [A=255, R=255, G=255, B=255]
+  Authorization                       String                         = None
+  BackColor                           Color                          = Color [A=255, R=200, G=205, B=215]
+  BackFillPattern                     HmiFillPattern                 = Solid
+  BorderColor                         Color                          = Color [A=255, R=125, G=125, B=133]
+  BorderWidth                         Byte                           = 1
+  Corners                             HmiCornersPart                 = Siemens.Engineering.HmiUnified.UI.Parts.HmiCornersPart
+  CurrentQuality                      HmiQuality                     = None
+  DashType                            HmiDashType                    = Solid
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Enabled                             Boolean                        = True
+  EventHandlers                       HmiRectangleEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.HmiRectangleEventHandlerComposition
+  FillDirection                       HmiFillDirection               = BottomToTop
+  FillLevel                           Byte                           = 0
+  Height                              UInt32                         = 48
+  Left                                Int32                          = 0
+  Name                                String                         = __tmp_rect
+  Opacity                             Single                         = 1
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Screens.HmiScreen
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  RequireExplicitUnlock               Boolean                        = False
+  RotationAngle                       Int16                          = 0
+  RotationCenterPlacement             HmiRotationCenterPlacement     = AbsoluteFromCenter
+  RotationCenterX                     Single                         = 0
+  RotationCenterY                     Single                         = 0
+  ShowFillLevel                       Boolean                        = False
+  ShowFocusVisual                     Boolean                        = True
+  StyleItemClass                      String                         = HmiRectangle
+  TabIndex                            UInt16                         = 0
+  ToolTipText                         MultilingualText               = Siemens.Engineering.MultilingualText
+  Top                                 Int32                          = 0
+  Visible                             Boolean                        = True
+  Width                               UInt32                         = 96
+
+=== HmiEllipse ===
+  AlternateBackColor                  Color                          = Color [A=255, R=0, G=255, B=0]
+  AlternateBorderColor                Color                          = Color [A=255, R=255, G=255, B=255]
+  Authorization                       String                         = None
+  BackColor                           Color                          = Color [A=255, R=200, G=205, B=215]
+  BackFillPattern                     HmiFillPattern                 = Solid
+  BorderColor                         Color                          = Color [A=255, R=125, G=125, B=133]
+  BorderWidth                         Byte                           = 1
+  CenterX                             Int32                          = 48
+  CenterY                             Int32                          = 24
+  CurrentQuality                      HmiQuality                     = None
+  DashType                            HmiDashType                    = Solid
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Enabled                             Boolean                        = True
+  EventHandlers                       HmiEllipseEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.HmiEllipseEventHandlerComposition
+  FillDirection                       HmiFillDirection               = BottomToTop
+  FillLevel                           Byte                           = 0
+  Name                                String                         = __tmp_ellipse
+  Opacity                             Single                         = 1
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Screens.HmiScreen
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  RadiusX                             UInt32                         = 48
+  RadiusY                             UInt32                         = 24
+  RequireExplicitUnlock               Boolean                        = False
+  RotationAngle                       Int16                          = 0
+  RotationCenterPlacement             HmiRotationCenterPlacement     = AbsoluteFromCenter
+  RotationCenterX                     Single                         = 0
+  RotationCenterY                     Single                         = 0
+  ShowFillLevel                       Boolean                        = False
+  ShowFocusVisual                     Boolean                        = True
+  StyleItemClass                      String                         = HmiEllipse
+  TabIndex                            UInt16                         = 0
+  ToolTipText                         MultilingualText               = Siemens.Engineering.MultilingualText
+  Visible                             Boolean                        = True
+
+=== HmiButton ===
+  AlternateBackColor                  Color                          = Color [A=255, R=128, G=128, B=128]
+  AlternateBorderColor                Color                          = Color [A=255, R=255, G=255, B=255]
+  AlternateGraphic                    String                         = 
+  AlternateText                       MultilingualText               = Siemens.Engineering.MultilingualText
+  Authorization                       String                         = None
+  BackColor                           Color                          = Color [A=255, R=242, G=244, B=255]
+  BorderColor                         Color                          = Color [A=255, R=100, G=100, B=106]
+  BorderWidth                         Byte                           = 1
+  Content                             HmiContentPart                 = Siemens.Engineering.HmiUnified.UI.Parts.HmiContentPart
+  CurrentQuality                      HmiQuality                     = None
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Enabled                             Boolean                        = True
+  EventHandlers                       HmiButtonEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.HmiButtonEventHandlerComposition
+  Font                                HmiFontPart                    = Siemens.Engineering.HmiUnified.UI.Parts.HmiFontPart
+  ForeColor                           Color                          = Color [A=255, R=0, G=0, B=0]
+  Graphic                             String                         = 
+  Height                              UInt32                         = 40
+  HotKey                              UInt16                         = 0
+  Left                                Int32                          = 0
+  Name                                String                         = __tmp_btn
+  Opacity                             Single                         = 1
+  Padding                             HmiPaddingPart                 = Siemens.Engineering.HmiUnified.UI.Parts.HmiPaddingPart
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Screens.HmiScreen
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  RequireExplicitUnlock               Boolean                        = False
+  RotationAngle                       Int16                          = 0
+  RotationCenterPlacement             HmiRotationCenterPlacement     = AbsoluteFromCenter
+  RotationCenterX                     Single                         = 0
+  RotationCenterY                     Single                         = 0
+  ShowFocusVisual                     Boolean                        = True
+  StyleItemClass                      String                         = HmiButton
+  TabIndex                            UInt16                         = 0
+  Text                                MultilingualText               = Siemens.Engineering.MultilingualText
+  ToolTipText                         MultilingualText               = Siemens.Engineering.MultilingualText
+  Top                                 Int32                          = 0
+  Visible                             Boolean                        = True
+  VisualizeQuality                    Boolean                        = True
+  Width                               UInt32                         = 160
+
+=== HmiIOField ===
+  AlternateBackColor                  Color                          = Color [A=255, R=128, G=128, B=128]
+  AlternateBorderColor                Color                          = Color [A=255, R=255, G=255, B=255]
+  Authorization                       String                         = None
+  BackColor                           Color                          = Color [A=255, R=255, G=255, B=255]
+  BorderColor                         Color                          = Color [A=255, R=100, G=100, B=106]
+  BorderWidth                         Byte                           = 1
+  CurrentQuality                      HmiQuality                     = None
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Enabled                             Boolean                        = True
+  EventHandlers                       HmiIOFieldEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.HmiIOFieldEventHandlerComposition
+  Font                                HmiFontPart                    = Siemens.Engineering.HmiUnified.UI.Parts.HmiFontPart
+  ForeColor                           Color                          = Color [A=255, R=0, G=0, B=0]
+  Height                              UInt32                         = 40
+  HorizontalTextAlignment             HmiHorizontalAlignment         = Center
+  InputBehavior                       HmiInputBehaviorPart           = Siemens.Engineering.HmiUnified.UI.Parts.HmiInputBehaviorPart
+  IOFieldType                         HmiIOFieldType                 = InputOutput
+  Left                                Int32                          = 0
+  Name                                String                         = __tmp_io
+  Opacity                             Single                         = 1
+  OutputFormat                        String                         = 
+  Padding                             HmiPaddingPart                 = Siemens.Engineering.HmiUnified.UI.Parts.HmiPaddingPart
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Screens.HmiScreen
+  ProcessValue                        String                         = 
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  RequireExplicitUnlock               Boolean                        = False
+  RotationAngle                       Int16                          = 0
+  RotationCenterPlacement             HmiRotationCenterPlacement     = AbsoluteFromCenter
+  RotationCenterX                     Single                         = 0
+  RotationCenterY                     Single                         = 0
+  ShowFocusVisual                     Boolean                        = True
+  StyleItemClass                      String                         = HmiIOField
+  TabIndex                            UInt16                         = 0
+  TextTrimming                        HmiTextTrimming                = None
+  Thresholds                          HmiThresholdPartComposition    = Siemens.Engineering.HmiUnified.UI.Parts.HmiThresholdPartComposition
+  ToolTipText                         MultilingualText               = Siemens.Engineering.MultilingualText
+  Top                                 Int32                          = 0
+  VerticalTextAlignment               HmiVerticalAlignment           = Center
+  Visible                             Boolean                        = True
+  VisualizeQuality                    Boolean                        = True
+  Width                               UInt32                         = 160
+
+[HmiLabel] NULL

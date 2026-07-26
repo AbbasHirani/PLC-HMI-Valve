@@ -1,0 +1,57 @@
+=== Library Type: Valve_Faceplate ===
+  Version: 0.0.1
+    Property: Comment                        = Siemens.Engineering.MultilingualText
+    Property: Parent                         = Siemens.Engineering.Library.Types.LibraryType
+    Property: Author                         = System.String
+    Property: Dependencies                   = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Dependents                     = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Guid                           = System.Guid
+    Property: IsDefault                      = System.Boolean
+    Property: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Property: ModifiedDate                   = System.DateTime
+    Property: OriginalLibrary                = System.String
+    Property: State                          = Siemens.Engineering.Library.Types.LibraryTypeVersionState
+    Property: TypeObject                     = Siemens.Engineering.Library.Types.LibraryType
+    Property: VersionNumber                  = System.Version
+  Version: 0.0.2
+    Property: VersionNumber                  = System.Version
+    Property: Comment                        = Siemens.Engineering.MultilingualText
+    Property: Parent                         = Siemens.Engineering.Library.Types.LibraryType
+    Property: Author                         = System.String
+    Property: Dependencies                   = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Dependents                     = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Guid                           = System.Guid
+    Property: IsDefault                      = System.Boolean
+    Property: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Property: ModifiedDate                   = System.DateTime
+    Property: OriginalLibrary                = System.String
+    Property: State                          = Siemens.Engineering.Library.Types.LibraryTypeVersionState
+    Property: TypeObject                     = Siemens.Engineering.Library.Types.LibraryType
+  Version: 0.0.3
+    Property: VersionNumber                  = System.Version
+    Property: Comment                        = Siemens.Engineering.MultilingualText
+    Property: Parent                         = Siemens.Engineering.Library.Types.LibraryType
+    Property: Author                         = System.String
+    Property: Dependencies                   = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Dependents                     = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Guid                           = System.Guid
+    Property: IsDefault                      = System.Boolean
+    Property: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Property: ModifiedDate                   = System.DateTime
+    Property: OriginalLibrary                = System.String
+    Property: State                          = Siemens.Engineering.Library.Types.LibraryTypeVersionState
+    Property: TypeObject                     = Siemens.Engineering.Library.Types.LibraryType
+  Version: 0.0.4
+    Property: VersionNumber                  = System.Version
+    Property: Comment                        = Siemens.Engineering.MultilingualText
+    Property: Parent                         = Siemens.Engineering.Library.Types.LibraryType
+    Property: Author                         = System.String
+    Property: Dependencies                   = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Dependents                     = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Property: Guid                           = System.Guid
+    Property: IsDefault                      = System.Boolean
+    Property: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Property: ModifiedDate                   = System.DateTime
+    Property: OriginalLibrary                = System.String
+    Property: State                          = Siemens.Engineering.Library.Types.LibraryTypeVersionState
+    Property: TypeObject                     = Siemens.Engineering.Library.Types.LibraryType

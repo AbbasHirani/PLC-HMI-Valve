@@ -1,0 +1,3 @@
+=== PROJECT LIBRARY TYPES ===
++ Folder: Types
+  - Type: Valve_Faceplate (LibraryType)

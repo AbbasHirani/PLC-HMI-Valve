@@ -1,0 +1,34 @@
+=== HMI Tag Tables and Tags ===
+
+Tag Table: Default tag table
+  Tag: 'OpenCmd_V1' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'CloseCmd_V1' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'OpenFB_V1' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'ClosedFB_V1' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'Healthy_V1' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'LocalMode_V1' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'SelectedValveIndex' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Total Tags in this table: 7
+
+Tag Table: ValveTags
+  Tag: 'V001_OpenCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V001_CloseCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V001_OpenFB' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V001_ClosedFB' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V001_Healthy' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V001_LocalMode' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V002_OpenCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V002_CloseCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V002_OpenFB' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V002_ClosedFB' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V002_Healthy' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V002_LocalMode' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V003_OpenCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V003_CloseCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V003_OpenFB' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V003_ClosedFB' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V003_Healthy' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V003_LocalMode' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V004_OpenCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Tag: 'V004_CloseCmd' | Connection: 'HMI_Connection_1' | PLC Tag: ''
+  Total Tags in this table: 623

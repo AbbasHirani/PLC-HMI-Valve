@@ -1,0 +1,16 @@
+=== Button: Nav_Overview ===
+Text Property Type: Siemens.Engineering.MultilingualText
+  Item Text: '<body><p>Overview</p></body>' | Culture: ''
+Event Handlers:
+  Handler: Siemens.Engineering.HmiUnified.UI.Events.HmiButtonEventHandler
+    Script: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.ScriptDynamization
+    Code: HMIRuntime.UI.SysFct.ChangeScreen("Screen_1", "~");
+
+=== Button: FPC_V001 ===
+Text Property Type: Siemens.Engineering.MultilingualText
+  Item Text: '<body><p>VALVE<br />V-001</p></body>' | Culture: ''
+Event Handlers:
+  Handler: Siemens.Engineering.HmiUnified.UI.Events.HmiButtonEventHandler
+    Script: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.ScriptDynamization
+    Code: HMIRuntime.UI.OpenFaceplateInPopup("Valve_Faceplate_V_0_0_2", "Valve 001 Control", { "OpenCmd": "V001_OpenCmd", "CloseCmd": "V001_CloseCmd", "OpenFB": "V001_OpenFB", "ClosedFB": "V001_ClosedFB", "Healthy": "V001_Healthy", "LocalMode": "V001_LocalMode" }, null, false, "Popup_V001", { left: 660, top: 240, width: 600, height: 500 });
+

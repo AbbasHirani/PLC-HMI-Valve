@@ -1,0 +1,23 @@
+=== PROJECT DETAILS ===
+Project Name: valveDemo2
+Project Path: C:\Users\Admin\Documents\Automation\valveDemo2\valveDemo2.ap20
+HMI Device: HMI_1
+
+=== HMI SCREENS ===
+Screen: Screen_Alarms (Width: 1920, Height: 1080)
+  ScreenItems count: 6
+  Buttons: 2, FaceplateContainers: 0
+Screen: Screen_1 (Width: 1920, Height: 1080)
+  ScreenItems count: 119
+  Buttons: 96, FaceplateContainers: 0
+
+=== PROJECT LIBRARY TYPES ===
+Type: Valve_Faceplate (Status: Consistent)
+  Version: 0.0.1 (IsDefault: False, State: Committed, Guid: ce4aab81-ccb3-4a7f-a307-574d41b3af24)
+  Version: 0.0.2 (IsDefault: False, State: Committed, Guid: 4a1d3a20-d677-4e73-b2ed-65e22ae770f9)
+  Version: 0.0.3 (IsDefault: False, State: Committed, Guid: c485fc25-5763-43b3-ac86-e4c57f453cc8)
+  Version: 0.0.4 (IsDefault: True, State: Committed, Guid: 39ebd289-85bf-4d5d-8bf2-bff62059ce2b)
+
+=== HMI TAG TABLES ===
+TagTable: Default tag table
+TagTable: ValveTags

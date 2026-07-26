@@ -1,0 +1,41 @@
+=== Inspecting Screen_1 Items ===
+
+Item: FPC_V001
+ScriptCode:
+Tags("SelectedValve").Write(1);
+HMIRuntime.UI.SysFct.OpenScreenInPopup("Popup_Valve", "Screen_Popup", "Valve V-001 Control", 660, 240, true, true);
+
+Dynamizations:
+  Property: BorderColor | Type: ScriptDynamization
+    Code:
+let configured = Tags("V001_Configured").Read().Value;
+let healthy = Tags("V001_Healthy").Read().Value;
+let open = Tags("V001_OpenFB").Read().Value;
+let closed = Tags("V001_ClosedFB").Read().Value;
+let local = Tags("V001_LocalMode").Read().Value;
+let flash = Tags("Valves_DB_Clock1Hz").Read().Value;
+
+if (!configured) return 0xFF353C4E;
+if (local) return 0xFFFF9F0A;
+if (!healthy || (open && closed)) return flash ? 0xFFFF0000 : 0xFF3A0000;
+if (open && !closed) return 0xFF32C785;
+if (!open && closed) return 0xFF353C4E;
+return 0xFF00A2FF;
+
+  Property: Text | Type: ScriptDynamization
+    Code:
+let configured = Tags("V001_Configured").Read().Value;
+let healthy = Tags("V001_Healthy").Read().Value;
+let open = Tags("V001_OpenFB").Read().Value;
+let closed = Tags("V001_ClosedFB").Read().Value;
+let local = Tags("V001_LocalMode").Read().Value;
+let flash = Tags("Valves_DB_Clock1Hz").Read().Value;
+
+let state = "MOVING";
+if (!configured) { state = "UNCFGD"; }
+else if (local) { state = "LOCAL"; }
+else if (!healthy || (open && closed)) { state = flash ? "FAULT" : "FAULT"; }
+else if (open && !closed) { state = "OPEN"; }
+else if (!open && closed) { state = "CLOSED"; }
+
+return "V-001\n" + state;

@@ -1,0 +1,58 @@
+=== Faceplate Types Inspection ===
+Type: Valve_Faceplate
+  Version: 0.0.1 (Guid: ce4aab81-ccb3-4a7f-a307-574d41b3af24, Default: False)
+    Prop: Comment = Siemens.Engineering.MultilingualText
+    Prop: Parent = Siemens.Engineering.Library.Types.LibraryType
+    Prop: Author = TIA_VM
+    Prop: Dependencies = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Dependents = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Guid = ce4aab81-ccb3-4a7f-a307-574d41b3af24
+    Prop: IsDefault = False
+    Prop: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Prop: ModifiedDate = 21-07-2026 12:59:52
+    Prop: OriginalLibrary = valveDemo2
+    Prop: State = Committed
+    Prop: TypeObject = Siemens.Engineering.Library.Types.LibraryType
+    Prop: VersionNumber = 0.0.1
+  Version: 0.0.2 (Guid: 4a1d3a20-d677-4e73-b2ed-65e22ae770f9, Default: False)
+    Prop: Comment = Siemens.Engineering.MultilingualText
+    Prop: Parent = Siemens.Engineering.Library.Types.LibraryType
+    Prop: Author = Admin
+    Prop: Dependencies = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Dependents = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Guid = 4a1d3a20-d677-4e73-b2ed-65e22ae770f9
+    Prop: IsDefault = False
+    Prop: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Prop: ModifiedDate = 22-07-2026 06:08:48
+    Prop: OriginalLibrary = valveDemo2
+    Prop: State = Committed
+    Prop: TypeObject = Siemens.Engineering.Library.Types.LibraryType
+    Prop: VersionNumber = 0.0.2
+  Version: 0.0.3 (Guid: c485fc25-5763-43b3-ac86-e4c57f453cc8, Default: False)
+    Prop: Comment = Siemens.Engineering.MultilingualText
+    Prop: Parent = Siemens.Engineering.Library.Types.LibraryType
+    Prop: Author = Admin
+    Prop: Dependencies = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Dependents = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Guid = c485fc25-5763-43b3-ac86-e4c57f453cc8
+    Prop: IsDefault = False
+    Prop: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Prop: ModifiedDate = 24-07-2026 11:07:11
+    Prop: OriginalLibrary = valveDemo2
+    Prop: State = Committed
+    Prop: TypeObject = Siemens.Engineering.Library.Types.LibraryType
+    Prop: VersionNumber = 0.0.3
+  Version: 0.0.4 (Guid: 39ebd289-85bf-4d5d-8bf2-bff62059ce2b, Default: True)
+    Prop: Comment = Siemens.Engineering.MultilingualText
+    Prop: Parent = Siemens.Engineering.Library.Types.LibraryType
+    Prop: Author = Admin
+    Prop: Dependencies = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Dependents = Siemens.Engineering.Library.Types.LibraryTypeVersionAssociation
+    Prop: Guid = 39ebd289-85bf-4d5d-8bf2-bff62059ce2b
+    Prop: IsDefault = True
+    Prop: MasterCopiesContainingInstances = Siemens.Engineering.Library.MasterCopies.MasterCopyAssociation
+    Prop: ModifiedDate = 24-07-2026 20:13:41
+    Prop: OriginalLibrary = valveDemo2
+    Prop: State = Committed
+    Prop: TypeObject = Siemens.Engineering.Library.Types.LibraryType
+    Prop: VersionNumber = 0.0.4

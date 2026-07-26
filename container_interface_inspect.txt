@@ -1,0 +1,63 @@
+Item: Faceplate container_1 (Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer)
+  Prop: EventHandlers = Siemens.Engineering.HmiUnified.UI.Events.HmiFaceplateContainerEventHandlerComposition
+  Prop: Interface = Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterfaceComposition
+    SubItem: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface
+      SubProp: Parent = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+      SubProp: PropertyName = OpenCmd
+      SubProp: Value = 
+      SubProp: Dynamizations = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+      SubProp: PropertyEventHandlers = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+    SubItem: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface
+      SubProp: Parent = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+      SubProp: PropertyName = CloseCmd
+      SubProp: Value = 
+      SubProp: Dynamizations = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+      SubProp: PropertyEventHandlers = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+    SubItem: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface
+      SubProp: Parent = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+      SubProp: PropertyName = OpenFB
+      SubProp: Value = 
+      SubProp: Dynamizations = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+      SubProp: PropertyEventHandlers = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+    SubItem: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface
+      SubProp: Parent = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+      SubProp: PropertyName = ClosedFB
+      SubProp: Value = 
+      SubProp: Dynamizations = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+      SubProp: PropertyEventHandlers = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+    SubItem: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface
+      SubProp: Parent = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+      SubProp: PropertyName = Healthy
+      SubProp: Value = 
+      SubProp: Dynamizations = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+      SubProp: PropertyEventHandlers = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+    SubItem: Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface
+      SubProp: Parent = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+      SubProp: PropertyName = LocalMode
+      SubProp: Value = 
+      SubProp: Dynamizations = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+      SubProp: PropertyEventHandlers = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  Prop: Parent = Siemens.Engineering.HmiUnified.UI.Screens.HmiScreen
+  Prop: Adaption = None
+  Prop: RotationAngle = 0
+  Prop: RotationCenterPlacement = AbsoluteFromCenter
+  Prop: RotationCenterX = 0
+  Prop: RotationCenterY = 0
+  Prop: ContainedType = V0.0.4\Valve_Faceplate
+  Prop: Caption = Siemens.Engineering.HmiUnified.UI.Parts.HmiTextPart
+  Prop: CaptionColor = Color [A=255, R=145, G=147, B=154]
+  Prop: Height = 509
+  Prop: Icon = 
+  Prop: Left = -5
+  Prop: Top = -18
+  Prop: Width = 604
+  Prop: WindowFlags = None
+  Prop: CurrentQuality = None
+  Prop: Enabled = True
+  Prop: Name = Faceplate container_1
+  Prop: ShowFocusVisual = True
+  Prop: StyleItemClass = HmiFaceplateContainer
+  Prop: TabIndex = 0
+  Prop: Visible = True
+  Prop: Dynamizations = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Prop: PropertyEventHandlers = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition

@@ -1,0 +1,14 @@
+Created temporary screen.
+Created HmiFaceplateContainer.
+Set ContainedType to Valve_Faceplate_V_0_0_2.
+
+=== Interface Properties on HmiFaceplateContainer ===
+  Property Name: 'OpenCmd' | Type: 'Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface'
+  Property Name: 'CloseCmd' | Type: 'Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface'
+  Property Name: 'OpenFB' | Type: 'Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface'
+  Property Name: 'ClosedFB' | Type: 'Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface'
+  Property Name: 'Healthy' | Type: 'Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface'
+  Property Name: 'LocalMode' | Type: 'Siemens.Engineering.HmiUnified.UI.Parts.HmiFaceplateInterface'
+
+=== Dynamizations on HmiFaceplateContainer ===
+Temporary screen deleted.

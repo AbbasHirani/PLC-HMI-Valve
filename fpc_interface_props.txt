@@ -1,0 +1,43 @@
+=== Faceplate Container: FPC_V001 ===
+--- Interface Parameter ---
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  PropertyName                        String                         = OpenCmd
+  Value                               Object                         = V001_OpenCmd
+
+--- Interface Parameter ---
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  PropertyName                        String                         = CloseCmd
+  Value                               Object                         = V001_CloseCmd
+
+--- Interface Parameter ---
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  PropertyName                        String                         = OpenFB
+  Value                               Object                         = V001_OpenFB
+
+--- Interface Parameter ---
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  PropertyName                        String                         = ClosedFB
+  Value                               Object                         = V001_ClosedFB
+
+--- Interface Parameter ---
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  PropertyName                        String                         = Healthy
+  Value                               Object                         = V001_Healthy
+
+--- Interface Parameter ---
+  Dynamizations                       DynamizationBaseComposition    = Siemens.Engineering.HmiUnified.UI.Dynamization.DynamizationBaseComposition
+  Parent                              IEngineeringObject             = Siemens.Engineering.HmiUnified.UI.Controls.HmiFaceplateContainer
+  PropertyEventHandlers               PropertyEventHandlerComposition = Siemens.Engineering.HmiUnified.UI.Events.PropertyEventHandlerComposition
+  PropertyName                        String                         = LocalMode
+  Value                               Object                         = V001_LocalMode
+
