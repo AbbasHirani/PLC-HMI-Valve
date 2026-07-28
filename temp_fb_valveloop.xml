@@ -168,11 +168,6 @@
     END_IF;
 
     FOR #i := 1 TO 88 DO
-        // Auto-enable valve configuration if command is issued from HMI
-        IF &quot;Valves_DB&quot;.Valve[#i].OpenCmd OR &quot;Valves_DB&quot;.Valve[#i].CloseCmd THEN
-            &quot;Valves_DB&quot;.Valve[#i].Configured := TRUE;
-        END_IF;
-
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
             // Auto-initialize Healthy status to TRUE and Resting Position to CLOSED seat if uninitialized
             IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB AND #SimStep[#i] = 0 THEN
@@ -239,6 +234,9 @@
             ELSE
                 #tempTransit := #tempTransit + 1; // MOVING state!
             END_IF;
+        ELSE
+            &quot;Valves_DB&quot;.Valve[#i].OpenCmd := FALSE;
+            &quot;Valves_DB&quot;.Valve[#i].CloseCmd := FALSE;
         END_IF;
     END_FOR;
 
