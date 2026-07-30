@@ -74,21 +74,42 @@ namespace ValveDemoHmiBuilder
         static void Main(string[] args)
         {
             AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
-            // --popup-only  → rebuild Screen_Popup only (~30s)
-            // --screen1     → rebuild Screen_1 + Screen_Popup (skip Alarms)
-            // --alarms-only → rebuild Screen_Alarms + Screen_Popup (~40s)
-            // (no flag)     → rebuild ALL screens (~10min)
-            bool popupOnly  = Array.IndexOf(args, "--popup-only") >= 0;
-            bool screen1    = Array.IndexOf(args, "--screen1")   >= 0;
-            bool alarmsOnly = Array.IndexOf(args, "--alarms-only") >= 0;
-            try { Run(popupOnly, screen1, alarmsOnly); }
+            // --only=Home,Bilge  → rebuild just the listed screens (keys: Home, Bilge, Fwd, Aft,
+            //                       Diag, Login, Alarms). Screen_Popup is always rebuilt regardless
+            //                       — it's cheap and every screen's valve badges open it.
+            // --fix-tags         → repair pass only: re-binds HMI tag addresses that got stuck
+            //                       broken because they were created before the PLC was compiled.
+            //                       Skips PLC import and ALL screen rebuilding.
+            // (no flags)         → rebuild ALL screens (full run)
+            HashSet<string> only = null;
+            bool fixTags = false;
+            string dumpTag = null;
+            string exportBlock = null;
+            bool importOnly = false;
+            foreach (var a in args) {
+                if (a.StartsWith("--only=")) {
+                    only = new HashSet<string>(a.Substring(7).Split(','), StringComparer.OrdinalIgnoreCase);
+                } else if (a == "--fix-tags") {
+                    fixTags = true;
+                } else if (a.StartsWith("--dump-tag=")) {
+                    dumpTag = a.Substring(11);
+                } else if (a.StartsWith("--export-block=")) {
+                    exportBlock = a.Substring(15);
+                } else if (a == "--import-only") {
+                    importOnly = true;
+                }
+            }
+            try { Run(only, fixTags, dumpTag, exportBlock, importOnly); }
             catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); }
             Console.WriteLine("\nPress Enter to exit..."); try { Console.ReadLine(); } catch {}
         }
 
-        static void Run(bool popupOnly, bool screen1Only, bool alarmsOnly)
+        static bool Want(HashSet<string> only, string key) { return only == null || only.Contains(key); }
+
+        static void Run(HashSet<string> only, bool fixTags = false, string dumpTag = null, string exportBlock = null, bool importOnly = false)
         {
             var procs = TiaPortal.GetProcesses();
+            Console.WriteLine("  [DEBUG] TiaPortal.GetProcesses() found " + procs.Count + " process(es).");
             if (procs.Count == 0) { Console.WriteLine("[ERROR] TIA Portal not running."); return; }
             Console.WriteLine("Searching for active TIA Portal project...");
             TiaPortal portal = null;
@@ -96,12 +117,15 @@ namespace ValveDemoHmiBuilder
             foreach (var p in procs) {
                 try {
                     var att = p.Attach();
+                    Console.WriteLine("  [DEBUG] Attach() succeeded, Projects.Count=" + (att == null ? "null" : att.Projects.Count.ToString()));
                     if (att != null && att.Projects.Count > 0) {
                         portal = att;
                         project = att.Projects[0];
                         break;
                     }
-                } catch {}
+                } catch (Exception ex) {
+                    Console.WriteLine("  [DEBUG] Attach() threw: " + ex.GetType().Name + ": " + ex.Message);
+                }
             }
             if (portal == null || project == null) {
                 Console.WriteLine("[ERROR] Could not attach to active TIA Portal project.");
@@ -109,8 +133,65 @@ namespace ValveDemoHmiBuilder
             }
             Console.WriteLine("Attached to Project: " + project.Name);
 
+            if (fixTags) {
+                Device fixHmiDevice = FindDeviceByPartialName(project, "HMI");
+                if (fixHmiDevice == null) { Console.WriteLine("[ERROR] HMI device not found."); return; }
+                HmiSoftware fixHmi = FindHmiSoftware(fixHmiDevice);
+                if (fixHmi == null) { Console.WriteLine("[ERROR] HMI software not found."); return; }
+                Console.WriteLine("\n[FIX-TAGS] Re-binding tags that were created before the PLC was compiled...");
+                CreateSummaryHmiTags(fixHmi, true);
+                Console.WriteLine("\n=== Fix-tags complete! ===");
+                return;
+            }
+
+            if (dumpTag != null) {
+                Device dumpHmiDevice = FindDeviceByPartialName(project, "HMI");
+                if (dumpHmiDevice == null) { Console.WriteLine("[ERROR] HMI device not found."); return; }
+                HmiSoftware dumpHmi = FindHmiSoftware(dumpHmiDevice);
+                if (dumpHmi == null) { Console.WriteLine("[ERROR] HMI software not found."); return; }
+                var table = dumpHmi.TagTables.Find("ValveTags");
+                if (table == null) { Console.WriteLine("[ERROR] ValveTags table not found."); return; }
+                var tag = table.Tags.Find(dumpTag);
+                if (tag == null) { Console.WriteLine("[ERROR] Tag " + dumpTag + " not found."); return; }
+                Console.WriteLine("\n[DUMP-TAG] " + dumpTag + " (" + tag.GetType().FullName + ")");
+                foreach (var pp in tag.GetType().GetProperties()) {
+                    try {
+                        object val = pp.GetValue(tag, null);
+                        Console.WriteLine("  " + pp.Name + " (" + pp.PropertyType.Name + ", CanWrite=" + pp.CanWrite + ") = " + (val == null ? "null" : val.ToString()));
+                    } catch (Exception ex) {
+                        Console.WriteLine("  " + pp.Name + " -> [threw " + ex.GetType().Name + ": " + ex.Message + "]");
+                    }
+                }
+                Console.WriteLine("\n=== Dump-tag complete! ===");
+                return;
+            }
+
+            if (exportBlock != null) {
+                PlcSoftware plc = null;
+                foreach (Device d in project.Devices) {
+                    foreach (DeviceItem it in d.DeviceItems) {
+                        var c = it.GetService<SoftwareContainer>();
+                        if (c != null && c.Software is PlcSoftware) { plc = c.Software as PlcSoftware; break; }
+                    }
+                    if (plc != null) break;
+                }
+                if (plc == null) { Console.WriteLine("[ERROR] PlcSoftware not found."); return; }
+                var block = plc.BlockGroup.Blocks.Find(exportBlock);
+                if (block == null) { Console.WriteLine("[ERROR] Block " + exportBlock + " not found."); return; }
+                string outPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_export_" + exportBlock + ".xml";
+                block.Export(new FileInfo(outPath), ExportOptions.WithDefaults);
+                Console.WriteLine("\n[EXPORT-BLOCK] " + exportBlock + " -> " + outPath);
+                Console.WriteLine("\n=== Export-block complete! ===");
+                return;
+            }
+
             // Import updated PLC blocks (FB_ValveLoop with Configured headroom logic)
             ImportPlcBlocks(project);
+
+            if (importOnly) {
+                Console.WriteLine("\n=== Import-only complete! (PLC blocks re-imported, no HMI changes) ===");
+                return;
+            }
 
             Device hmiDevice = FindDeviceByPartialName(project, "HMI");
             if (hmiDevice == null) { Console.WriteLine("[ERROR] HMI device not found."); return; }
@@ -129,23 +210,53 @@ namespace ValveDemoHmiBuilder
             HmiScreen oldP = FindScreen(hmi, "Screen_Popup");
             if (oldP != null) { try { CleanScreen(oldP); oldP.Delete(); } catch {} }
 
-            HmiScreen scHome = RecreateScreen(hmi, "Screen_Home");
-            if (scHome != null) BuildScreenHome(scHome);
+            if (Want(only, "Home")) {
+                HmiScreen scHome = RecreateScreen(hmi, "Screen_Home");
+                if (scHome != null) BuildScreenHome(scHome);
+            } else Console.WriteLine("  Skipping Screen_Home (not in --only)...");
 
-            // HmiScreen scBilge = RecreateScreen(hmi, "Screen_Bilge");
-            // if (scBilge != null) BuildScreenBilge(scBilge);
+            // Mimic valves open the SBO popup, so it must exist alongside every screen — always
+            // rebuilt regardless of selection (cheap, ~30s, and a universal dependency).
+            EnsurePopupScreen(hmi);
 
-            // HmiScreen scFwd = RecreateScreen(hmi, "Screen_FwdBallast");
-            // if (scFwd != null) BuildScreenFwdBallast(scFwd);
+            // BuildAlarmScreen already exists (below) and was fully written previously but
+            // never actually wired into Run() — the nav bar pointed at a screen that was
+            // never created. Enabling it now that the nav is being made fully functional.
+            if (Want(only, "Alarms")) EnsureAlarmScreen(hmi);
+            else Console.WriteLine("  Skipping Screen_Alarms (not in --only)...");
 
-            // HmiScreen scAft = RecreateScreen(hmi, "Screen_AftBallast");
-            // if (scAft != null) BuildScreenAftBallast(scAft);
+            // The remaining nav targets have no dedicated screen design yet except Screen_Bilge
+            // (BuildScreenBilge). Rather than leave their nav buttons dead-clicking, each gets a
+            // minimal placeholder (header + working nav + a plain panel) so every button goes
+            // somewhere real.
+            if (Want(only, "Bilge")) {
+                HmiScreen scBilge = RecreateScreen(hmi, "Screen_Bilge");
+                if (scBilge != null) BuildScreenBilge(scBilge);
+            } else Console.WriteLine("  Skipping Screen_Bilge (not in --only)...");
 
-            // HmiScreen scAlarms = RecreateScreen(hmi, "Screen_Alarms");
-            // if (scAlarms != null) BuildMarineAlarmScreen(scAlarms);
+            if (Want(only, "Fwd")) {
+                HmiScreen scFwd = RecreateScreen(hmi, "Screen_FwdBallast");
+                if (scFwd != null) BuildPlaceholderScreen(scFwd, "Screen_FwdBallast", "FORWARD BALLAST", "Valves V029–V060");
+            } else Console.WriteLine("  Skipping Screen_FwdBallast (not in --only)...");
+
+            if (Want(only, "Aft")) {
+                HmiScreen scAft = RecreateScreen(hmi, "Screen_AftBallast");
+                if (scAft != null) BuildPlaceholderScreen(scAft, "Screen_AftBallast", "AFT BALLAST", "Valves V061–V088");
+            } else Console.WriteLine("  Skipping Screen_AftBallast (not in --only)...");
+
+            if (Want(only, "Diag")) {
+                HmiScreen scDiag = RecreateScreen(hmi, "Screen_Diagnostics");
+                if (scDiag != null) BuildPlaceholderScreen(scDiag, "Screen_Diagnostics", "DIAGNOSTICS", "System diagnostics");
+            } else Console.WriteLine("  Skipping Screen_Diagnostics (not in --only)...");
+
+            if (Want(only, "Login")) {
+                HmiScreen scLogin = RecreateScreen(hmi, "Screen_Login");
+                if (scLogin != null) BuildPlaceholderScreen(scLogin, "Screen_Login", "LOGIN", "User access control");
+            } else Console.WriteLine("  Skipping Screen_Login (not in --only)...");
 
             Console.WriteLine("\n=== Complete! ===");
-            Console.WriteLine("Screens: Home ONLY");
+            Console.WriteLine("Screens: Screen_Home, Screen_Popup, Screen_Alarms, Screen_Bilge, Screen_FwdBallast, Screen_AftBallast, Screen_Diagnostics, Screen_Login");
+            Console.WriteLine("All 7 nav bar buttons now target real screens.");
             Console.WriteLine("\nPress Enter to exit...");
         }
 
@@ -240,8 +351,8 @@ namespace ValveDemoHmiBuilder
                     "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n\n" +
                     "let st = \"MOVING\";\n" +
                     "if (!configured) st = \"UNCONFIGURED\";\n" +
-                    "else if (local) st = \"LOCAL MODE\";\n" +
                     "else if (!healthy || (open && closed)) st = \"FAULT\";\n" +
+                    "else if (local) st = \"LOCAL MODE\";\n" +
                     "else if (open && !closed) st = \"OPEN\";\n" +
                     "else if (!open && closed) st = \"CLOSED\";\n\n" +
                     "let hl = (!configured) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
@@ -283,8 +394,8 @@ namespace ValveDemoHmiBuilder
                     "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
                     "let flash      = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n\n" +
                     "if (!configured) return 0xFF8E8E93;\n" +
-                    "if (local) return 0xFFFF9F0A;\n" +
                     "if (!healthy || (open && closed)) return flash ? 0xFFFF0000 : 0xFF3A0000;\n" +
+                    "if (local) return 0xFFFF9F0A;\n" +
                     "if (open && !closed) return 0xFF32C785;\n" +
                     "if (!open && closed) return 0xFF4B5563;\n" +
                     "return 0xFF00A2FF;\n";
@@ -311,8 +422,8 @@ namespace ValveDemoHmiBuilder
                     "let closed     = readTag(Tags(vTag + \"_ClosedFB\").Read());\n" +
                     "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n\n" +
                     "if (!configured) return \"⬤  UNCONFIGURED\";\n" +
-                    "if (local) return \"⬤  LOCAL MODE\";\n" +
                     "if (!healthy || (open && closed)) return \"⬤  FAULT\";\n" +
+                    "if (local) return \"⬤  LOCAL MODE\";\n" +
                     "if (open && !closed) return \"⬤  FULLY OPEN\";\n" +
                     "if (!open && closed) return \"⬤  FULLY CLOSED\";\n" +
                     "return \"⬤  MOVING\";\n";
@@ -592,8 +703,8 @@ namespace ValveDemoHmiBuilder
             btnRet.Width = 480; btnRet.Height = 64;
             btnRet.BackColor = TEAL; btnRet.ForeColor = Color.Black;
             btnRet.BorderColor = Color.White; btnRet.BorderWidth = 2;
-            SetMLText(btnRet, "Text", "▲ RETURN TO OVERVIEW (SCREEN_1)");
-            AddNavScript(btnRet, "Screen_1");
+            SetMLText(btnRet, "Text", "▲ RETURN TO OVERVIEW");
+            AddNavScript(btnRet, "Screen_Home");
 
             Console.WriteLine("  Screen_Alarms built successfully.");
         }
@@ -704,7 +815,7 @@ namespace ValveDemoHmiBuilder
             btnOv.ForeColor = isOverview ? Color.Black : TEAL;
             btnOv.BorderColor = TEAL; btnOv.BorderWidth = 1;
             SetMLText(btnOv, "Text", "Overview");
-            AddNavScript(btnOv, "Screen_1");
+            AddNavScript(btnOv, "Screen_Home");
 
             var btnAl = sc.ScreenItems.Create<HmiButton>("Nav_Alarms");
             btnAl.Left = SCREEN_W - 122; btnAl.Top = 8;
@@ -848,11 +959,19 @@ namespace ValveDemoHmiBuilder
                         "Tags(vTag + \"_OpenCmd\").Write(false);\n" +
                         "Tags(vTag + \"_CloseCmd\").Write(true);";
                 } else if (action == "ResetFault") {
-                    scriptBody = 
+                    // Just writing Healthy:=true isn't enough for a double-indication fault
+                    // (OpenFB && ClosedFB both true) — FB_ValveLoop re-derives Healthy:=false from
+                    // that same condition every scan, so the reset would be undone before the
+                    // operator even saw it. Clearing both feedback bits actually resolves the root
+                    // cause: the valve shows MOVING/unknown position until commanded again, which
+                    // is the honest state after a sensor conflict.
+                    scriptBody =
                         helper +
                         "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
                         "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
-                        "Tags(vTag + \"_Healthy\").Write(true);";
+                        "Tags(vTag + \"_Healthy\").Write(true);\n" +
+                        "Tags(vTag + \"_OpenFB\").Write(false);\n" +
+                        "Tags(vTag + \"_ClosedFB\").Write(false);";
                 } else if (action == "ToggleService") {
                     scriptBody = 
                         helper +
@@ -876,17 +995,10 @@ namespace ValveDemoHmiBuilder
                 PropertyInfo evProp = null;
                 foreach (var p in btn.GetType().GetProperties())
                     if (p.Name == "EventHandlers") { evProp = p; if (p.DeclaringType == btn.GetType()) break; }
-                if (evProp == null) return;
+                if (evProp == null) { Console.WriteLine("  [PopupScript ERR] No EventHandlers property on " + btn.GetType().Name); return; }
                 object evObj = evProp.GetValue(btn, null);
-                Type evEnum = null;
-                foreach (var t in btn.GetType().Assembly.GetTypes())
-                    if (t.Name == "HmiButtonEventType") { evEnum = t; break; }
-                if (evEnum == null) return;
-                object evVal = Enum.Parse(evEnum, "Tapped");
-                var cm = evObj.GetType().GetMethod("Create", new Type[]{ evEnum });
-                if (cm == null) return;
-                object handler = cm.Invoke(evObj, new object[]{ evVal });
-                if (handler == null) return;
+                object handler = CreateTappedHandler(evObj);
+                if (handler == null) { Console.WriteLine("  [PopupScript ERR] Could not create Tapped handler for " + vTag); return; }
                 var sp = handler.GetType().GetProperty("Script");
                 object script = sp.GetValue(handler, null);
                 var scp = script.GetType().GetProperty("ScriptCode");
@@ -913,17 +1025,10 @@ namespace ValveDemoHmiBuilder
                 PropertyInfo evProp = null;
                 foreach (var p in btn.GetType().GetProperties())
                     if (p.Name == "EventHandlers") { evProp = p; if (p.DeclaringType == btn.GetType()) break; }
-                if (evProp == null) return;
+                if (evProp == null) { Console.WriteLine("  [MasterReset ERR] No EventHandlers property on " + btn.GetType().Name); return; }
                 object evObj = evProp.GetValue(btn, null);
-                Type evEnum = null;
-                foreach (var t in btn.GetType().Assembly.GetTypes())
-                    if (t.Name == "HmiButtonEventType") { evEnum = t; break; }
-                if (evEnum == null) return;
-                object evVal = Enum.Parse(evEnum, "Tapped");
-                var cm = evObj.GetType().GetMethod("Create", new Type[]{ evEnum });
-                if (cm == null) return;
-                object handler = cm.Invoke(evObj, new object[]{ evVal });
-                if (handler == null) return;
+                object handler = CreateTappedHandler(evObj);
+                if (handler == null) { Console.WriteLine("  [MasterReset ERR] Could not create Tapped handler"); return; }
                 var sp = handler.GetType().GetProperty("Script");
                 object script = sp.GetValue(handler, null);
                 var scp = script.GetType().GetProperty("ScriptCode");
@@ -999,29 +1104,41 @@ namespace ValveDemoHmiBuilder
             }
         }
 
+        // Finds whatever enum type the item's own EventHandlers.Create() method actually takes,
+        // instead of guessing a hardcoded type name (e.g. "HmiButtonEventType") that only exists
+        // for some widget types — HmiEllipse's is HmiEllipseEventType, HmiRectangle's is
+        // HmiRectangleEventType, etc. A wrong guess makes Create() lookup fail and the whole
+        // method silently return with the click never wired — this is what that bug looked like.
+        static object CreateTappedHandler(object evObj)
+        {
+            foreach (var m in evObj.GetType().GetMethods()) {
+                if (m.Name != "Create") continue;
+                var ps = m.GetParameters();
+                if (ps.Length != 1 || !ps[0].ParameterType.IsEnum) continue;
+                object evVal;
+                try { evVal = Enum.Parse(ps[0].ParameterType, "Tapped"); }
+                catch { continue; }
+                return m.Invoke(evObj, new object[] { evVal });
+            }
+            return null;
+        }
+
         static void AddNavScript(HmiButton btn, string targetScreen)
         {
             try {
                 PropertyInfo evProp = null;
                 foreach (var p in btn.GetType().GetProperties())
                     if (p.Name == "EventHandlers") { evProp = p; if (p.DeclaringType == btn.GetType()) break; }
-                if (evProp == null) return;
+                if (evProp == null) { Console.WriteLine("  [NavScript ERR] No EventHandlers property on " + btn.GetType().Name); return; }
                 object evObj = evProp.GetValue(btn, null);
-                Type evEnum = null;
-                foreach (var t in btn.GetType().Assembly.GetTypes())
-                    if (t.Name == "HmiButtonEventType") { evEnum = t; break; }
-                if (evEnum == null) return;
-                object evVal = Enum.Parse(evEnum, "Tapped");
-                var cm = evObj.GetType().GetMethod("Create", new Type[]{ evEnum });
-                if (cm == null) return;
-                object handler = cm.Invoke(evObj, new object[]{ evVal });
-                if (handler == null) return;
+                object handler = CreateTappedHandler(evObj);
+                if (handler == null) { Console.WriteLine("  [NavScript ERR] Could not create Tapped handler for " + btn.GetType().Name); return; }
                 var sp = handler.GetType().GetProperty("Script");
                 object script = sp.GetValue(handler, null);
                 var scp = script.GetType().GetProperty("ScriptCode");
                 if (scp != null && scp.CanWrite)
                     scp.SetValue(script, "HMIRuntime.UI.SysFct.ChangeScreen(\"" + targetScreen + "\", \"~\");", null);
-            } catch {}
+            } catch (Exception ex) { Console.WriteLine("  [NavScript ERR] " + ex.Message); }
         }
 
         static void SetPropEnum(object obj, string propName, string enumValueName)
@@ -1083,27 +1200,60 @@ namespace ValveDemoHmiBuilder
                     string loopPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_fb_valveloop.xml";
                     Console.WriteLine("  [PLC] Importing FB_ValveLoop from " + loopPath + "...");
                     var loopBlock = plc.BlockGroup.Blocks.Import(new FileInfo(loopPath), ImportOptions.Override);
-                    if (loopBlock != null && loopBlock.Count > 0) 
+                    if (loopBlock != null && loopBlock.Count > 0)
                         Console.WriteLine("  [PLC] Import successful: " + loopBlock[0].Name);
                 } catch (Exception ex) {
                     Console.WriteLine("  [PLC] (Skipping FB_ValveLoop re-import - PLC is online or block exists)");
+                }
+
+                // Import Valve_Meta_DB — manually-maintained Name/Location per valve, not
+                // written by any script. Sized for all 88 valves so future zone screens
+                // (Bilge/ER first) reuse it without another PLC change.
+                try {
+                    string metaPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_valve_meta_db.xml";
+                    Console.WriteLine("  [PLC] Importing Valve_Meta_DB from " + metaPath + "...");
+                    var metaBlock = plc.BlockGroup.Blocks.Import(new FileInfo(metaPath), ImportOptions.Override);
+                    if (metaBlock != null && metaBlock.Count > 0)
+                        Console.WriteLine("  [PLC] Import successful: " + metaBlock[0].Name);
+                } catch (Exception ex) {
+                    Console.WriteLine("  [PLC] (Skipping Valve_Meta_DB re-import - PLC is online or block exists)");
                 }
             } catch (Exception ex) {
                 Console.WriteLine("  [PLC] Skipping PLC block import: " + ex.Message);
             }
         }
 
-        static void CreateSummaryHmiTags(HmiSoftware hmi)
+        static void CreateSummaryHmiTags(HmiSoftware hmi, bool forceRefreshNewTags = false)
         {
             Console.WriteLine("\n[STEP 2] Checking and creating HMI tags for all 88 valves...");
             // SelectedValve is an INTERNAL HMI tag - no PLC address, just holds the selected index
             CreateInternalTag(hmi, "SelectedValve", "Int");
+            // BilgePage tracks which page (0 or 1) of the Bilge valve table is currently shown —
+            // internal only, no PLC binding, same pattern as SelectedValve.
+            CreateInternalTag(hmi, "BilgePage", "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalOpen",   "Valves_DB.TotalOpen",   "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalClosed", "Valves_DB.TotalClosed", "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalTransit","Valves_DB.TotalTransit","Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalFault",  "Valves_DB.TotalFault",  "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalLocal",  "Valves_DB.TotalLocal",  "Int");
+            // forceRefreshNewTags: these tags (plus the zone sub-totals and Name/Location below)
+            // were originally created in the same run that imported the PLC blocks but before
+            // the PLC was ever compiled, so their address binding never resolved and is stuck
+            // broken ("PLC tag is invalid" in the HMI compiler) no matter how many times the PLC
+            // is compiled afterward. Re-setting the address now that the PLC is properly
+            // compiled fixes it. The 7 pre-existing tags above never had this problem, so they
+            // stay on the normal skip-if-exists path.
+            CreateSummaryTag(hmi, "Valves_DB_TotalConfigured", "Valves_DB.TotalConfigured", "Int", forceRefreshNewTags);
             CreateSummaryTag(hmi, "Valves_DB_Clock1Hz",    "Valves_DB.Clock_1Hz",   "Bool");
+
+            // Per-zone sub-totals — FB_ValveLoop computes these in the same 1..88 pass that
+            // already builds the plant-wide totals above, so each KPI/caption cell on
+            // Screen_Home can read one tag instead of looping its zone's valves itself.
+            string[] zonePfx = { "Er", "Fwd", "Aft" };
+            string[] statSuf = { "Open", "Closed", "Transit", "Fault", "Local", "Configured" };
+            foreach (var zp in zonePfx)
+                foreach (var st in statSuf)
+                    CreateSummaryTag(hmi, "Valves_DB_" + zp + st, "Valves_DB." + zp + st, "Int", forceRefreshNewTags);
 
             Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 88 valves...");
             for (int i = 1; i <= VALVE_COUNT; i++) {
@@ -1116,19 +1266,32 @@ namespace ValveDemoHmiBuilder
                 CreateSummaryTag(hmi, vTag + "_ClosedFB",   plcPrefix + ".ClosedFB",   "Bool");
                 CreateSummaryTag(hmi, vTag + "_Healthy",    plcPrefix + ".Healthy",    "Bool");
                 CreateSummaryTag(hmi, vTag + "_LocalMode",  plcPrefix + ".LocalMode",  "Bool");
+                // Manually-maintained reference data (Valve_Meta_DB) — not written by any
+                // script; an engineer fills these in by hand. Built for all 88 now so every
+                // future zone screen (not just Bilge/ER) can reuse them without another pass.
+                CreateSummaryTag(hmi, vTag + "_Name",     "Valve_Meta_DB.Name[" + i + "]",     "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_Location", "Valve_Meta_DB.Location[" + i + "]", "String", forceRefreshNewTags);
             }
         }
 
         // Creates an HMI tag that IS connected to a PLC tag
-        static void CreateSummaryTag(HmiSoftware hmi, string tagName, string plcAddress, string dataType = "Int")
+        static void CreateSummaryTag(HmiSoftware hmi, string tagName, string plcAddress, string dataType = "Int", bool forceRefresh = false)
         {
             try {
                 var table = hmi.TagTables.Find("ValveTags");
                 if (table == null) { table = hmi.TagTables.Create("ValveTags"); Console.WriteLine("  Created tag table: ValveTags"); }
-                
+
                 var tag = table.Tags.Find(tagName);
+                // Existing tags never need their address/connection/type touched again —
+                // re-setting all three on all 616 valve tags every run was costing
+                // ~1800 redundant Openness round-trips (the dominant cost per call,
+                // since there's no bulk-write API) on every single rebuild.
+                // forceRefresh bypasses this: tags created while the PLC block existed but
+                // wasn't yet compiled get their address bound to nothing and stay broken
+                // forever — re-setting the address after the PLC is properly compiled fixes it.
+                if (tag != null && !forceRefresh) return;
                 if (tag == null) tag = table.Tags.Create(tagName, "ValveTags");
-                
+
                 // Try all known property names for the PLC address field
                 bool addressSet = false;
                 foreach (var propName in new string[]{ "LogicalAddress", "PlcTag", "Address", "TagAddress" }) {
@@ -1164,8 +1327,8 @@ namespace ValveDemoHmiBuilder
             try {
                 var table = hmi.TagTables.Find("ValveTags");
                 if (table == null) { table = hmi.TagTables.Create("ValveTags"); }
-                var tag = table.Tags.Find(tagName);
-                if (tag == null) tag = table.Tags.Create(tagName, "ValveTags");
+                if (table.Tags.Find(tagName) != null) return; // already exists, nothing to do
+                var tag = table.Tags.Create(tagName, "ValveTags");
                 // Do NOT set Connection or address - internal tag has no PLC binding
                 try {
                     var dtProp = tag.GetType().GetProperty("DataType");

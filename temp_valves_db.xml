@@ -94,6 +94,30 @@
     <Member Name="TotalTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="TotalFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="TotalLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="TotalConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <!-- Per-zone sub-totals: FB_ValveLoop already iterates 1..88 every scan to build the
+         plant-wide totals above, so computing these zone-scoped versions in the same pass
+         costs nothing extra. Each HMI KPI/caption cell reads one of these directly instead
+         of looping 28-32 valves itself, which is what was making Screen_Home's tables slow
+         to repopulate after every screen switch. -->
+    <Member Name="ErOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="ErClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="ErTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="ErFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="ErLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="ErConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="FwdOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="FwdClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="FwdTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="FwdFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="FwdLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="FwdConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="AftOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="AftClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="AftTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="AftFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="AftLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="AftConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="Clock_1Hz" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="ClockCounter" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
   </Section>

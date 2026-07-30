@@ -51,56 +51,6 @@
   <Section Name="Output" />
   <Section Name="InOut" />
   <Section Name="Static">
-    <Member Name="LogicInstance" Datatype="&quot;FB_ValveLogic&quot;" Accessibility="Public">
-      <AttributeList>
-        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
-        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
-        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
-        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
-      </AttributeList>
-      <Sections>
-        <Section Name="Input" />
-        <Section Name="Output" />
-        <Section Name="InOut">
-          <Member Name="Valve" Datatype="&quot;Valve_IO&quot;">
-            <Sections>
-              <Section Name="None">
-                <Member Name="Configured" Datatype="Bool" />
-                <Member Name="OpenCmd" Datatype="Bool" />
-                <Member Name="CloseCmd" Datatype="Bool" />
-                <Member Name="LocalMode" Datatype="Bool" />
-                <Member Name="Healthy" Datatype="Bool" />
-                <Member Name="OpenFB" Datatype="Bool" />
-                <Member Name="ClosedFB" Datatype="Bool" />
-                <Member Name="OpenValve" Datatype="Bool" />
-                <Member Name="CloseValve" Datatype="Bool" />
-                <Member Name="TimerOpen" Datatype="TON_TIME" Version="1.0">
-                  <Sections>
-                    <Section Name="None">
-                      <Member Name="PT" Datatype="Time" />
-                      <Member Name="ET" Datatype="Time" />
-                      <Member Name="IN" Datatype="Bool" />
-                      <Member Name="Q" Datatype="Bool" />
-                    </Section>
-                  </Sections>
-                </Member>
-                <Member Name="TimerClose" Datatype="TON_TIME" Version="1.0">
-                  <Sections>
-                    <Section Name="None">
-                      <Member Name="PT" Datatype="Time" />
-                      <Member Name="ET" Datatype="Time" />
-                      <Member Name="IN" Datatype="Bool" />
-                      <Member Name="Q" Datatype="Bool" />
-                    </Section>
-                  </Sections>
-                </Member>
-              </Section>
-            </Sections>
-          </Member>
-        </Section>
-        <Section Name="Static" />
-      </Sections>
-    </Member>
     <Member Name="i" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
@@ -124,6 +74,25 @@
     <Member Name="tempTransit" Datatype="Int" />
     <Member Name="tempFault" Datatype="Int" />
     <Member Name="tempLocal" Datatype="Int" />
+    <Member Name="tempConfigured" Datatype="Int" />
+    <Member Name="tempErOpen" Datatype="Int" />
+    <Member Name="tempErClosed" Datatype="Int" />
+    <Member Name="tempErTransit" Datatype="Int" />
+    <Member Name="tempErFault" Datatype="Int" />
+    <Member Name="tempErLocal" Datatype="Int" />
+    <Member Name="tempErConfigured" Datatype="Int" />
+    <Member Name="tempFwdOpen" Datatype="Int" />
+    <Member Name="tempFwdClosed" Datatype="Int" />
+    <Member Name="tempFwdTransit" Datatype="Int" />
+    <Member Name="tempFwdFault" Datatype="Int" />
+    <Member Name="tempFwdLocal" Datatype="Int" />
+    <Member Name="tempFwdConfigured" Datatype="Int" />
+    <Member Name="tempAftOpen" Datatype="Int" />
+    <Member Name="tempAftClosed" Datatype="Int" />
+    <Member Name="tempAftTransit" Datatype="Int" />
+    <Member Name="tempAftFault" Datatype="Int" />
+    <Member Name="tempAftLocal" Datatype="Int" />
+    <Member Name="tempAftConfigured" Datatype="Int" />
   </Section>
   <Section Name="Constant" />
 </Sections></Interface>
@@ -159,6 +128,10 @@
     #tempTransit := 0;
     #tempFault := 0;
     #tempLocal := 0;
+    #tempConfigured := 0;
+    #tempErOpen := 0;    #tempErClosed := 0;    #tempErTransit := 0;    #tempErFault := 0;    #tempErLocal := 0;    #tempErConfigured := 0;
+    #tempFwdOpen := 0;   #tempFwdClosed := 0;   #tempFwdTransit := 0;   #tempFwdFault := 0;   #tempFwdLocal := 0;   #tempFwdConfigured := 0;
+    #tempAftOpen := 0;   #tempAftClosed := 0;   #tempAftTransit := 0;   #tempAftFault := 0;   #tempAftLocal := 0;   #tempAftConfigured := 0;
 
     // 1Hz Flashing Clock Generator (Toggles every ~500ms)
     &quot;Valves_DB&quot;.ClockCounter := &quot;Valves_DB&quot;.ClockCounter + 1;
@@ -187,52 +160,88 @@
                     // Start OPENING sequence: Immediately leave seat -> MOVING!
                     &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
                     &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
-                    #SimStep[#i] := 1; // Start motion timer
+                    #SimStep[#i] := 1; // 1 = opening in progress
                     &quot;Valves_DB&quot;.Valve[#i].OpenCmd := FALSE;
                     &quot;Valves_DB&quot;.Valve[#i].CloseCmd := FALSE;
                 ELSIF &quot;Valves_DB&quot;.Valve[#i].CloseCmd THEN
                     // Start CLOSING sequence: Immediately leave seat -> MOVING!
                     &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
                     &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
-                    #SimStep[#i] := 101; // Start motion timer
+                    #SimStep[#i] := 2; // 2 = closing in progress
                     &quot;Valves_DB&quot;.Valve[#i].CloseCmd := FALSE;
                     &quot;Valves_DB&quot;.Valve[#i].OpenCmd := FALSE;
                 END_IF;
             END_IF;
 
-            // 2. Motion Delay Execution (Simulating 3.0-second travel delay: 30 scan cycles)
-            IF #SimStep[#i] &gt; 0 AND #SimStep[#i] &lt; 30 THEN
-                #SimStep[#i] := #SimStep[#i] + 1;
-            ELSIF #SimStep[#i] = 30 THEN
+            // 2. Motion Delay Execution — real 3.0s TON per valve (Valve[i].TimerOpen/Close
+            // are dedicated instances since they live inside this array element). Scan-cycle
+            // counting was used before; it only equalled 3.0s if every scan took exactly
+            // 100ms, which isn't guaranteed, so the MOVING state could flash by in well
+            // under a second on a fast scan. A TON runs on the CPU's real-time clock, so
+            // this duration is exact regardless of scan speed.
+            &quot;Valves_DB&quot;.Valve[#i].TimerOpen(IN := #SimStep[#i] = 1, PT := T#3S);
+            IF #SimStep[#i] = 1 AND &quot;Valves_DB&quot;.Valve[#i].TimerOpen.Q THEN
                 &quot;Valves_DB&quot;.Valve[#i].OpenFB := TRUE;   // Reached OPEN position!
                 &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
                 #SimStep[#i] := 0;                       // Sequence complete
-            ELSIF #SimStep[#i] &gt; 100 AND #SimStep[#i] &lt; 130 THEN
-                #SimStep[#i] := #SimStep[#i] + 1;
-            ELSIF #SimStep[#i] = 130 THEN
+            END_IF;
+
+            &quot;Valves_DB&quot;.Valve[#i].TimerClose(IN := #SimStep[#i] = 2, PT := T#3S);
+            IF #SimStep[#i] = 2 AND &quot;Valves_DB&quot;.Valve[#i].TimerClose.Q THEN
                 &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE; // Reached CLOSED position!
                 &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
                 #SimStep[#i] := 0;                       // Sequence complete
             END_IF;
 
-            #LogicInstance(Valve := &quot;Valves_DB&quot;.Valve[#i]);
-            
             // 3. Failsafe Double Indication Fault Check
             IF &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
                 &quot;Valves_DB&quot;.Valve[#i].Healthy := FALSE; // Trip Fault
             END_IF;
 
-            // 4. Priority Summary Counting
+            // 4. Priority Summary Counting — plant-wide AND per-zone in the same pass
+            // (this loop already runs 1..88 every scan regardless, so the zone-scoped
+            // increments below are free — they're what let every HMI KPI/caption cell
+            // read one tag instead of re-looping its zone's 28-32 valves itself).
+            // Zone valve-number ranges: ER=1-28, FWD=29-60, AFT=61-88.
+            #tempConfigured := #tempConfigured + 1;
+            IF #i &lt;= 28 THEN
+                #tempErConfigured := #tempErConfigured + 1;
+            ELSIF #i &lt;= 60 THEN
+                #tempFwdConfigured := #tempFwdConfigured + 1;
+            ELSE
+                #tempAftConfigured := #tempAftConfigured + 1;
+            END_IF;
+
             IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy OR (&quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB) THEN
                 #tempFault := #tempFault + 1;
+                IF #i &lt;= 28 THEN #tempErFault := #tempErFault + 1;
+                ELSIF #i &lt;= 60 THEN #tempFwdFault := #tempFwdFault + 1;
+                ELSE #tempAftFault := #tempAftFault + 1;
+                END_IF;
             ELSIF &quot;Valves_DB&quot;.Valve[#i].LocalMode THEN
                 #tempLocal := #tempLocal + 1;
+                IF #i &lt;= 28 THEN #tempErLocal := #tempErLocal + 1;
+                ELSIF #i &lt;= 60 THEN #tempFwdLocal := #tempFwdLocal + 1;
+                ELSE #tempAftLocal := #tempAftLocal + 1;
+                END_IF;
             ELSIF &quot;Valves_DB&quot;.Valve[#i].OpenFB AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
                 #tempOpen := #tempOpen + 1;
+                IF #i &lt;= 28 THEN #tempErOpen := #tempErOpen + 1;
+                ELSIF #i &lt;= 60 THEN #tempFwdOpen := #tempFwdOpen + 1;
+                ELSE #tempAftOpen := #tempAftOpen + 1;
+                END_IF;
             ELSIF NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
                 #tempClosed := #tempClosed + 1;
+                IF #i &lt;= 28 THEN #tempErClosed := #tempErClosed + 1;
+                ELSIF #i &lt;= 60 THEN #tempFwdClosed := #tempFwdClosed + 1;
+                ELSE #tempAftClosed := #tempAftClosed + 1;
+                END_IF;
             ELSE
                 #tempTransit := #tempTransit + 1; // MOVING state!
+                IF #i &lt;= 28 THEN #tempErTransit := #tempErTransit + 1;
+                ELSIF #i &lt;= 60 THEN #tempFwdTransit := #tempFwdTransit + 1;
+                ELSE #tempAftTransit := #tempAftTransit + 1;
+                END_IF;
             END_IF;
         ELSE
             &quot;Valves_DB&quot;.Valve[#i].OpenCmd := FALSE;
@@ -245,6 +254,28 @@
     &quot;Valves_DB&quot;.TotalTransit := #tempTransit;
     &quot;Valves_DB&quot;.TotalFault := #tempFault;
     &quot;Valves_DB&quot;.TotalLocal := #tempLocal;
+    &quot;Valves_DB&quot;.TotalConfigured := #tempConfigured;
+
+    &quot;Valves_DB&quot;.ErOpen := #tempErOpen;
+    &quot;Valves_DB&quot;.ErClosed := #tempErClosed;
+    &quot;Valves_DB&quot;.ErTransit := #tempErTransit;
+    &quot;Valves_DB&quot;.ErFault := #tempErFault;
+    &quot;Valves_DB&quot;.ErLocal := #tempErLocal;
+    &quot;Valves_DB&quot;.ErConfigured := #tempErConfigured;
+
+    &quot;Valves_DB&quot;.FwdOpen := #tempFwdOpen;
+    &quot;Valves_DB&quot;.FwdClosed := #tempFwdClosed;
+    &quot;Valves_DB&quot;.FwdTransit := #tempFwdTransit;
+    &quot;Valves_DB&quot;.FwdFault := #tempFwdFault;
+    &quot;Valves_DB&quot;.FwdLocal := #tempFwdLocal;
+    &quot;Valves_DB&quot;.FwdConfigured := #tempFwdConfigured;
+
+    &quot;Valves_DB&quot;.AftOpen := #tempAftOpen;
+    &quot;Valves_DB&quot;.AftClosed := #tempAftClosed;
+    &quot;Valves_DB&quot;.AftTransit := #tempAftTransit;
+    &quot;Valves_DB&quot;.AftFault := #tempAftFault;
+    &quot;Valves_DB&quot;.AftLocal := #tempAftLocal;
+    &quot;Valves_DB&quot;.AftConfigured := #tempAftConfigured;
   </Text>
 </StructuredText></NetworkSource>
           <ProgrammingLanguage>SCL</ProgrammingLanguage>
