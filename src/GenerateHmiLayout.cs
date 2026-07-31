@@ -11,10 +11,12 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.HmiUnified;
+using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HmiUnified.UI.Screens;
 using Siemens.Engineering.HmiUnified.UI.Base;
 using Siemens.Engineering.HmiUnified.UI.Widgets;
 using Siemens.Engineering.HmiUnified.UI.Shapes;
+using Siemens.Engineering.HmiUnified.UI.Controls;
 using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 
@@ -101,7 +103,8 @@ namespace ValveDemoHmiBuilder
             }
             try { Run(only, fixTags, dumpTag, exportBlock, importOnly); }
             catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); }
-            Console.WriteLine("\nPress Enter to exit..."); try { Console.ReadLine(); } catch {}
+            Console.WriteLine("\nPress Enter to exit..."); 
+            if (!Console.IsInputRedirected) { try { Console.ReadLine(); } catch {} }
         }
 
         static bool Want(HashSet<string> only, string key) { return only == null || only.Contains(key); }
@@ -225,29 +228,31 @@ namespace ValveDemoHmiBuilder
             if (Want(only, "Alarms")) EnsureAlarmScreen(hmi);
             else Console.WriteLine("  Skipping Screen_Alarms (not in --only)...");
 
-            // The remaining nav targets have no dedicated screen design yet except Screen_Bilge
-            // (BuildScreenBilge). Rather than leave their nav buttons dead-clicking, each gets a
-            // minimal placeholder (header + working nav + a plain panel) so every button goes
-            // somewhere real.
+            // The remaining nav targets have no dedicated screen design yet.
+            // Rather than leave their nav buttons dead-clicking, each gets a
             if (Want(only, "Bilge")) {
                 HmiScreen scBilge = RecreateScreen(hmi, "Screen_Bilge");
-                if (scBilge != null) BuildScreenBilge(scBilge);
+                if (scBilge != null) BuildZoneScreen(scBilge, "Screen_Bilge", "BILGE AND FIRE", 29, 56, "Er", 14);
             } else Console.WriteLine("  Skipping Screen_Bilge (not in --only)...");
 
             if (Want(only, "Fwd")) {
                 HmiScreen scFwd = RecreateScreen(hmi, "Screen_FwdBallast");
-                if (scFwd != null) BuildPlaceholderScreen(scFwd, "Screen_FwdBallast", "FORWARD BALLAST", "Valves V029–V060");
+                if (scFwd != null) BuildZoneScreen(scFwd, "Screen_FwdBallast", "FORWARD BALLAST", 57, 88, "Fwd", 16);
             } else Console.WriteLine("  Skipping Screen_FwdBallast (not in --only)...");
 
             if (Want(only, "Aft")) {
                 HmiScreen scAft = RecreateScreen(hmi, "Screen_AftBallast");
-                if (scAft != null) BuildPlaceholderScreen(scAft, "Screen_AftBallast", "AFT BALLAST", "Valves V061–V088");
+                if (scAft != null) BuildZoneScreen(scAft, "Screen_AftBallast", "AFT BALLAST", 1, 28, "Aft", 14);
             } else Console.WriteLine("  Skipping Screen_AftBallast (not in --only)...");
 
             if (Want(only, "Diag")) {
                 HmiScreen scDiag = RecreateScreen(hmi, "Screen_Diagnostics");
                 if (scDiag != null) BuildPlaceholderScreen(scDiag, "Screen_Diagnostics", "DIAGNOSTICS", "System diagnostics");
             } else Console.WriteLine("  Skipping Screen_Diagnostics (not in --only)...");
+
+            if (Want(only, "Alarms") || Want(only, "DiscreteAlarms")) {
+                CreateAlarms(hmi, "Valves_DB");
+            }
 
             if (Want(only, "Login")) {
                 HmiScreen scLogin = RecreateScreen(hmi, "Screen_Login");
@@ -268,9 +273,10 @@ namespace ValveDemoHmiBuilder
                 try {
                     CleanScreen(existing);
                     existing.Delete();
-                } catch {
-                    CleanScreen(existing);
-                    return existing;
+                } catch (Exception ex) {
+                    Console.WriteLine("[ERROR] Could not delete existing screen " + screenName + ": " + ex.Message);
+                    Console.WriteLine("Please close the screen in the TIA Portal UI before running the build.");
+                    throw;
                 }
             }
 
@@ -430,17 +436,17 @@ namespace ValveDemoHmiBuilder
                 slDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
             } catch {}
 
-            // ─── RESET FAULT Button (Left=25, Y=292, Width=195, Height=46) ───────────
+            // ─── RESET FAULT Button (Left=15, Y=292, Width=138, Height=46) ───────────
             var btnReset = sc.ScreenItems.Create<HmiButton>("Btn_Reset");
-            btnReset.Left = 25; btnReset.Top = 292; btnReset.Width = 195; btnReset.Height = 46;
+            btnReset.Left = 15; btnReset.Top = 292; btnReset.Width = 138; btnReset.Height = 46;
             btnReset.BackColor = Color.FromArgb(255, 194, 65, 12); btnReset.ForeColor = Color.White;
             btnReset.BorderColor = Color.FromArgb(255, 249, 115, 22); btnReset.BorderWidth = 2;
             SetMLText(btnReset, "Text", "⚡ RESET FAULT");
             AddPopupActionButton(btnReset, "ResetFault");
 
-            // ─── SERVICE ON/OFF Toggle Switch (Left=235, Y=292, Width=195, Height=46) ──
+            // ─── SERVICE ON/OFF Toggle Switch (Left=160, Y=292, Width=138, Height=46) ──
             var btnService = sc.ScreenItems.Create<HmiButton>("Btn_Service");
-            btnService.Left = 235; btnService.Top = 292; btnService.Width = 195; btnService.Height = 46;
+            btnService.Left = 160; btnService.Top = 292; btnService.Width = 138; btnService.Height = 46;
             btnService.BackColor = Color.FromArgb(255, 58, 58, 60); btnService.ForeColor = Color.White;
             btnService.BorderColor = TEAL; btnService.BorderWidth = 2;
             SetMLText(btnService, "Text", "🛠️ SERVICE:  OFF");
@@ -468,6 +474,36 @@ namespace ValveDemoHmiBuilder
                 srvBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
             } catch {}
 
+            // ─── SIMULATE STUCK Toggle Switch (Left=305, Y=292, Width=140, Height=46) ──
+            var btnStuck = sc.ScreenItems.Create<HmiButton>("Btn_Stuck");
+            btnStuck.Left = 305; btnStuck.Top = 292; btnStuck.Width = 140; btnStuck.Height = 46;
+            btnStuck.BackColor = Color.FromArgb(255, 58, 58, 60); btnStuck.ForeColor = Color.White;
+            btnStuck.BorderColor = Color.FromArgb(255, 234, 179, 8); btnStuck.BorderWidth = 2;
+            SetMLText(btnStuck, "Text", "⚠️ STUCK: OFF");
+            AddPopupActionButton(btnStuck, "ToggleStuck");
+            try {
+                var stkDyn = btnStuck.Dynamizations.Create<ScriptDynamization>("Text");
+                stkDyn.ScriptCode =
+                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
+                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
+                    "let vTag = \"V\" + vNum;\n" +
+                    "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
+                    "return stk ? \"⚠️ STUCK: ON\" : \"⚠️ STUCK: OFF\";\n";
+                stkDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+            } catch {}
+            try {
+                var stkBg = btnStuck.Dynamizations.Create<ScriptDynamization>("BackColor");
+                stkBg.ScriptCode =
+                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
+                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
+                    "let vTag = \"V\" + vNum;\n" +
+                    "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
+                    "return stk ? 0xFF00A2FF : 0xFF3A3A3C;\n";
+                stkBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+            } catch {}
+
             Console.WriteLine("  Screen_Popup built: Direct PLC tag reading for live status, bracket-notation close button.");
         }
 
@@ -475,237 +511,68 @@ namespace ValveDemoHmiBuilder
         {
             Console.WriteLine("  Building 1920x1080 Alarm & Fault Diagnostics layout on Screen_Alarms...");
 
-            // 1. Background canvas
-            MakeRect(sc, "Al_BG", 0, 0, SCREEN_W, SCREEN_H, BG_DARK, BG_DARK, 0);
+            sc.BackColor = M_BG;
+            MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
+            BuildHomeHeader(sc);
+            BuildNav(sc, "Screen_Alarms");
 
-            // 2. Header bar (with "⚠ Alarms" active toggle)
-            BuildHeaderBar(sc, "Alarm & Fault Diagnostics — 88-Valve SCADA System", false);
-
-            // 3. KPI Banner Row (Y=48..103 px, height=55 px)
-            MakeRect(sc, "Al_KPI_BG", 0, HEADER_H, SCREEN_W, SUMMARY_H, BG_SUMMARY, BORDER, 1);
-
-            // Tile 1: Total Valves
-            var kpiTotal = sc.ScreenItems.Create<HmiButton>("Al_KPI_Total");
-            kpiTotal.Left = 20; kpiTotal.Top = HEADER_H + 8;
-            kpiTotal.Width = 240; kpiTotal.Height = 38;
-            kpiTotal.BackColor = BG_HEADER; kpiTotal.ForeColor = Color.White;
-            kpiTotal.BorderColor = TEAL; kpiTotal.BorderWidth = 1;
-            SetMLText(kpiTotal, "Text", "TOTAL VALVES:  88");
-
-            // Tile 2: Active Faults Counter
-            var kpiFaults = sc.ScreenItems.Create<HmiButton>("Al_KPI_Faults");
-            kpiFaults.Left = 280; kpiFaults.Top = HEADER_H + 8;
-            kpiFaults.Width = 280; kpiFaults.Height = 38;
-            kpiFaults.BackColor = COLOR_FAIL; kpiFaults.ForeColor = Color.White;
-            kpiFaults.BorderColor = Color.Red; kpiFaults.BorderWidth = 2;
+            // Alarm Control
             try {
-                var d = kpiFaults.Dynamizations.Create<ScriptDynamization>("Text");
-                d.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "Tags(\"Valves_DB_Clock1Hz\").Read();\n" +
-                    "let faults = 0;\n" +
-                    "for (let i = 1; i <= 88; i++) {\n" +
-                    "  let tag = \"V\" + (\"000\" + i).slice(-3);\n" +
-                    "  let cfg     = readTag(Tags(tag + \"_Configured\").Read());\n" +
-                    "  let healthy = readTag(Tags(tag + \"_Healthy\").Read());\n" +
-                    "  let open    = readTag(Tags(tag + \"_OpenFB\").Read());\n" +
-                    "  let closed  = readTag(Tags(tag + \"_ClosedFB\").Read());\n" +
-                    "  if (cfg && (!healthy || (open && closed))) faults++;\n" +
-                    "}\n" +
-                    "return \"ACTIVE FAULTS:  \" + faults;";
-                d.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-            } catch {}
-
-            // Tile 3: Healthy Valves Counter
-            var kpiHealthy = sc.ScreenItems.Create<HmiButton>("Al_KPI_Healthy");
-            kpiHealthy.Left = 580; kpiHealthy.Top = HEADER_H + 8;
-            kpiHealthy.Width = 280; kpiHealthy.Height = 38;
-            kpiHealthy.BackColor = COLOR_OK; kpiHealthy.ForeColor = Color.White;
-            kpiHealthy.BorderColor = Color.Green; kpiHealthy.BorderWidth = 1;
-            try {
-                var d = kpiHealthy.Dynamizations.Create<ScriptDynamization>("Text");
-                d.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "Tags(\"Valves_DB_Clock1Hz\").Read();\n" +
-                    "let healthyCount = 0;\n" +
-                    "for (let i = 1; i <= 88; i++) {\n" +
-                    "  let tag = \"V\" + (\"000\" + i).slice(-3);\n" +
-                    "  let cfg     = readTag(Tags(tag + \"_Configured\").Read());\n" +
-                    "  let healthy = readTag(Tags(tag + \"_Healthy\").Read());\n" +
-                    "  let open    = readTag(Tags(tag + \"_OpenFB\").Read());\n" +
-                    "  let closed  = readTag(Tags(tag + \"_ClosedFB\").Read());\n" +
-                    "  if (cfg && healthy && !(open && closed)) healthyCount++;\n" +
-                    "}\n" +
-                    "return \"HEALTHY VALVES:  \" + healthyCount;";
-                d.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-            } catch {}
-
-            // Tile 4: System Health Status Banner
-            var kpiBanner = sc.ScreenItems.Create<HmiButton>("Al_KPI_Banner");
-            kpiBanner.Left = 880; kpiBanner.Top = HEADER_H + 8;
-            kpiBanner.Width = 1020; kpiBanner.Height = 38;
-            kpiBanner.BackColor = COLOR_OK; kpiBanner.ForeColor = Color.White;
-            kpiBanner.BorderColor = Color.Green; kpiBanner.BorderWidth = 2;
-            try {
-                var dt = kpiBanner.Dynamizations.Create<ScriptDynamization>("Text");
-                dt.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "Tags(\"Valves_DB_Clock1Hz\").Read();\n" +
-                    "let faults = 0;\n" +
-                    "for (let i = 1; i <= 88; i++) {\n" +
-                    "  let tag = \"V\" + (\"000\" + i).slice(-3);\n" +
-                    "  let cfg     = readTag(Tags(tag + \"_Configured\").Read());\n" +
-                    "  let healthy = readTag(Tags(tag + \"_Healthy\").Read());\n" +
-                    "  let open    = readTag(Tags(tag + \"_OpenFB\").Read());\n" +
-                    "  let closed  = readTag(Tags(tag + \"_ClosedFB\").Read());\n" +
-                    "  if (cfg && (!healthy || (open && closed))) faults++;\n" +
-                    "}\n" +
-                    "if (faults > 0) return \"⚠  CRITICAL SYSTEM ALARM — \" + faults + \" VALVE FAULT(S) DETECTED — INSPECT BELOW\";\n" +
-                    "return \"✔  SYSTEM NORMAL — ALL 88 VALVES HEALTHY\";";
-                dt.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-
-                var db = kpiBanner.Dynamizations.Create<ScriptDynamization>("BackColor");
-                db.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "Tags(\"Valves_DB_Clock1Hz\").Read();\n" +
-                    "let faults = 0;\n" +
-                    "for (let i = 1; i <= 88; i++) {\n" +
-                    "  let tag = \"V\" + (\"000\" + i).slice(-3);\n" +
-                    "  let cfg     = readTag(Tags(tag + \"_Configured\").Read());\n" +
-                    "  let healthy = readTag(Tags(tag + \"_Healthy\").Read());\n" +
-                    "  let open    = readTag(Tags(tag + \"_OpenFB\").Read());\n" +
-                    "  let closed  = readTag(Tags(tag + \"_ClosedFB\").Read());\n" +
-                    "  if (cfg && (!healthy || (open && closed))) faults++;\n" +
-                    "}\n" +
-                    "if (faults > 0) return 0xFFB91C1C; // Deep Red\n" +
-                    "return 0xFF0F5132; // Deep Green";
-                db.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-
-                var dbr = kpiBanner.Dynamizations.Create<ScriptDynamization>("BorderColor");
-                dbr.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let faults = 0;\n" +
-                    "for (let i = 1; i <= 88; i++) {\n" +
-                    "  let tag = \"V\" + (\"000\" + i).slice(-3);\n" +
-                    "  let cfg     = readTag(Tags(tag + \"_Configured\").Read());\n" +
-                    "  let healthy = readTag(Tags(tag + \"_Healthy\").Read());\n" +
-                    "  let open    = readTag(Tags(tag + \"_OpenFB\").Read());\n" +
-                    "  let closed  = readTag(Tags(tag + \"_ClosedFB\").Read());\n" +
-                    "  if (cfg && (!healthy || (open && closed))) faults++;\n" +
-                    "}\n" +
-                    "let flash = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n" +
-                    "if (faults > 0) return flash ? 0xFFFF0000 : 0xFFB91C1C;\n" +
-                    "return 0xFF198754;";
-                dbr.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-            } catch {}
-
-            // 4. Annunciator Diagnostics Board (11 cols x 8 rows = 88 cards, Y=122..946 px)
-            Console.WriteLine("  Placing 88 Annunciator Diagnostic tiles...");
-            int cols = 11;
-            int startX = 29;
-            int startY = 122;
-            int tileW  = 162;
-            int tileH  = 96;
-            int gapX   = 8;
-            int gapY   = 8;
-
-            for (int v = 1; v <= VALVE_COUNT; v++) {
-                int col = (v - 1) % cols;
-                int row = (v - 1) / cols;
-                int x = startX + col * (tileW + gapX);
-                int y = startY + row * (tileH + gapY);
-
-                string vTag  = string.Format("V{0:D3}", v);
-                string btnId = string.Format("Al_Card_{0:D3}", v);
-
-                var card = sc.ScreenItems.Create<HmiButton>(btnId);
-                card.Left = x; card.Top = y;
-                card.Width = (uint)tileW; card.Height = (uint)tileH;
-                card.BackColor = BG_HEADER; card.ForeColor = Color.White;
-                card.BorderColor = BORDER; card.BorderWidth = 1;
-                SetMLText(card, "Text", "V-" + string.Format("{0:D3}", v));
-
-                AddPopupScript(card, vTag);
-
-                // Add card Text dynamization
-                try {
-                    var dt = card.Dynamizations.Create<ScriptDynamization>("Text");
-                    string jsCode = string.Format(
-                        "function readTag(v) {{ return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }}\n" +
-                        "let configured = readTag(Tags(\"{0}_Configured\").Read());\n" +
-                        "let healthy    = readTag(Tags(\"{0}_Healthy\").Read());\n" +
-                        "let open       = readTag(Tags(\"{0}_OpenFB\").Read());\n" +
-                        "let closed     = readTag(Tags(\"{0}_ClosedFB\").Read());\n" +
-                        "let local      = readTag(Tags(\"{0}_LocalMode\").Read());\n\n" +
-                        "if (!configured) return \"V-{1}\\nUNCONFIGURED\";\n" +
-                        "if (!healthy || (open && closed)) return \"V-{1}\\n⚠ FAULT / TRIP\";\n" +
-                        "if (local) return \"V-{1}\\nLOCAL OVERRIDE\";\n" +
-                        "return \"V-{1}\\n✔ NORMAL\";",
-                        vTag, string.Format("{0:D3}", v));
-                    dt.ScriptCode = jsCode;
-                    dt.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-                } catch {}
-
-                // Add card BackColor dynamization
-                try {
-                    var db = card.Dynamizations.Create<ScriptDynamization>("BackColor");
-                    string jsCode = string.Format(
-                        "function readTag(v) {{ return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }}\n" +
-                        "let configured = readTag(Tags(\"{0}_Configured\").Read());\n" +
-                        "let healthy    = readTag(Tags(\"{0}_Healthy\").Read());\n" +
-                        "let open       = readTag(Tags(\"{0}_OpenFB\").Read());\n" +
-                        "let closed     = readTag(Tags(\"{0}_ClosedFB\").Read());\n" +
-                        "let local      = readTag(Tags(\"{0}_LocalMode\").Read());\n" +
-                        "let flash      = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n\n" +
-                        "if (!configured) return 0xFF2A2E3D; // Slate\n" +
-                        "if (!healthy || (open && closed)) return flash ? 0xFFB91C1C : 0xFF7F1D1D; // Flashing Dark Red\n" +
-                        "if (local) return 0xFF7C2D12; // Amber/Brown\n" +
-                        "return 0xFF1E293B; // Dark Navy (Normal)",
-                        vTag);
-                    db.ScriptCode = jsCode;
-                    db.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-                } catch {}
-
-                // Add card BorderColor dynamization
-                try {
-                    var dbr = card.Dynamizations.Create<ScriptDynamization>("BorderColor");
-                    string jsCode = string.Format(
-                        "function readTag(v) {{ return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }}\n" +
-                        "let configured = readTag(Tags(\"{0}_Configured\").Read());\n" +
-                        "let healthy    = readTag(Tags(\"{0}_Healthy\").Read());\n" +
-                        "let open       = readTag(Tags(\"{0}_OpenFB\").Read());\n" +
-                        "let closed     = readTag(Tags(\"{0}_ClosedFB\").Read());\n" +
-                        "let local      = readTag(Tags(\"{0}_LocalMode\").Read());\n" +
-                        "let flash      = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n\n" +
-                        "if (!configured) return 0xFF475569;\n" +
-                        "if (!healthy || (open && closed)) return flash ? 0xFFFF0000 : 0xFFDC2626; // Bright Red\n" +
-                        "if (local) return 0xFFF59E0B; // Amber\n" +
-                        "return 0xFF334155; // Subtle Slate (Normal)",
-                        vTag);
-                    dbr.ScriptCode = jsCode;
-                    dbr.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-                } catch {}
+                var alarmCtrl = sc.ScreenItems.Create<HmiAlarmControl>("AlarmView");
+                Console.WriteLine("  [DEBUG] alarmCtrl instantiated as: " + alarmCtrl.GetType().FullName);
+                alarmCtrl.Left = 16;
+                alarmCtrl.Top = 198;
+                alarmCtrl.Width = 1420;
+                alarmCtrl.Height = 850;
+            } catch (Exception ex) {
+                Console.WriteLine("  [ERROR] Failed to create HmiAlarmControl: " + ex.Message);
             }
 
-            // 5. Master Action Footer (Y = 968..1060 px)
-            MakeRect(sc, "Al_Footer_BG", 0, 968, SCREEN_W, 112, BG_HEADER, BORDER, 1);
-
-            var btnMasterReset = sc.ScreenItems.Create<HmiButton>("Al_Btn_MasterReset");
-            btnMasterReset.Left = 40; btnMasterReset.Top = 988;
-            btnMasterReset.Width = 480; btnMasterReset.Height = 64;
-            btnMasterReset.BackColor = Color.FromArgb(255, 194, 65, 12); btnMasterReset.ForeColor = Color.White;
-            btnMasterReset.BorderColor = Color.FromArgb(255, 249, 115, 22); btnMasterReset.BorderWidth = 2;
-            SetMLText(btnMasterReset, "Text", "⚡ MASTER RESET ALL SYSTEM FAULTS");
-            AddMasterResetScript(btnMasterReset);
-
-            var btnRet = sc.ScreenItems.Create<HmiButton>("Al_Btn_ReturnOverview");
-            btnRet.Left = SCREEN_W - 520; btnRet.Top = 988;
-            btnRet.Width = 480; btnRet.Height = 64;
-            btnRet.BackColor = TEAL; btnRet.ForeColor = Color.Black;
-            btnRet.BorderColor = Color.White; btnRet.BorderWidth = 2;
-            SetMLText(btnRet, "Text", "▲ RETURN TO OVERVIEW");
-            AddNavScript(btnRet, "Screen_Home");
-
+            // SYSTEM STATUS Panel
+            int sysX = 1456;
+            int sysY = 198;
+            MakeRect(sc, "SysStat_BG", sysX, sysY, 448, 500, M_BOX, M_BORDER, 1);
+            MakeTb(sc, "SysStat_Title", sysX + 10, sysY + 10, 428, 30, "SYSTEM STATUS", M_TRANS, M_HDRTXT, 0, "Center", 16, true);
+            
+            string[] sysAlarmText = {
+                "PLC CPU",
+                "Aft Ballast RIO",
+                "Bilge/ER RIO",
+                "Fwd Ballast RIO",
+                "I/O Module",
+                "Power / UPS",
+                "Network",
+                "HMI Heartbeat",
+                "System Fault"
+            };
+            
+            for (int i = 0; i < 9; i++) {
+                int rowY = sysY + 60 + i * 40;
+                var lbl = MakeLiveText(sc, "SysStat_Lbl_" + i, sysX + 20, rowY, 200, 30, M_TEXT, "Left", 14, false);
+                SetMLText(lbl, "Text", sysAlarmText[i]);
+                
+                var stat = MakeLiveText(sc, "SysStat_Val_" + i, sysX + 240, rowY, 188, 30, M_TEXT, "Center", 14, true);
+                SetMLText(stat, "Text", "UNKNOWN");
+                
+                try {
+                    var d = stat.Dynamizations.Create<ScriptDynamization>("Text");
+                    d.ScriptCode = 
+                        "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                        "let word = readTag(Tags(\"Valves_DB_HwWord\").Read());\n" +
+                        "let bit = (word & (1 << " + i + ")) !== 0;\n" +
+                        "return bit ? \"FAULT\" : \"HEALTHY\";";
+                    d.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                    
+                    var dc = stat.Dynamizations.Create<ScriptDynamization>("ForeColor");
+                    dc.ScriptCode = 
+                        "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                        "let word = readTag(Tags(\"Valves_DB_HwWord\").Read());\n" +
+                        "let bit = (word & (1 << " + i + ")) !== 0;\n" +
+                        "return bit ? 0xFFFF0000 : 0xFF00FF00;";
+                    dc.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                } catch {}
+            }
+            
             Console.WriteLine("  Screen_Alarms built successfully.");
         }
 
@@ -971,7 +838,10 @@ namespace ValveDemoHmiBuilder
                         "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
                         "Tags(vTag + \"_Healthy\").Write(true);\n" +
                         "Tags(vTag + \"_OpenFB\").Write(false);\n" +
-                        "Tags(vTag + \"_ClosedFB\").Write(false);";
+                        "Tags(vTag + \"_ClosedFB\").Write(false);\n" +
+                        "Tags(vTag + \"_TimeoutOpenAlarm\").Write(false);\n" +
+                        "Tags(vTag + \"_TimeoutCloseAlarm\").Write(false);\n" +
+                        "Tags(vTag + \"_UnexpMove\").Write(false);";
                 } else if (action == "ToggleService") {
                     scriptBody = 
                         helper +
@@ -983,6 +853,13 @@ namespace ValveDemoHmiBuilder
                         "if (newVal) {\n" +
                         "  Tags(vTag + \"_Healthy\").Write(true);\n" +
                         "}";
+                } else if (action == "ToggleStuck") {
+                    scriptBody = 
+                        helper +
+                        "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
+                        "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
+                        "let cur = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
+                        "Tags(vTag + \"_Stuck\").Write(!cur);";
                 }
 
                 scp.SetValue(script, scriptBody, null);
@@ -1206,9 +1083,7 @@ namespace ValveDemoHmiBuilder
                     Console.WriteLine("  [PLC] (Skipping FB_ValveLoop re-import - PLC is online or block exists)");
                 }
 
-                // Import Valve_Meta_DB — manually-maintained Name/Location per valve, not
-                // written by any script. Sized for all 88 valves so future zone screens
-                // (Bilge/ER first) reuse it without another PLC change.
+                // Import Valve_Meta_DB
                 try {
                     string metaPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_valve_meta_db.xml";
                     Console.WriteLine("  [PLC] Importing Valve_Meta_DB from " + metaPath + "...");
@@ -1220,6 +1095,62 @@ namespace ValveDemoHmiBuilder
                 }
             } catch (Exception ex) {
                 Console.WriteLine("  [PLC] Skipping PLC block import: " + ex.Message);
+            }
+        }
+
+        static void CreateAlarms(HmiSoftware hmi, string dbName = "Valves_DB")
+        {
+            Console.WriteLine("\n[STEP 3] Generating Discrete Alarms...");
+            
+            // Ensure required AlarmClasses exist in project so WinCC compiler does not emit errors
+            string[] neededClasses = { "ValveFault", "ValveWarning", "System" };
+            foreach (string cName in neededClasses) {
+                if (hmi.AlarmClasses.Find(cName) == null) {
+                    try { hmi.AlarmClasses.Create(cName); } catch {}
+                }
+            }
+            
+            // Generate 9 System Alarms (HwWord bits 0..8)
+            CreateDiscreteAlarm(hmi, "System_PLC_CPU_Fault", "System", "PLC CPU fault detected.", dbName + "_HwWord", 0);
+            CreateDiscreteAlarm(hmi, "System_Aft_RIO_Fault", "System", "Aft Ballast RIO station failure.", dbName + "_HwWord", 1);
+            CreateDiscreteAlarm(hmi, "System_Bilge_RIO_Fault", "System", "Bilge/ER RIO station failure.", dbName + "_HwWord", 2);
+            CreateDiscreteAlarm(hmi, "System_Fwd_RIO_Fault", "System", "Fwd Ballast RIO station failure.", dbName + "_HwWord", 3);
+            CreateDiscreteAlarm(hmi, "System_IO_Module_Fault", "System", "I/O Module fault detected.", dbName + "_HwWord", 4);
+            CreateDiscreteAlarm(hmi, "System_Power_UPS_Fault", "System", "Power/UPS fault detected.", dbName + "_HwWord", 5);
+            CreateDiscreteAlarm(hmi, "System_Network_Loss", "System", "Network loss detected.", dbName + "_HwWord", 6);
+            CreateDiscreteAlarm(hmi, "System_Heartbeat_Fault", "System", "HMI Heartbeat loss detected.", dbName + "_HwWord", 7);
+            CreateDiscreteAlarm(hmi, "System_General_Fault", "System", "System fault detected.", dbName + "_HwWord", 8);
+            
+            for (int i = 1; i <= 88; i++) {
+                string vId = string.Format("V{0:D3}", i);
+                
+                // Pass 1: High priority alarms
+                CreateDiscreteAlarm(hmi, vId + "_Unhealthy", "ValveFault", vId + " reported Unhealthy status.", dbName + "_W_Unhealthy_" + ((i-1)/16), (i-1)%16);
+                CreateDiscreteAlarm(hmi, vId + "_Conflict", "ValveFault", vId + " Command Conflict (Open and Close requested).", dbName + "_W_Conflict_" + ((i-1)/16), (i-1)%16);
+                CreateDiscreteAlarm(hmi, vId + "_FailOpen", "ValveWarning", vId + " Failed to Open in automatic mode.", dbName + "_W_FailOpen_" + ((i-1)/16), (i-1)%16);
+                CreateDiscreteAlarm(hmi, vId + "_FailClose", "ValveWarning", vId + " Failed to Close in automatic mode.", dbName + "_W_FailClose_" + ((i-1)/16), (i-1)%16);
+                
+                // Pass 2 (Commented out for now)
+                // CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveFault", vId + " Loss of Position Feedback.", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16);
+                // CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", vId + " Unexpected Movement detected.", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16);
+                // CreateDiscreteAlarm(hmi, vId + "_Local", "ValveWarning", vId + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16);
+            }
+            Console.WriteLine("  Created " + (88 * 4 + 9) + " discrete alarms.");
+        }
+
+        static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit)
+        {
+            try {
+                var al = hmi.DiscreteAlarms.Find(name);
+                if (al == null) al = hmi.DiscreteAlarms.Create(name);
+                al.AlarmClass = className;
+                SetMLText(al, "AlarmText", text);
+                al.RaisedStateTag = triggerTag;
+                al.RaisedStateTagBitNumber = (uint)triggerBit;
+                
+                Console.WriteLine("    -> Created " + name + " | Tag: " + triggerTag + " | Bit: " + triggerBit);
+            } catch (Exception ex) {
+                Console.WriteLine("  [ERROR] Alarm " + name + ": " + ex.Message);
             }
         }
 
@@ -1255,6 +1186,14 @@ namespace ValveDemoHmiBuilder
                 foreach (var st in statSuf)
                     CreateSummaryTag(hmi, "Valves_DB_" + zp + st, "Valves_DB." + zp + st, "Int", forceRefreshNewTags);
 
+            // Add the word arrays for discrete alarms
+            string[] conditions = { "Unhealthy", "Conflict", "FailOpen", "FailClose", "LossPos", "UnexpMove", "Local" };
+            for (int w = 0; w < 6; w++) {
+                foreach (var cond in conditions) {
+                    CreateSummaryTag(hmi, "Valves_DB_W_" + cond + "_" + w, "Valves_DB.W_" + cond + "[" + w + "]", "UInt");
+                }
+            }
+
             Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 88 valves...");
             for (int i = 1; i <= VALVE_COUNT; i++) {
                 string vTag = string.Format("V{0:D3}", i);
@@ -1266,6 +1205,10 @@ namespace ValveDemoHmiBuilder
                 CreateSummaryTag(hmi, vTag + "_ClosedFB",   plcPrefix + ".ClosedFB",   "Bool");
                 CreateSummaryTag(hmi, vTag + "_Healthy",    plcPrefix + ".Healthy",    "Bool");
                 CreateSummaryTag(hmi, vTag + "_LocalMode",  plcPrefix + ".LocalMode",  "Bool");
+                CreateSummaryTag(hmi, vTag + "_Stuck",             "Valves_DB.Stuck[" + i + "]",             "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_TimeoutOpenAlarm",  "Valves_DB.TimeoutOpenAlarm[" + i + "]",  "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_TimeoutCloseAlarm", "Valves_DB.TimeoutCloseAlarm[" + i + "]", "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_UnexpMove",         "Valves_DB.UnexpMove[" + i + "]",         "Bool", forceRefreshNewTags);
                 // Manually-maintained reference data (Valve_Meta_DB) — not written by any
                 // script; an engineer fills these in by hand. Built for all 88 now so every
                 // future zone screen (not just Bilge/ER) can reuse them without another pass.
@@ -1341,7 +1284,27 @@ namespace ValveDemoHmiBuilder
         }
 
         static HmiScreen FindScreen(HmiSoftware hmi, string name)
-        { foreach (HmiScreen s in hmi.Screens) if (s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) return s; return null; }
+        {
+            foreach (HmiScreen s in hmi.Screens) if (s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) return s;
+            try {
+                var pFolders = hmi.GetType().GetProperty("Folders");
+                if (pFolders != null) {
+                    var folders = pFolders.GetValue(hmi, null) as IEnumerable;
+                    if (folders != null) return FindScreenInFolders(folders, name);
+                }
+            } catch {}
+            return null;
+        }
+
+        static HmiScreen FindScreenInFolders(System.Collections.IEnumerable folders, string name)
+        {
+            foreach (dynamic f in folders) {
+                foreach (HmiScreen s in f.Screens) if (s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) return s;
+                var res = FindScreenInFolders(f.Folders, name);
+                if (res != null) return res;
+            }
+            return null;
+        }
 
         static HmiSoftware FindHmiSoftware(Device device)
         { foreach (DeviceItem it in device.DeviceItems) { var r = FindHmiSoftwareInItem(it); if (r != null) return r; } return null; }

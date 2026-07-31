@@ -8,6 +8,7 @@ using Siemens.Engineering.HmiUnified.UI.Widgets;
 using Siemens.Engineering.HmiUnified.UI.Shapes;
 using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
+using Siemens.Engineering.HmiUnified.UI.Dynamization.Tag;
 using Siemens.Engineering.HmiUnified.UI.Base;
 
 namespace ValveDemoHmiBuilder
@@ -29,6 +30,10 @@ namespace ValveDemoHmiBuilder
         static readonly Color M_BLUE     = Color.FromArgb(255,   0, 162, 255); // In transit / Moving (#00A2FF per spec)
         static readonly Color M_ACCENT   = Color.FromArgb(255,   0, 116, 186); // Selection / active nav
         static readonly Color M_TRANS    = Color.FromArgb(0,   0,   0,   0);   // Transparent
+        // Table dressing. Alternating row tint carries the eye across a wide row far better than a
+        // hairline rule, and the header band separates labels from data without another border.
+        static readonly Color M_ZEBRA    = Color.FromArgb(255, 231, 235, 241); // Alternate row tint
+        static readonly Color M_HDRBAND  = Color.FromArgb(255, 219, 224, 233); // Column-header band
 
         // ── SetMLText (proven version from GenerateHmiLayout.cs) ────────
         static void SetText(object obj, string propName, string text)
@@ -166,6 +171,222 @@ namespace ValveDemoHmiBuilder
             }
         }
 
+        // ── Native tag binding (no JavaScript) ──────────────────────────
+        // Every dynamic property in this project used to be a ScriptDynamization: a JS block
+        // re-run on a cyclic trigger that calls Tags(...).Read(). Screen_Home carried ~111 of
+        // them, all instantiated and evaluated when the screen activates — the most plausible
+        // remaining cause of the slow re-populate on screen switch. A TagDynamization binds the
+        // property straight to a tag and updates push-based when the value changes, with no
+        // script engine involved. Use Dyn() only where a script is genuinely required (string
+        // composition, or no tag at all, e.g. the header clock).
+        static object DynTag(object item, string prop, string tagName)
+        {
+            try {
+                var dp = item.GetType().GetProperty("Dynamizations");
+                if (dp == null) { Console.WriteLine("  [DynTag ERR ." + prop + "] no Dynamizations property"); return null; }
+                object dyns = dp.GetValue(item, null);
+                if (dyns == null) return null;
+
+                MethodInfo create = null;
+                foreach (var m in dyns.GetType().GetMethods()) {
+                    if (m.Name != "Create" || !m.IsGenericMethodDefinition) continue;
+                    var ps = m.GetParameters();
+                    if (ps.Length == 1 && ps[0].ParameterType == typeof(string)) { create = m; break; }
+                }
+                if (create == null) { Console.WriteLine("  [DynTag ERR ." + prop + "] no Create<T>(string)"); return null; }
+
+                object d = create.MakeGenericMethod(typeof(TagDynamization)).Invoke(dyns, new object[] { prop });
+                var td = (TagDynamization)d;
+                td.Tag = tagName;
+                return td;
+            } catch (Exception ex) {
+                Console.WriteLine("  [DynTag ERR ." + prop + "] " + ex.Message);
+                return null;
+            }
+        }
+
+        // Attaches a value->result mapping (state code 0..5 -> colour or string) to a
+        // TagDynamization, so the mapping happens natively instead of in a JS if-chain.
+        // The exact entry shape TIA wants isn't documented in the API surface — Simple takes a
+        // Condition string, Range takes From/To (its RangeType is read-only) — so try Simple
+        // first and fall back to Range, reporting which one took so the build log records it.
+        static bool s_mapShapeLogged = false;
+
+        // Reflection wraps every failure in TargetInvocationException, whose own Message is the
+        // useless "Exception has been thrown by the target of an invocation." Always report the
+        // innermost message or there is nothing to diagnose from.
+        static string Root(Exception ex)
+        {
+            while (ex.InnerException != null) ex = ex.InnerException;
+            return ex.GetType().Name + ": " + ex.Message;
+        }
+
+        // codes[] and values[] are parallel: codes[k] is the tag value to match, values[k] the
+        // colour/string to show. Explicit codes rather than array positions because the table needs
+        // to map -1 (empty slot on a short last page), which an index-based map can't express.
+        static bool AddValueMap(object tagDyn, int[] codes, object[] values)
+        {
+            if (tagDyn == null) return false;
+            try {
+                var vcProp = tagDyn.GetType().GetProperty("ValueConverter");
+                object vc = vcProp.GetValue(tagDyn, null);
+                var mtProp = vc.GetType().GetProperty("MappingTable");
+                object mt = mtProp.GetValue(vc, null);
+                object entries = mt.GetType().GetProperty("Entries").GetValue(mt, null);
+
+                MethodInfo createGeneric = null;
+                foreach (var m in entries.GetType().GetMethods()) {
+                    if (m.Name != "Create" || !m.IsGenericMethodDefinition) continue;
+                    if (m.GetParameters().Length == 0) { createGeneric = m; break; }
+                }
+                if (createGeneric == null) { Console.WriteLine("  [AddValueMap ERR] no Entries.Create<T>()"); return false; }
+
+                // The mapping table must be told what kind of condition its entries use BEFORE any
+                // entry is created — creating an entry that doesn't match ConditionType throws.
+                // Omitting this is what made the first attempt fail on every entry type.
+                bool ctSet = false;
+                try {
+                    var ctProp = mt.GetType().GetProperty("ConditionType");
+                    if (ctProp != null && ctProp.CanWrite) {
+                        ctProp.SetValue(mt, Enum.Parse(ctProp.PropertyType, "Range"), null);
+                        ctSet = true;
+                    }
+                } catch (Exception exCt) { Console.WriteLine("  [AddValueMap ERR] ConditionType=Range -> " + Root(exCt)); }
+
+                string shapeUsed = null;
+                for (int k = 0; k < codes.Length; k++) {
+                    int code = codes[k];
+                    if (values[k] == null) continue;
+                    bool ok = false;
+                    // Range first now: ConditionType is set to Range above, so a degenerate
+                    // From==To range is the entry type that should match it.
+                    try {
+                        object e = createGeneric.MakeGenericMethod(typeof(MappingTableEntryRange)).Invoke(entries, null);
+                        var re = (MappingTableEntryRange)e;
+                        re.From = code; re.To = code;
+                        re.Value = values[k];
+                        ok = true; shapeUsed = shapeUsed ?? "Range";
+                    } catch (Exception exRange) {
+                        try {
+                            object e = createGeneric.MakeGenericMethod(typeof(MappingTableEntrySimple)).Invoke(entries, null);
+                            var se = (MappingTableEntrySimple)e;
+                            se.Condition = code.ToString();
+                            se.Value = values[k];
+                            ok = true; shapeUsed = shapeUsed ?? "Simple";
+                        } catch (Exception exSimple) {
+                            Console.WriteLine("  [AddValueMap ERR] code " + code + " (ConditionType set=" + ctSet + ")");
+                            Console.WriteLine("      Range  -> " + Root(exRange));
+                            Console.WriteLine("      Simple -> " + Root(exSimple));
+                        }
+                    }
+                    if (!ok) return false;
+                }
+                if (!s_mapShapeLogged && shapeUsed != null) {
+                    Console.WriteLine("  [AddValueMap] mapping entries created using: " + shapeUsed);
+                    s_mapShapeLogged = true;
+                }
+                return true;
+            } catch (Exception ex) {
+                Console.WriteLine("  [AddValueMap ERR] " + Root(ex));
+                return false;
+            }
+        }
+
+        // Without a mapping table a TagDynamization would bind BackColor straight to the raw
+        // state number (0..5), which is not a colour — so a failed mapping must not be left in
+        // place. Remove it and let the caller fall back to the proven script path.
+        static void RemoveDyn(object item, string prop)
+        {
+            try {
+                var dp = item.GetType().GetProperty("Dynamizations");
+                if (dp == null) return;
+                object dyns = dp.GetValue(item, null);
+                if (dyns == null) return;
+                var find = dyns.GetType().GetMethod("Find", new Type[] { typeof(string) });
+                if (find == null) return;
+                object d = find.Invoke(dyns, new object[] { prop });
+                if (d == null) return;
+                var del = d.GetType().GetMethod("Delete", Type.EmptyTypes);
+                if (del != null) del.Invoke(d, null);
+            } catch {}
+        }
+
+        // Set false the first time a native mapping fails, so the whole run falls back to scripts
+        // consistently instead of producing a screen with a mix of working and broken badges.
+        static bool s_nativeBadgeOk = true;
+
+        // State-code palette/labels, shared by every native mapping (same order and meaning as
+        // STATE_COLOR_LOGIC / STATE_TEXT_LOGIC, which the Bilge table's script slots still use).
+        static readonly int[] STATE_CODES = { 0, 1, 2, 3, 4, 5 };
+        static readonly object[] STATE_COLORS = {
+            Color.FromArgb(255, 154, 163, 176), // 0 UNCONFIGURED
+            Color.FromArgb(255, 205,  32,  38), // 1 FAULT
+            Color.FromArgb(255, 226, 168,   0), // 2 LOCAL
+            Color.FromArgb(255,   0, 158,  74), // 3 OPEN
+            Color.FromArgb(255,  96, 106, 122), // 4 CLOSED
+            Color.FromArgb(255,   0, 162, 255)  // 5 MOVING
+        };
+
+        // Table variant adds code 6 = "no valve in this slot on this page" (a zone whose valve
+        // count isn't a multiple of 14 leaves the last page short), drawn in transparent ink so the
+        // row reads as blank. 6 rather than -1: negative codes are avoided since the mapping table
+        // is fussy about what it accepts, and there was no reason to risk it.
+        // There is deliberately no TBL_WORDS — a mapping table is rejected on a Text property
+        // ("Creation of Tag dynamization entries is not allowed for this property"), so the status
+        // word is supplied ready-made by the PLC in <Zone>TblStateTxt and bound directly.
+        static readonly int[] TBL_CODES = { 0, 1, 2, 3, 4, 5, 6 };
+        static readonly object[] TBL_COLORS = {
+            Color.FromArgb(255, 154, 163, 176),
+            Color.FromArgb(255, 205,  32,  38),
+            Color.FromArgb(255, 226, 168,   0),
+            Color.FromArgb(255,   0, 158,  74),
+            Color.FromArgb(255,  96, 106, 122),
+            Color.FromArgb(255,   0, 162, 255),
+            M_TRANS
+        };
+
+        // Command buttons fill only in their own state; every other state has no entry, so the
+        // button keeps its own (white) background. Verify this fallback holds in runtime — if an
+        // unmatched value renders wrong instead, these need all seven codes spelled out.
+        static readonly int[] FILL_OPEN_CODES  = { 3 };
+        static readonly object[] FILL_OPEN     = { Color.FromArgb(255, 0, 158, 74) };
+        static readonly int[] FILL_CLOSE_CODES = { 4 };
+        static readonly object[] FILL_CLOSE    = { Color.FromArgb(255, 205, 32, 38) };
+
+        // Click handler for a table slot. The slot doesn't know its valve at build time — that
+        // depends on the page — so it resolves it at click time from the slot's live NO. tag
+        // (position within the zone) plus the zone's first valve number. This is an event, so it
+        // only ever runs on tap and costs nothing during screen activation.
+        static void AddSlotCmdScript(HmiButton btn, string zonePrefix, int slot, int zoneStart, bool isOpen)
+        {
+            try {
+                PropertyInfo evProp = null;
+                foreach (var p in btn.GetType().GetProperties())
+                    if (p.Name == "EventHandlers") { evProp = p; break; }
+                if (evProp == null) { Console.WriteLine("  [SlotCmd ERR] No EventHandlers on " + btn.GetType().Name); return; }
+                object evObj = evProp.GetValue(btn, null);
+                object handler = CreateTappedHandler(evObj);
+                if (handler == null) { Console.WriteLine("  [SlotCmd ERR] No Tapped handler for slot " + slot); return; }
+                var sp = handler.GetType().GetProperty("Script");
+                object script = sp.GetValue(handler, null);
+                var scp = script.GetType().GetProperty("ScriptCode");
+                if (scp == null || !scp.CanWrite) return;
+
+                string setSuf = isOpen ? "_OpenCmd" : "_CloseCmd";
+                string clrSuf = isOpen ? "_CloseCmd" : "_OpenCmd";
+                string js = JS_READ +
+                    "var no=r(Tags(\"" + zonePrefix + "_TblNo_" + slot + "\").Read());\n" +
+                    "if(!no) return;\n" +                       // empty slot on a short last page
+                    "var v=" + (zoneStart - 1) + "+no;\n" +
+                    "var vTag=\"V\"+(\"000\"+v).slice(-3);\n" +
+                    "var cfg=r(Tags(vTag+\"_Configured\").Read());\n" +
+                    "if(!cfg) return;\n" +
+                    "Tags(vTag+\"" + clrSuf + "\").Write(false);\n" +
+                    "Tags(vTag+\"" + setSuf + "\").Write(true);";
+                scp.SetValue(script, js, null);
+            } catch (Exception ex) { Console.WriteLine("  [SlotCmd ERR] " + ex.Message); }
+        }
+
         const string JS_READ = "function r(v){return(v!==null&&typeof v===\"object\"&&\"Value\"in v)?v.Value:v;}\n";
         // A literal Tags(...) read is mandatory: with trigger AutomaticTags the TIA compiler
         // statically scans for literal tag names, and loop-built names alone fail compilation.
@@ -191,6 +412,17 @@ namespace ValveDemoHmiBuilder
         // Display-only relabelling: operator sees CM-01..CM-88, but every PLC member, all 616
         // HMI tags, and every script keep V001..V088 — nothing underneath changes.
         static string Disp(int n) { return "CM-" + n.ToString("D2"); }
+
+        // Build-time throttle on illustration badges (each costs 3 Openness items + a dynamization
+        // + 6 mapping entries, and every one is a cross-process round-trip). The valve tables, KPI
+        // panels and summaries are never capped — they read PLC-precomputed totals, so they always
+        // report the full section counts.
+        //
+        // Kept at 4 while iterating: badges dominate build time, and layout changes need fast
+        // turnaround more than they need a full illustration. Raise to 99 for a final build once
+        // the layout is signed off — that is a deliberate, costly choice (Screen_Home alone is 88
+        // badges), so it should be an explicit decision, not a default.
+        const int ILLUSTRATION_VALVES_PER_ZONE = 4;
 
         static HmiEllipse MakeDot(HmiScreen sc, string name, int cx, int cy, int rx, int ry,
                                    Color fill, Color border, int bw = 2)
@@ -314,44 +546,59 @@ namespace ValveDemoHmiBuilder
         // by having the label button's transparent body double as the hit-target.
         // Shared by the badge (BackColor), and the valve-table's status text + dot (Screen_Bilge)
         // — one 6-state definition instead of three copies drifting apart over time.
+        // One read instead of five. FB_ValveLoop precomputes StateCode per valve using the exact
+        // same priority chain this used to evaluate in JavaScript (Fault > Local > Open > Closed >
+        // Moving), so behaviour is unchanged but Screen_Home drops from 440 tag reads per refresh
+        // to 88 — and _State is a CyclicContinuous tag, so it's served from a warm cache instead
+        // of a cold PLC round-trip on every screen switch.
         static string ValveStateReads(string vTag)
         {
-            return JS_READ +
-                "var cfg=r(Tags(\"" + vTag + "_Configured\").Read());\n" +
-                "var op=r(Tags(\"" + vTag + "_OpenFB\").Read());\n" +
-                "var cl=r(Tags(\"" + vTag + "_ClosedFB\").Read());\n" +
-                "var hl=r(Tags(\"" + vTag + "_Healthy\").Read());\n" +
-                "var lo=r(Tags(\"" + vTag + "_LocalMode\").Read());\n";
+            return JS_READ + "var st=r(Tags(\"" + vTag + "_State\").Read());\n";
         }
-        static string ValveStateColorScript(string vTag)
-        {
-            return ValveStateReads(vTag) +
-                "if(!cfg) return 0xFF9AA3B0;\n" +
-                "if(!hl||(op&&cl)) return 0xFFCD2026;\n" +
-                "if(lo) return 0xFFE2A800;\n" +          // LOCAL — amber
-                "if(op&&!cl) return 0xFF009E4A;\n" +
-                "if(cl&&!op) return 0xFF606A7A;\n" +
+
+        // Shared state-code if-chains — factored out so both the fixed-vTag callers below (badges,
+        // etc.) and the slot-based ones (BuildValveTable's virtualized rows, which compute vTag
+        // from a live page tag rather than a build-time constant) use identical logic.
+        // 0=UNCONFIGURED 1=FAULT 2=LOCAL 3=OPEN 4=CLOSED 5=MOVING
+        const string STATE_COLOR_LOGIC =
+                "if(st==0) return 0xFF9AA3B0;\n" +
+                "if(st==1) return 0xFFCD2026;\n" +
+                "if(st==2) return 0xFFE2A800;\n" +        // LOCAL — amber
+                "if(st==3) return 0xFF009E4A;\n" +
+                "if(st==4) return 0xFF606A7A;\n" +
                 "return 0xFF00A2FF;";                     // MOVING/IN TRANSIT — blue
-        }
-        static string ValveStateTextScript(string vTag)
-        {
-            return ValveStateReads(vTag) +
-                "if(!cfg) return \"UNCONFIGURED\";\n" +
-                "if(!hl||(op&&cl)) return \"FAULT\";\n" +
-                "if(lo) return \"LOCAL\";\n" +
-                "if(op&&!cl) return \"OPEN\";\n" +
-                "if(cl&&!op) return \"CLOSED\";\n" +
+        const string STATE_TEXT_LOGIC =
+                "if(st==0) return \"UNCONFIGURED\";\n" +
+                "if(st==1) return \"FAULT\";\n" +
+                "if(st==2) return \"LOCAL\";\n" +
+                "if(st==3) return \"OPEN\";\n" +
+                "if(st==4) return \"CLOSED\";\n" +
                 "return \"MOVING\";";
-        }
+
+        static string ValveStateColorScript(string vTag) { return ValveStateReads(vTag) + STATE_COLOR_LOGIC; }
+        static string ValveStateTextScript(string vTag) { return ValveStateReads(vTag) + STATE_TEXT_LOGIC; }
+
+        // (The Slot* script helpers and AddCmdScriptSlot that used to live here are gone: the table
+        // now binds natively to the PLC's per-zone page window, so no HMI-side page arithmetic —
+        // and therefore no runtime-built tag names — remain. See BuildValveTable.)
 
         static void DrawValveSym(HmiScreen sc, string name, int cx, int cy, int tagNum)
         {
             string vTag = string.Format("V{0:D3}", tagNum);
             const int R = 21; // 42px-diameter badge
 
-            // 1. Status badge — a filled disc whose colour IS the valve state.
+            // 1. Status badge — a filled disc whose colour IS the valve state. Bound natively to
+            // the precomputed _State tag with a value->colour map (no script, push-based), since
+            // 88 of these on Screen_Home was the single biggest block of polled JavaScript.
             var badge = MakeDot(sc, name + "_badge", cx, cy, R, R, M_MUTED, M_BORDER, 2);
-            Dyn(badge, "BackColor", ValveStateColorScript(vTag), "T500ms");
+            if (s_nativeBadgeOk) {
+                if (!AddValueMap(DynTag(badge, "BackColor", vTag + "_State"), STATE_CODES, STATE_COLORS)) {
+                    RemoveDyn(badge, "BackColor");
+                    s_nativeBadgeOk = false;
+                    Console.WriteLine("  [DrawValveSym] native colour mapping unavailable — falling back to script for all badges.");
+                }
+            }
+            if (!s_nativeBadgeOk) Dyn(badge, "BackColor", ValveStateColorScript(vTag), "T1s");
 
             // 2. Bowtie glyph on top of the badge — fixed white, legible against all 6 states.
             var sym = sc.ScreenItems.Create<HmiTextBox>(name + "_sym");
@@ -399,9 +646,9 @@ namespace ValveDemoHmiBuilder
 
             int tY = 774, tH = 288, tW = 304, tStep = 316, tX0 = 16;
             // Left-to-right order matches the mimic's corrected zone order above it (AFT-ER-FWD).
-            BuildKpiBox(sc, "AFT BALLAST",     61, 88, "Aft", tX0 + 0 * tStep, tY, tW, tH);
-            BuildKpiBox(sc, "BILGE / ER",       1, 28, "Er",  tX0 + 1 * tStep, tY, tW, tH);
-            BuildKpiBox(sc, "FORWARD BALLAST", 29, 60, "Fwd", tX0 + 2 * tStep, tY, tW, tH);
+            BuildKpiBox(sc, "AFT BALLAST",      1, 28, "Aft", tX0 + 0 * tStep, tY, tW, tH);
+            BuildKpiBox(sc, "BILGE / ER",      29, 56, "Er",  tX0 + 1 * tStep, tY, tW, tH);
+            BuildKpiBox(sc, "FORWARD BALLAST", 57, 88, "Fwd", tX0 + 2 * tStep, tY, tW, tH);
             BuildSysStatus(sc,                       tX0 + 3 * tStep, tY, tW, tH);
             BuildPlantSummary(sc,                    tX0 + 4 * tStep, tY, tW, tH);
             BuildAlarmPanel(sc,                      tX0 + 5 * tStep, tY, tW, tH);
@@ -433,7 +680,7 @@ namespace ValveDemoHmiBuilder
             // Title band.
             MakeRect(sc, "Title_Rule", 0, 46, 1920, 4, M_ACCENT, M_ACCENT, 0);
             MakeTb(sc, "Title_Main", 0, 50, 1920, 54, "MV WESTERLY  &#xB7;  VALVE REMOTE CONTROL SYSTEM",
-                   M_TRANS, M_TEXT, 0, "Center", 42, true);
+                   M_TRANS, M_TEXT, 0, "Center", 32, true);
             MakeTb(sc, "Title_Sub", 0, 104, 1920, 24, "Bilge &amp; Ballast Distribution  &#x2014;  88 Motorised Valves",
                    M_TRANS, M_MUTED, 0, "Center", 19, false);
         }
@@ -469,9 +716,11 @@ namespace ValveDemoHmiBuilder
         {
             MakeRect(sc, "Nav_BG", 0, 128, 1920, 58, M_BOX, M_LINE, 1);
 
-            string[] labels  = { "&#x2302;  HOME", "&#x1F4A7;  BILGE / ER", "&#x2693;  BALLAST FWD",
-                                 "&#x2693;  BALLAST AFT", "&#x1F514;  ALARMS", "&#x1F4C8;  DIAGNOSTICS", "&#x1F464;  LOGIN" };
-            string[] targets = { "Screen_Home", "Screen_Bilge", "Screen_FwdBallast", "Screen_AftBallast",
+            // Zone buttons run in valve-number order (AFT CM-01-28, BILGE/ER CM-29-56,
+            // FWD CM-57-88), which is also stern->bow, matching the mimic's zone order.
+            string[] labels  = { "&#x2302;  HOME", "&#x2693;  BALLAST AFT", "&#x1F4A7;  BILGE / ER",
+                                 "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x1F4C8;  DIAGNOSTICS", "&#x1F464;  LOGIN" };
+            string[] targets = { "Screen_Home", "Screen_AftBallast", "Screen_Bilge", "Screen_FwdBallast",
                                  "Screen_Alarms", "Screen_Diagnostics", "Screen_Login" };
 
             int w = 258, h = 46, y = 134, x0 = 20, gap = 8;
@@ -513,8 +762,11 @@ namespace ValveDemoHmiBuilder
             int[] div = { zoneX[1], zoneX[2] };
 
             string[] zoneNames  = { "AFT BALLAST", "BILGE / ER", "FORWARD BALLAST" };
-            int[] zoneVStart    = { 61, 1, 29 };
-            int[] zoneVEnd      = { 88, 28, 60 };
+            // Valve numbers follow physical position stern->bow, so the mimic reads CM-01..CM-88
+            // straight across instead of jumping 61-88, 1-28, 29-60. FB_ValveLoop uses the exact
+            // same boundaries (i<=28 Aft, i<=56 Er, else Fwd) for its per-zone counters.
+            int[] zoneVStart    = { 1, 29, 57 };
+            int[] zoneVEnd      = { 28, 56, 88 };
             // Exact fit: 7+7+8 columns x 4 rows = 28+28+32 = 88, no leftover.
             int[] zoneCols      = { 7, 7, 8 };
             string[] zonePfx    = { "Aft", "Er", "Fwd" }; // matches Valves_DB_<prefix>Configured etc.
@@ -555,21 +807,27 @@ namespace ValveDemoHmiBuilder
 
             for (int z = 0; z < 3; z++) {
                 int cols = zoneCols[z];
-                int usedW = cols * cellW;
-                int leftPad = (zoneW - usedW) / 2;
-                int rowSpanL = zoneX[z] + leftPad;
+                // Pipework follows however many valves are actually drawn, so a capped
+                // illustration still looks deliberate (no manifolds running off past empty rows).
+                // Uncapped this is identical to before: full rows, all 4 of them.
+                int zoneCount = Math.Min(ILLUSTRATION_VALVES_PER_ZONE, zoneVEnd[z] - zoneVStart[z] + 1);
+                int rowsNeeded = Math.Min(4, (zoneCount + cols - 1) / cols);
 
                 // One horizontal manifold per row + one vertical trunk per zone — a full
                 // per-valve P&ID routing would clutter badly at this density and cost far
                 // more Openness items for no real gain in clarity.
                 int trunkX = zoneX[z] + zoneW / 2;
-                MakeRect(sc, "Pipe_Trunk" + z, trunkX - 2, rowY[0], 4, rowY[3] - rowY[0], M_BORDER, M_BORDER, 0);
-                for (int r = 0; r < 4; r++)
-                    MakeRect(sc, "Pipe_Row" + z + "_" + r, rowSpanL, rowY[r] - 2, usedW, 4, M_BORDER, M_BORDER, 0);
+                if (rowsNeeded > 1)
+                    MakeRect(sc, "Pipe_Trunk" + z, trunkX - 2, rowY[0], 4, rowY[rowsNeeded - 1] - rowY[0], M_BORDER, M_BORDER, 0);
 
                 int vNum = zoneVStart[z];
-                for (int r = 0; r < 4; r++) {
-                    for (int c = 0; c < cols; c++) {
+                for (int r = 0; r < rowsNeeded; r++) {
+                    int inThisRow = Math.Min(cols, zoneCount - r * cols);
+                    int usedW = inThisRow * cellW;
+                    int rowSpanL = zoneX[z] + (zoneW - usedW) / 2;
+                    MakeRect(sc, "Pipe_Row" + z + "_" + r, rowSpanL, rowY[r] - 2, usedW, 4, M_BORDER, M_BORDER, 0);
+
+                    for (int c = 0; c < inThisRow; c++) {
                         int cx = rowSpanL + (int)((c + 0.5) * cellW);
                         DrawValveSym(sc, "Vlv_" + z + "_" + r + "_" + c, cx, rowY[r], vNum);
                         vNum++;
@@ -635,8 +893,9 @@ namespace ValveDemoHmiBuilder
                     MakeTb(sc, "KPI_Val_" + vStart + "_" + i, x + w - 78, rY, 68, rowH,
                            zoneTotal.ToString(), M_TRANS, M_TEXT, 0, "Right", 22, true);
                 } else {
+                    // Pure passthrough of an Int — bind straight to the tag, no script needed.
                     var val = MakeLiveText(sc, "KPI_Val_" + vStart + "_" + i, x + w - 78, rY, 68, rowH, cols[i], "Right", 22, true);
-                    Dyn(val, "Text", JS_READ + "return \"\"+r(Tags(\"Valves_DB_" + zonePrefix + tagSuf[i] + "\").Read());", "T1s");
+                    DynTag(val, "Text", "Valves_DB_" + zonePrefix + tagSuf[i]);
                 }
                 if (i < labels.Length - 1) MakeRect(sc, "KPI_Sep_" + vStart + "_" + i, x + 10, rY + rowH - 1, w - 20, 1, M_LINE, M_LINE, 0);
             }
@@ -678,7 +937,7 @@ namespace ValveDemoHmiBuilder
             // it in the same pass as the other totals, so this no longer loops all 88 tags.
             MakeTb(sc, "Pls_Lbl1", x + 14, rY0 + rowH, w - 116, rowH, "CONFIGURED", M_TRANS, M_MUTED, 0, "Left", 15, false);
             var cfgVal = MakeLiveText(sc, "Pls_Val1", x + w - 78, rY0 + rowH, 68, rowH, M_ACCENT, "Right", 22, true);
-            Dyn(cfgVal, "Text", JS_READ + "return \"\"+r(Tags(\"Valves_DB_TotalConfigured\").Read());", "T1s");
+            DynTag(cfgVal, "Text", "Valves_DB_TotalConfigured");
             MakeRect(sc, "Pls_Sep1", x + 10, rY0 + rowH * 2 - 1, w - 20, 1, M_LINE, M_LINE, 0);
 
             // LOCAL MODE reads Valves_DB_TotalLocal directly instead of looping — FB_ValveLoop
@@ -686,7 +945,7 @@ namespace ValveDemoHmiBuilder
             // (CreateSummaryHmiTags) existed but was unused. One tag read replaces 88.
             MakeTb(sc, "Pls_Lbl2", x + 14, rY0 + rowH * 2, w - 116, rowH, "LOCAL MODE", M_TRANS, M_MUTED, 0, "Left", 15, false);
             var locVal = MakeLiveText(sc, "Pls_Val2", x + w - 78, rY0 + rowH * 2, 68, rowH, M_YELLOW, "Right", 22, true);
-            Dyn(locVal, "Text", JS_READ + "return \"\"+r(Tags(\"Valves_DB_TotalLocal\").Read());", "T1s");
+            DynTag(locVal, "Text", "Valves_DB_TotalLocal");
         }
 
         static void BuildAlarmPanel(HmiScreen sc, int x, int y, int w, int h)
@@ -695,13 +954,15 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Alm_Hdr", x, y, w, 36, M_HDR, M_HDR, 0);
             MakeTb(sc, "Alm_Ttl", x + 10, y + 5, w - 20, 26, "ACTIVE ALARMS", M_TRANS, M_HDRTXT, 0, "Left", 17, true);
 
-            // Reads Valves_DB_TotalFault directly — same pre-computed-total optimization as
-            // Plant Summary's LOCAL MODE row, removing another 88-valve loop.
-            string readFaultTotal = JS_READ + "var n=r(Tags(\"Valves_DB_TotalFault\").Read());\n";
-
+            // The count is a straight passthrough, so it binds natively.
             var big = MakeLiveText(sc, "Alm_Count", x + 14, y + 42, 90, h - 92, M_RED, "Center", 50, true);
-            Dyn(big, "Text", readFaultTotal + "return \"\"+n;", "T1s");
+            DynTag(big, "Text", "Valves_DB_TotalFault");
 
+            // The state word/colour stay on scripts. A fault total is 0..88, so expressing
+            // "zero vs non-zero" as a discrete value map would need ~89 entries per property —
+            // i.e. ~178 extra Openness round-trips at build time to remove just two scripts.
+            // Not worth it; the win from native binding is in the 88 badges and 15 KPI cells.
+            string readFaultTotal = JS_READ + "var n=r(Tags(\"Valves_DB_TotalFault\").Read());\n";
             var state = MakeLiveText(sc, "Alm_State", x + 112, y + 48, w - 126, 26, M_GREEN, "Left", 18, true);
             Dyn(state, "Text", readFaultTotal + "return n>0?\"ALARM ACTIVE\":\"ALL NORMAL\";", "T1s");
             Dyn(state, "ForeColor", readFaultTotal + "return n>0?0xFFCD2026:0xFF009E4A;", "T1s");
@@ -713,43 +974,63 @@ namespace ValveDemoHmiBuilder
             AddNavClick(goAlarms, "Screen_Alarms");
         }
 
-        // ── SCREEN_BILGE — ER zone (V001-028): illustration + paginated table + summary ──
-        static void BuildScreenBilge(HmiScreen sc)
+        // ── Zone screen (AFT / BILGE-ER / FWD): illustration + paged table + summary ──
+        // One builder for all three zones — they differ only in valve range, page count and which
+        // PLC window prefix (Aft/Er/Fwd) their table reads.
+        static void BuildZoneScreen(HmiScreen sc, string screenTarget, string zoneLabel,
+                                     int vStart, int vEnd, string zonePrefix, int mimicCols)
         {
-            Console.WriteLine("  Drawing Screen_Bilge (ER zone: 28 valves, illustration + paginated table + summary)...");
+            int count = vEnd - vStart + 1;
+            int maxPage = (count + 13) / 14 - 1;   // 0-based index of the last page
+            Console.WriteLine("  Drawing " + screenTarget + " (" + zoneLabel + ": " + count +
+                              " valves, " + (maxPage + 1) + " page(s))...");
 
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
             BuildHomeHeader(sc);
-            BuildNav(sc, "Screen_Bilge");
+            BuildNav(sc, screenTarget);
 
-            // Illustration gets max width/height (like Home's mimic) — the table below only needs
-            // to fit 8 rows per page now (not all 28 at once), so it doesn't need much height.
-            // 198 + 410 + 14 + 380 + 14 + 46 = 1062, matching Home's same bottom boundary.
-            BuildZoneMimic(sc, 16, 198, 1888, 410, 1, 28, 14, 2, "BILGE / ER");
-            BuildValveTable(sc, 16, 622, 1510, 380, 1, 28);
+            // Illustration stops 24px short of the table/summary row so the two panels read as
+            // separate boxes — at 484 they shared an edge and looked fused together.
+            // 198 + 460 = 658, then a 24px gap, then the table row at 682 .. 1062 (Home's bottom).
+            BuildZoneMimic(sc, 16, 198, 1888, 460, vStart, vEnd, mimicCols, 2, zoneLabel);
+            // Table takes width back off the summary (1650 -> 1674): the summary only has to fit
+            // six short label/number rows, whereas the table has six columns fighting for room.
+            BuildValveTable(sc, 16, 682, 1674, 380, zonePrefix, vStart, maxPage);
 
-            // Summary now sits beside the table (same row) instead of stretching the full column
-            // height — right-sized instead of the previous 6-rows-in-864px stretch.
-            BuildKpiBox(sc, "BILGE / ER SUMMARY", 1, 28, "Er", 1540, 622, 364, 380);
+            // Summary sits beside the table, sharing its top edge, and now runs the full width left
+            // over to the right margin (1680..1904) instead of stopping at 1880 and leaving a dead
+            // strip. Its height reaches down to just above the page buttons for the same reason —
+            // 260 left an odd blank gap in the middle of the column.
+            // Short title: BuildKpiBox gives the title only (w-108)px, so the full zone name would
+            // clip; the zone is already named on the illustration header directly above.
+            // 200 wide, not narrower: BuildKpiBox gives its title only (w-108)px, and "SUMMARY" at
+            // font 17 needs ~75 of the 92 that leaves — any narrower and the title starts clipping.
+            const int sumX = 1704, sumW = 200;      // 1704 + 200 = 1904 = 1920 - 16px margin
+            BuildKpiBox(sc, "SUMMARY", vStart, vEnd, zonePrefix, sumX, 682, sumW, 320);
 
-            // Page UP/DOWN — below the summary specifically, not spanning the table's width too.
-            int pbY = 622 + 380 + 14;
-            var upBtn   = MakeBtn(sc, "Bilge_PageUp",   1540, pbY, 174, 46, "&#x25B2;  UP",   M_HDR, M_HDRTXT, M_BORDER, 1, 16, true);
-            var downBtn = MakeBtn(sc, "Bilge_PageDown", 1730, pbY, 174, 46, "&#x25BC;  DOWN", M_HDR, M_HDRTXT, M_BORDER, 1, 16, true);
-            AddPageNavScript(upBtn, "BilgePage", -1, 1);
-            AddPageNavScript(downBtn, "BilgePage", 1, 1);
-            // Dim each button when it's already at its boundary (page 0 for UP, page 1 for DOWN) —
-            // purely visual feedback; the click script's own clamp is what actually prevents
-            // going out of range.
-            Dyn(upBtn, "BackColor", JS_READ + "var p=r(Tags(\"BilgePage\").Read()); return p<=0?0xFF3A4356:0xFF263242;", "T1s");
-            Dyn(upBtn, "ForeColor", JS_READ + "var p=r(Tags(\"BilgePage\").Read()); return p<=0?0xFF7A8494:0xFFF5F7FA;", "T1s");
-            Dyn(downBtn, "BackColor", JS_READ + "var p=r(Tags(\"BilgePage\").Read()); return p>=1?0xFF3A4356:0xFF263242;", "T1s");
-            Dyn(downBtn, "ForeColor", JS_READ + "var p=r(Tags(\"BilgePage\").Read()); return p>=1?0xFF7A8494:0xFFF5F7FA;", "T1s");
+            // Page UP/DOWN — below the summary, matching its width so the column lines up.
+            // These write the PLC's per-zone page tag; the PLC then reloads the table window.
+            string pageTag = "Valves_DB_" + zonePrefix + "Page";
+            int pbY = 1016;                          // 682 + 320 = 1002, 14px gap, 1016 + 46 = 1062
+            const int pbW = 95;                      // 95 + 10 gap + 95 = 200, same as the summary
+            var upBtn   = MakeBtn(sc, "Zn_PageUp",   sumX, pbY, pbW, 46, "&#x25B2; UP",   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
+            var downBtn = MakeBtn(sc, "Zn_PageDown", sumX + pbW + 10, pbY, pbW, 46, "&#x25BC; DN", M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
+            AddPageNavScript(upBtn, pageTag, -1, maxPage);
+            AddPageNavScript(downBtn, pageTag, 1, maxPage);
+            // Dim each button at its boundary (first page for UP, last for DOWN) — purely visual;
+            // the click script's own clamp is what actually prevents going out of range. Native
+            // bindings: one entry marks the boundary page, every other page falls back to the
+            // button's own colours.
+            AddValueMap(DynTag(upBtn, "BackColor", pageTag), new int[] { 0 }, new object[] { Color.FromArgb(255, 58, 67, 86) });
+            AddValueMap(DynTag(upBtn, "ForeColor", pageTag), new int[] { 0 }, new object[] { Color.FromArgb(255, 122, 132, 148) });
+            AddValueMap(DynTag(downBtn, "BackColor", pageTag), new int[] { maxPage }, new object[] { Color.FromArgb(255, 58, 67, 86) });
+            AddValueMap(DynTag(downBtn, "ForeColor", pageTag), new int[] { maxPage }, new object[] { Color.FromArgb(255, 122, 132, 148) });
         }
 
         // Same CreateTappedHandler pattern as AddCmdScript/AddNavClick — writes a clamped page
-        // index to an internal (no-PLC-binding) HMI tag like BilgePage.
+        // index to the zone's PLC page tag (Valves_DB_<Zone>Page), which the PLC then uses to
+        // reload that zone's 14-slot table window.
         static void AddPageNavScript(HmiButton btn, string tagName, int delta, int maxPage)
         {
             try {
@@ -784,7 +1065,7 @@ namespace ValveDemoHmiBuilder
             MakePanel(sc, "ZMim_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             MakeRect(sc, "ZMim_Hdr", px, py, pw, 40, M_HDR, M_HDR, 0);
             MakeTb(sc, "ZMim_Ttl", px + 16, py + 7, pw - 32, 28,
-                   zoneLabel + " &#x2014; " + (vEnd - vStart + 1) + " VALVES", M_TRANS, M_HDRTXT, 0, "Left", 20, true);
+                   zoneLabel + " &#x2014; " + (vEnd - vStart + 1) + " VALVES", M_TRANS, M_HDRTXT, 0, "Left", 15, true);
 
             int hullL = px + 24, hullT = py + 44, hullR = px + pw - 24, hullB = py + ph - 16;
             MakeRect(sc, "ZHull_Top",   hullL,     hullT,     hullR - hullL, 4,             M_BORDER, M_BORDER, 0);
@@ -796,123 +1077,141 @@ namespace ValveDemoHmiBuilder
             int rowPitch = (gridB - gridT) / rows;
             int colPitch = (gridR - gridL) / cols;
 
-            // One horizontal manifold per row, spanning the grid.
-            for (int r = 0; r < rows; r++) {
-                int ry = gridT + rowPitch * r + rowPitch / 2;
-                MakeRect(sc, "ZPipe_Row" + r, gridL, ry - 2, gridR - gridL, 4, M_BORDER, M_BORDER, 0);
-            }
+            // Manifolds follow the valves actually drawn (see ILLUSTRATION_VALVES_PER_ZONE) and the
+            // group is centred, so a capped illustration still looks deliberate rather than like a
+            // half-empty grid. Uncapped this is identical to before: full-width rows.
+            int zoneCount = Math.Min(ILLUSTRATION_VALVES_PER_ZONE, vEnd - vStart + 1);
+            int rowsNeeded = Math.Min(rows, (zoneCount + cols - 1) / cols);
 
             int vNum = vStart;
-            for (int r = 0; r < rows; r++) {
+            for (int r = 0; r < rowsNeeded; r++) {
                 int ry = gridT + rowPitch * r + rowPitch / 2;
-                for (int c = 0; c < cols; c++) {
-                    if (vNum > vEnd) break;
-                    int cx = gridL + colPitch * c + colPitch / 2;
+                int inThisRow = Math.Min(cols, zoneCount - r * cols);
+                int usedW = inThisRow * colPitch;
+                int rowL = gridL + ((gridR - gridL) - usedW) / 2;
+                MakeRect(sc, "ZPipe_Row" + r, rowL, ry - 2, usedW, 4, M_BORDER, M_BORDER, 0);
+
+                for (int c = 0; c < inThisRow; c++) {
+                    int cx = rowL + colPitch * c + colPitch / 2;
                     DrawValveSym(sc, "ZVlv_" + r + "_" + c, cx, ry, vNum);
                     vNum++;
                 }
             }
         }
 
-        // Paginated valve table: NO. | TAG | NAME | LOCATION | STATUS | OPEN | CLOSE, split into 2
-        // columns of 8 rows each (16 valves per page). All 28 rows are built once; each row's
-        // Visible property is dynamized against the internal BilgePage tag, so page 0's and page
-        // 1's rows occupy the exact same screen slot and only one is ever shown at a time — the
-        // UP/DOWN buttons (built in BuildScreenBilge) just change which page is visible. Name/
-        // Location read the manually-maintained Valve_Meta_DB tags (Vnnn_Name/Vnnn_Location) —
-        // empty until an engineer fills them in.
-        static void BuildValveTable(HmiScreen sc, int px, int py, int pw, int ph, int vStart, int vEnd)
+        // Paged valve table: NO. | TAG | NAME | LOCATION | STATUS | OPEN | CLOSE, in 2 columns of
+        // 7 = 14 fixed slots. Every cell binds NATIVELY (TagDynamization) to the PLC's per-zone
+        // page window — slot 3 always reads Er_TblState_3, a constant name, while the PLC shifts
+        // what that slot contains as the page changes (see FB_ValveLoop's window loops).
+        //
+        // The previous version computed each slot's tag name in JavaScript from a page counter,
+        // which meant ~126 polled scripts per screen; that is what made Screen_Bilge slow to load,
+        // and a TagDynamization cannot express a name that is only known at runtime. Moving the
+        // paging arithmetic into the PLC removes the indirection entirely.
+        //
+        // TblState == -1 means "no valve in this slot on this page" (the last page of a zone whose
+        // valve count isn't a multiple of 14), rendered blank. 0 still means UNCONFIGURED.
+        // zonePrefix is Aft/Er/Fwd; maxPage is the last 0-based page index for this zone.
+        static void BuildValveTable(HmiScreen sc, int px, int py, int pw, int ph,
+                                     string zonePrefix, int zoneStart, int maxPage)
         {
             MakePanel(sc, "Tbl_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             MakeRect(sc, "Tbl_Hdr", px, py, pw, 38, M_HDR, M_HDR, 0);
             MakeTb(sc, "Tbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE LIST", M_TRANS, M_HDRTXT, 0, "Left", 18, true);
 
             const int cols = 2;
-            const int rowsPerCol = 8; // per page
-            int vCount = vEnd - vStart + 1;
-            int pages = (vCount + (cols * rowsPerCol) - 1) / (cols * rowsPerCol); // ceil(28/16)=2
-            int colGutter = 8;
+            const int rowsPerCol = 7;
+            int colGutter = 24;                         // room for the divider between the halves
             int colW = (pw - 32 - colGutter) / cols;     // 16px side margins inside the panel
             const int colHdrH = 30;
             int rowH = (ph - 38 - colHdrH - 10) / rowsPerCol;
 
-            // Field widths within one ~colW-wide column — unchanged from the non-paginated version,
-            // since colW here (~731px) is roomy enough to not need any shrinking.
-            const int noW = 36, tagW = 58, nameW = 190, locW = 140, statusW = 98, btnW = 94, btnGap = 6;
+            // Field widths within one ~colW-wide column, with `pad` breathing room between each so
+            // STATUS doesn't run into the command buttons. The status dot was removed (the status
+            // word is already colour-coded by the same state, so the dot only repeated it).
+            // Budget at pw=1674: colW=809; fields 34+72+182+156+112+200 = 756, plus 5 pads = 806,
+            // leaving 3px slack. Widths are set against worst-case content so nothing clips:
+            //   NO.      34  "28"                    ~20px
+            //   TAG      72  "CM-29" @15 bold        ~48px   (was 64 and clipped the last digit)
+            //   NAME    182  20 chars @13            ~143px  (Valve_Meta_DB is String[20])
+            //   LOCATION156  20 chars @13            ~143px
+            //   STATUS  112  "UNCONFIGURED" @14 bold ~101px  (longest state word)
+            //   COMMAND 200  two 96px buttons + 8 gap
+            const int noW = 34, tagW = 72, nameW = 182, locW = 156, statusW = 112,
+                      btnW = 96, btnGap = 8, pad = 10;
 
-            // Column headers — page-independent, built once.
+            int bodyTop = py + 38 + 2 + colHdrH + 4;
+
+            // Header band behind the column labels, so they read as a header rather than as
+            // another data row. Drawn before the divider and labels so it sits underneath both.
+            MakeRect(sc, "Tbl_HdrBand", px + 1, py + 38, pw - 2, colHdrH + 6, M_HDRBAND, M_HDRBAND, 0);
+
+            // Divider between the two halves — the left column's COMMAND buttons otherwise sit
+            // hard against the right column's NO., making them read as one run of cells.
+            int divX = px + 16 + colW + colGutter / 2;
+            MakeRect(sc, "Tbl_Div", divX, py + 42, 2, ph - 48, M_ACCENT, M_ACCENT, 0);
             for (int col = 0; col < cols; col++) {
                 int cx0 = px + 16 + col * (colW + colGutter);
                 int hy = py + 38 + 2;
-                int hxTag  = cx0 + noW;
-                int hxName = hxTag + tagW;
-                int hxLoc  = hxName + nameW;
-                int hxSt   = hxLoc + locW;
-                int hxCmd  = hxSt + statusW;
+                int hxTag  = cx0 + noW + pad;
+                int hxName = hxTag + tagW + pad;
+                int hxLoc  = hxName + nameW + pad;
+                int hxSt   = hxLoc + locW + pad;
+                int hxCmd  = hxSt + statusW + pad;
 
                 MakeTb(sc, "Tbl_H_No"   + col, cx0,    hy, noW,               colHdrH, "NO.",      M_TRANS, M_MUTED, 0, "Center", 14, true);
                 MakeTb(sc, "Tbl_H_Tag"  + col, hxTag,  hy, tagW,              colHdrH, "TAG",      M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "Tbl_H_Name" + col, hxName, hy, nameW - 4,         colHdrH, "NAME",     M_TRANS, M_MUTED, 0, "Left",   14, true);
-                MakeTb(sc, "Tbl_H_Loc"  + col, hxLoc,  hy, locW - 4,          colHdrH, "LOCATION", M_TRANS, M_MUTED, 0, "Left",   14, true);
+                MakeTb(sc, "Tbl_H_Name" + col, hxName, hy, nameW,             colHdrH, "NAME",     M_TRANS, M_MUTED, 0, "Center", 14, true);
+                MakeTb(sc, "Tbl_H_Loc"  + col, hxLoc,  hy, locW,              colHdrH, "LOCATION", M_TRANS, M_MUTED, 0, "Center", 14, true);
                 MakeTb(sc, "Tbl_H_St"   + col, hxSt,   hy, statusW,           colHdrH, "STATUS",   M_TRANS, M_MUTED, 0, "Center", 14, true);
                 MakeTb(sc, "Tbl_H_Cmd"  + col, hxCmd,  hy, btnW * 2 + btnGap, colHdrH, "COMMAND",  M_TRANS, M_MUTED, 0, "Center", 14, true);
-            }
 
-            int bodyTop = py + 38 + 2 + colHdrH + 4;
-            for (int page = 0; page < pages; page++) {
-                string visScript = JS_READ + "var p=r(Tags(\"BilgePage\").Read()); return p==" + page + ";";
-                for (int col = 0; col < cols; col++) {
-                    int cx0 = px + 16 + col * (colW + colGutter);
-                    int hxTag  = cx0 + noW;
-                    int hxName = hxTag + tagW;
-                    int hxLoc  = hxName + nameW;
-                    int hxSt   = hxLoc + locW;
-                    int hxCmd  = hxSt + statusW;
+                for (int r = 0; r < rowsPerCol; r++) {
+                    // 1-based slot index into the PLC's 14-entry window for this zone.
+                    int slot = col * rowsPerCol + r + 1;
+                    int rY = bodyTop + r * rowH;
+                    string sfx = "_" + col + "_" + r;
+                    string stateTag = zonePrefix + "_TblState_" + slot;
 
-                    for (int r = 0; r < rowsPerCol; r++) {
-                        int vNum = vStart + page * (cols * rowsPerCol) + col * rowsPerCol + r;
-                        if (vNum > vEnd) continue;
-                        int rY = bodyTop + r * rowH;
-                        string vTag = string.Format("V{0:D3}", vNum);
+                    // Alternating row tint, drawn first so every cell in the row sits on top of it.
+                    // This replaces the old hairline rule between rows — across a row this wide a
+                    // tint band tracks far better than a 1px line, and it's a plain rect with no
+                    // dynamization, so it costs nothing at runtime.
+                    if (r % 2 == 1)
+                        MakeRect(sc, "Tr_Zeb" + sfx, cx0 - 6, rY, colW + 6, rowH, M_ZEBRA, M_ZEBRA, 0);
 
-                        var noTb = MakeTb(sc, "Tr_No_"  + vNum, cx0,          rY, noW,       rowH, (vNum - vStart + 1).ToString(), M_TRANS, M_MUTED, 0, "Center", 15, false);
-                        Dyn(noTb, "Visible", visScript, "T1s");
-                        var tagTb = MakeTb(sc, "Tr_Tag_" + vNum, cx0 + noW,    rY, tagW,      rowH, Disp(vNum),                    M_TRANS, M_TEXT,  0, "Center", 15, true);
-                        Dyn(tagTb, "Visible", visScript, "T1s");
+                    // NO. is the row's position within the zone (1..28); TAG is the CM-nn label,
+                    // preformatted by the PLC so no string work is needed here.
+                    var noTb = MakeTb(sc, "Tr_No" + sfx, cx0, rY, noW, rowH, "", M_TRANS, M_MUTED, 0, "Center", 15, false);
+                    DynTag(noTb, "Text", zonePrefix + "_TblNo_" + slot);
+                    var tagTb = MakeTb(sc, "Tr_Tag" + sfx, cx0 + noW, rY, tagW, rowH, "", M_TRANS, M_TEXT, 0, "Center", 15, true);
+                    DynTag(tagTb, "Text", zonePrefix + "_TblTag_" + slot);
 
-                        var nameVal = MakeLiveText(sc, "Tr_Name_" + vNum, hxName, rY, nameW - 4, rowH, M_TEXT, "Left", 13, false);
-                        Dyn(nameVal, "Text", JS_READ + "var v=r(Tags(\"" + vTag + "_Name\").Read()); return (v&&v.length)?v:\"&#x2014;\";", "T1s");
-                        Dyn(nameVal, "Visible", visScript, "T1s");
+                    // NAME/LOCATION centred so the cells line up under their headers.
+                    var nameVal = MakeLiveText(sc, "Tr_Name" + sfx, hxName, rY, nameW, rowH, M_TEXT, "Center", 13, false);
+                    DynTag(nameVal, "Text", zonePrefix + "_TblName_" + slot);
 
-                        var locVal = MakeLiveText(sc, "Tr_Loc_" + vNum, hxLoc, rY, locW - 4, rowH, M_MUTED, "Left", 13, false);
-                        Dyn(locVal, "Text", JS_READ + "var v=r(Tags(\"" + vTag + "_Location\").Read()); return (v&&v.length)?v:\"&#x2014;\";", "T1s");
-                        Dyn(locVal, "Visible", visScript, "T1s");
+                    var locVal = MakeLiveText(sc, "Tr_Loc" + sfx, hxLoc, rY, locW, rowH, M_MUTED, "Center", 13, false);
+                    DynTag(locVal, "Text", zonePrefix + "_TblLoc_" + slot);
 
-                        var dot = MakeDot(sc, "Tr_Dot_" + vNum, hxSt + 12, rY + rowH / 2, 6, 6, M_MUTED, M_MUTED, 0);
-                        Dyn(dot, "BackColor", ValveStateColorScript(vTag), "T500ms");
-                        Dyn(dot, "Visible", visScript, "T1s");
-                        var stVal = MakeLiveText(sc, "Tr_St_" + vNum, hxSt + 24, rY, statusW - 28, rowH, M_MUTED, "Left", 14, true);
-                        Dyn(stVal, "Text", ValveStateTextScript(vTag), "T500ms");
-                        Dyn(stVal, "ForeColor", ValveStateColorScript(vTag), "T500ms");
-                        Dyn(stVal, "Visible", visScript, "T1s");
+                    // Word comes ready-made from the PLC (direct bind); only its colour needs the
+                    // value map, which is allowed on colour properties but not on Text.
+                    var stVal = MakeLiveText(sc, "Tr_St" + sfx, hxSt, rY, statusW, rowH, M_MUTED, "Center", 14, true);
+                    DynTag(stVal, "Text", zonePrefix + "_TblStateTxt_" + slot);
+                    AddValueMap(DynTag(stVal, "ForeColor", stateTag), TBL_CODES, TBL_COLORS);
 
-                        int btnX = hxCmd;
-                        var openBtn  = MakeBtn(sc, "Tr_Open_"  + vNum, btnX,                    rY + 2, btnW, rowH - 4, "OPEN",  M_BOX, M_GREEN, M_GREEN, 1, 15, true);
-                        var closeBtn = MakeBtn(sc, "Tr_Close_" + vNum, btnX + btnW + btnGap,    rY + 2, btnW, rowH - 4, "CLOSE", M_BOX, M_RED,   M_RED,   1, 15, true);
-                        AddCmdScript(openBtn, vTag, true);
-                        AddCmdScript(closeBtn, vTag, false);
-                        // Fill with the state color when active; white/idle otherwise.
-                        Dyn(openBtn, "BackColor", ValveStateReads(vTag) + "if(op&&!cl) return 0xFF009E4A; return 0xFFFFFFFF;", "T500ms");
-                        Dyn(closeBtn, "BackColor", ValveStateReads(vTag) + "if(cl&&!op) return 0xFFCD2026; return 0xFFFFFFFF;", "T500ms");
-                        Dyn(openBtn, "Visible", visScript, "T1s");
-                        Dyn(closeBtn, "Visible", visScript, "T1s");
-
-                        bool nextExistsInSlot = r < rowsPerCol - 1 && (vNum + 1) <= vEnd;
-                        if (nextExistsInSlot) {
-                            var sep = MakeRect(sc, "Tr_Sep_" + vNum, cx0, rY + rowH - 1, colW, 1, M_LINE, M_LINE, 0);
-                            Dyn(sep, "Visible", visScript, "T1s");
-                        }
-                    }
+                    int btnX = hxCmd;
+                    var openBtn  = MakeBtn(sc, "Tr_Open"  + sfx, btnX,                rY + 2, btnW, rowH - 4, "OPEN",  M_BOX, M_GREEN, M_GREEN, 1, 15, true);
+                    var closeBtn = MakeBtn(sc, "Tr_Close" + sfx, btnX + btnW + btnGap, rY + 2, btnW, rowH - 4, "CLOSE", M_BOX, M_RED,   M_RED,   1, 15, true);
+                    // Fill only in the matching state; every other state falls back to the
+                    // button's own white background (see FILL_OPEN/FILL_CLOSE).
+                    AddValueMap(DynTag(openBtn,  "BackColor", stateTag), FILL_OPEN_CODES,  FILL_OPEN);
+                    AddValueMap(DynTag(closeBtn, "BackColor", stateTag), FILL_CLOSE_CODES, FILL_CLOSE);
+                    // Commands stay scripts, but these are click *events* — they run on tap, never
+                    // on screen activation, so they cost nothing at load time. The valve is
+                    // resolved at click time from the slot's live NO. tag.
+                    AddSlotCmdScript(openBtn,  zonePrefix, slot, zoneStart, true);
+                    AddSlotCmdScript(closeBtn, zonePrefix, slot, zoneStart, false);
                 }
             }
         }

@@ -93,6 +93,18 @@
     <Member Name="tempAftFault" Datatype="Int" />
     <Member Name="tempAftLocal" Datatype="Int" />
     <Member Name="tempAftConfigured" Datatype="Int" />
+    <Member Name="j" Datatype="Int" />
+    <Member Name="z" Datatype="Int" />
+    <Member Name="idx" Datatype="Int" />
+    <Member Name="base" Datatype="Int" />
+    <Member Name="zStart" Datatype="Int" />
+    <Member Name="zEnd" Datatype="Int" />
+    <Member Name="tagStr" Datatype="String[8]" />
+    <Member Name="w" Datatype="Int" />
+    <Member Name="b" Datatype="Int" />
+    <Member Name="bitIdx" Datatype="Int" />
+    <Member Name="packWord" Datatype="Word" />
+    <Member Name="simStepAtStart" Datatype="Int" />
   </Section>
   <Section Name="Constant" />
 </Sections></Interface>
@@ -142,6 +154,13 @@
 
     FOR #i := 1 TO 88 DO
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
+            // Snapshot BEFORE this scan's command/timer processing runs — needed by the
+            // Unexpected Movement (F) guard below to tell a genuine idle-and-unexplained drop
+            // apart from a normal command-triggered one (a fresh command sets SimStep 0->nonzero
+            // in section 1; a completing travel sets it nonzero->0 in section 2 — comparing
+            // only the post-scan value can't distinguish either from true idle-the-whole-scan).
+            #simStepAtStart := #SimStep[#i];
+
             // Auto-initialize Healthy status to TRUE and Resting Position to CLOSED seat if uninitialized
             IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB AND #SimStep[#i] = 0 THEN
                 &quot;Valves_DB&quot;.Valve[#i].Healthy := TRUE;
@@ -179,18 +198,37 @@
             // 100ms, which isn't guaranteed, so the MOVING state could flash by in well
             // under a second on a fast scan. A TON runs on the CPU's real-time clock, so
             // this duration is exact regardless of scan speed.
+            // Stuck (set via the popup's SIMULATE STUCK toggle) holds the valve at the normal
+            // 3s completion so it never arrives — TON.ET keeps counting past PT as long as IN
+            // stays true, so at 8s (well past the normal 3s travel) that's a genuine failure to
+            // arrive, not just "still moving": latch Fail to Open/Close (C/D) and give up on the
+            // sequence, leaving both feedbacks false (position genuinely unknown).
             &quot;Valves_DB&quot;.Valve[#i].TimerOpen(IN := #SimStep[#i] = 1, PT := T#3S);
-            IF #SimStep[#i] = 1 AND &quot;Valves_DB&quot;.Valve[#i].TimerOpen.Q THEN
-                &quot;Valves_DB&quot;.Valve[#i].OpenFB := TRUE;   // Reached OPEN position!
-                &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
-                #SimStep[#i] := 0;                       // Sequence complete
+            IF #SimStep[#i] = 1 THEN
+                IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerOpen.Q THEN
+                    &quot;Valves_DB&quot;.Valve[#i].OpenFB := TRUE;   // Reached OPEN position!
+                    &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
+                    #SimStep[#i] := 0;                       // Sequence complete
+                ELSIF &quot;Valves_DB&quot;.Valve[#i].TimerOpen.ET &gt;= T#8S THEN
+                    &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] := TRUE;  // Fail to Open (C)
+                    &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
+                    &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
+                    #SimStep[#i] := 0;
+                END_IF;
             END_IF;
 
             &quot;Valves_DB&quot;.Valve[#i].TimerClose(IN := #SimStep[#i] = 2, PT := T#3S);
-            IF #SimStep[#i] = 2 AND &quot;Valves_DB&quot;.Valve[#i].TimerClose.Q THEN
-                &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE; // Reached CLOSED position!
-                &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
-                #SimStep[#i] := 0;                       // Sequence complete
+            IF #SimStep[#i] = 2 THEN
+                IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerClose.Q THEN
+                    &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE; // Reached CLOSED position!
+                    &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
+                    #SimStep[#i] := 0;                       // Sequence complete
+                ELSIF &quot;Valves_DB&quot;.Valve[#i].TimerClose.ET &gt;= T#8S THEN
+                    &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i] := TRUE; // Fail to Close (D)
+                    &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
+                    &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
+                    #SimStep[#i] := 0;
+                END_IF;
             END_IF;
 
             // 3. Failsafe Double Indication Fault Check
@@ -198,54 +236,102 @@
                 &quot;Valves_DB&quot;.Valve[#i].Healthy := FALSE; // Trip Fault
             END_IF;
 
+            // 3a. Alarm conditions E (Loss of Position) and F (Unexpected Movement) — both
+            // derived from the exact same OpenFB/ClosedFB pair used everywhere else; the only
+            // extra ingredient is TIME and CONTEXT (was a command active, what did it say a
+            // moment ago), not any new signal.
+            //
+            // E: idle (SimStep=0, so no travel is legitimately in progress) with NEITHER limit
+            // switch made — held for 2s via PosLostTmr so a normal in-flight transition can't
+            // false-trip it. Suppressed while a timeout (C/D) is already latched, since that is
+            // the exact same physical symptom (no position) already alarmed under its own name.
+            &quot;Valves_DB&quot;.PosLostTmr[#i](
+                IN := (#SimStep[#i] = 0) AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB
+                      AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB
+                      AND NOT &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] AND NOT &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i],
+                PT := T#2S);
+
+            // F: a limit switch that WAS made a scan ago has dropped, with no travel sequence
+            // running to explain it — nobody commanded this, so something moved the valve
+            // (handwheel) or a switch/wiring fault occurred. Latched.
+            // Requires SimStep to have been 0 BOTH before and after this scan's processing: a
+            // fresh command (0 -> nonzero, in section 1) or a completing travel (nonzero -> 0,
+            // in section 2) each only satisfy ONE side of this, so both are correctly excluded —
+            // only a scan truly idle throughout can reach here.
+            IF #simStepAtStart = 0 AND #SimStep[#i] = 0 THEN
+                IF (&quot;Valves_DB&quot;.PrevOpenFB[#i] AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB) OR
+                   (&quot;Valves_DB&quot;.PrevClosedFB[#i] AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB) THEN
+                    &quot;Valves_DB&quot;.UnexpMove[#i] := TRUE;
+                END_IF;
+            END_IF;
+            &quot;Valves_DB&quot;.PrevOpenFB[#i] := &quot;Valves_DB&quot;.Valve[#i].OpenFB;
+            &quot;Valves_DB&quot;.PrevClosedFB[#i] := &quot;Valves_DB&quot;.Valve[#i].ClosedFB;
+
             // 4. Priority Summary Counting — plant-wide AND per-zone in the same pass
             // (this loop already runs 1..88 every scan regardless, so the zone-scoped
             // increments below are free — they're what let every HMI KPI/caption cell
             // read one tag instead of re-looping its zone's 28-32 valves itself).
-            // Zone valve-number ranges: ER=1-28, FWD=29-60, AFT=61-88.
+            // Zone valve-number ranges follow physical position from stern to bow, so the HMI
+            // mimic reads CM-01..CM-88 straight across: AFT=1-28, ER=29-56, FWD=57-88.
             #tempConfigured := #tempConfigured + 1;
             IF #i &lt;= 28 THEN
-                #tempErConfigured := #tempErConfigured + 1;
-            ELSIF #i &lt;= 60 THEN
-                #tempFwdConfigured := #tempFwdConfigured + 1;
-            ELSE
                 #tempAftConfigured := #tempAftConfigured + 1;
+            ELSIF #i &lt;= 56 THEN
+                #tempErConfigured := #tempErConfigured + 1;
+            ELSE
+                #tempFwdConfigured := #tempFwdConfigured + 1;
             END_IF;
 
-            IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy OR (&quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB) THEN
+            // StateCode is assigned in these same branches (0=UNCONFIGURED 1=FAULT 2=LOCAL
+            // 3=OPEN 4=CLOSED 5=MOVING) so the HMI reads one Int per valve instead of
+            // recombining five raw bits in JavaScript on every refresh.
+            IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy OR (&quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB)
+               OR &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] OR &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i] THEN
+                &quot;Valves_DB&quot;.StateCode[#i] := 1;
                 #tempFault := #tempFault + 1;
-                IF #i &lt;= 28 THEN #tempErFault := #tempErFault + 1;
-                ELSIF #i &lt;= 60 THEN #tempFwdFault := #tempFwdFault + 1;
-                ELSE #tempAftFault := #tempAftFault + 1;
+                IF #i &lt;= 28 THEN #tempAftFault := #tempAftFault + 1;
+                ELSIF #i &lt;= 56 THEN #tempErFault := #tempErFault + 1;
+                ELSE #tempFwdFault := #tempFwdFault + 1;
                 END_IF;
             ELSIF &quot;Valves_DB&quot;.Valve[#i].LocalMode THEN
+                &quot;Valves_DB&quot;.StateCode[#i] := 2;
                 #tempLocal := #tempLocal + 1;
-                IF #i &lt;= 28 THEN #tempErLocal := #tempErLocal + 1;
-                ELSIF #i &lt;= 60 THEN #tempFwdLocal := #tempFwdLocal + 1;
-                ELSE #tempAftLocal := #tempAftLocal + 1;
+                IF #i &lt;= 28 THEN #tempAftLocal := #tempAftLocal + 1;
+                ELSIF #i &lt;= 56 THEN #tempErLocal := #tempErLocal + 1;
+                ELSE #tempFwdLocal := #tempFwdLocal + 1;
                 END_IF;
             ELSIF &quot;Valves_DB&quot;.Valve[#i].OpenFB AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
+                &quot;Valves_DB&quot;.StateCode[#i] := 3;
                 #tempOpen := #tempOpen + 1;
-                IF #i &lt;= 28 THEN #tempErOpen := #tempErOpen + 1;
-                ELSIF #i &lt;= 60 THEN #tempFwdOpen := #tempFwdOpen + 1;
-                ELSE #tempAftOpen := #tempAftOpen + 1;
+                IF #i &lt;= 28 THEN #tempAftOpen := #tempAftOpen + 1;
+                ELSIF #i &lt;= 56 THEN #tempErOpen := #tempErOpen + 1;
+                ELSE #tempFwdOpen := #tempFwdOpen + 1;
                 END_IF;
             ELSIF NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
+                &quot;Valves_DB&quot;.StateCode[#i] := 4;
                 #tempClosed := #tempClosed + 1;
-                IF #i &lt;= 28 THEN #tempErClosed := #tempErClosed + 1;
-                ELSIF #i &lt;= 60 THEN #tempFwdClosed := #tempFwdClosed + 1;
-                ELSE #tempAftClosed := #tempAftClosed + 1;
+                IF #i &lt;= 28 THEN #tempAftClosed := #tempAftClosed + 1;
+                ELSIF #i &lt;= 56 THEN #tempErClosed := #tempErClosed + 1;
+                ELSE #tempFwdClosed := #tempFwdClosed + 1;
                 END_IF;
             ELSE
+                &quot;Valves_DB&quot;.StateCode[#i] := 5;
                 #tempTransit := #tempTransit + 1; // MOVING state!
-                IF #i &lt;= 28 THEN #tempErTransit := #tempErTransit + 1;
-                ELSIF #i &lt;= 60 THEN #tempFwdTransit := #tempFwdTransit + 1;
-                ELSE #tempAftTransit := #tempAftTransit + 1;
+                IF #i &lt;= 28 THEN #tempAftTransit := #tempAftTransit + 1;
+                ELSIF #i &lt;= 56 THEN #tempErTransit := #tempErTransit + 1;
+                ELSE #tempFwdTransit := #tempFwdTransit + 1;
                 END_IF;
             END_IF;
         ELSE
+            &quot;Valves_DB&quot;.StateCode[#i] := 0;
             &quot;Valves_DB&quot;.Valve[#i].OpenCmd := FALSE;
             &quot;Valves_DB&quot;.Valve[#i].CloseCmd := FALSE;
+            // Don't let an unconfigured/removed valve leave a stale latched alarm behind.
+            &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] := FALSE;
+            &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i] := FALSE;
+            &quot;Valves_DB&quot;.UnexpMove[#i] := FALSE;
+            &quot;Valves_DB&quot;.PrevOpenFB[#i] := FALSE;
+            &quot;Valves_DB&quot;.PrevClosedFB[#i] := FALSE;
         END_IF;
     END_FOR;
 
@@ -276,7 +362,211 @@
     &quot;Valves_DB&quot;.AftFault := #tempAftFault;
     &quot;Valves_DB&quot;.AftLocal := #tempAftLocal;
     &quot;Valves_DB&quot;.AftConfigured := #tempAftConfigured;
-  </Text>
+
+    // ---- Alarm condition bit-packing -----------------------------------------
+    // WinCC discrete alarms trigger off a bit within a Word tag (RaisedStateTag +
+    // RaisedStateTagBitNumber), not a bare Bool array element, so each of the 7 per-valve
+    // conditions gets packed into 6 words (96 bits, 88 used) here. Valve V's bit for any
+    // condition is word (V-1)/16, bit (V-1) MOD 16 — matches how the HMI-side alarm creation
+    // computes the same trigger address, so the two have to stay in lockstep.
+    FOR #w := 0 TO 5 DO
+        #packWord := 0;
+        FOR #b := 0 TO 15 DO
+            #bitIdx := #w * 16 + #b + 1;
+            IF #bitIdx &lt;= 88 THEN
+                IF NOT &quot;Valves_DB&quot;.Valve[#bitIdx].Healthy THEN
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                END_IF;
+            END_IF;
+        END_FOR;
+        &quot;Valves_DB&quot;.W_Unhealthy[#w] := #packWord;
+    END_FOR;
+
+    FOR #w := 0 TO 5 DO
+        #packWord := 0;
+        FOR #b := 0 TO 15 DO
+            #bitIdx := #w * 16 + #b + 1;
+            IF #bitIdx &lt;= 88 THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].OpenFB AND &quot;Valves_DB&quot;.Valve[#bitIdx].ClosedFB THEN
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                END_IF;
+            END_IF;
+        END_FOR;
+        &quot;Valves_DB&quot;.W_Conflict[#w] := #packWord;
+    END_FOR;
+
+    FOR #w := 0 TO 5 DO
+        #packWord := 0;
+        FOR #b := 0 TO 15 DO
+            #bitIdx := #w * 16 + #b + 1;
+            IF #bitIdx &lt;= 88 THEN
+                IF &quot;Valves_DB&quot;.TimeoutOpenAlarm[#bitIdx] THEN
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                END_IF;
+            END_IF;
+        END_FOR;
+        &quot;Valves_DB&quot;.W_FailOpen[#w] := #packWord;
+    END_FOR;
+
+    FOR #w := 0 TO 5 DO
+        #packWord := 0;
+        FOR #b := 0 TO 15 DO
+            #bitIdx := #w * 16 + #b + 1;
+            IF #bitIdx &lt;= 88 THEN
+                IF &quot;Valves_DB&quot;.TimeoutCloseAlarm[#bitIdx] THEN
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                END_IF;
+            END_IF;
+        END_FOR;
+        &quot;Valves_DB&quot;.W_FailClose[#w] := #packWord;
+    END_FOR;
+
+    FOR #w := 0 TO 5 DO
+        #packWord := 0;
+        FOR #b := 0 TO 15 DO
+            #bitIdx := #w * 16 + #b + 1;
+            IF #bitIdx &lt;= 88 THEN
+                IF &quot;Valves_DB&quot;.PosLostTmr[#bitIdx].Q THEN
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                END_IF;
+            END_IF;
+        END_FOR;
+        &quot;Valves_DB&quot;.W_LossPos[#w] := #packWord;
+    END_FOR;
+
+    FOR #w := 0 TO 5 DO
+        #packWord := 0;
+        FOR #b := 0 TO 15 DO
+            #bitIdx := #w * 16 + #b + 1;
+            IF #bitIdx &lt;= 88 THEN
+                IF &quot;Valves_DB&quot;.UnexpMove[#bitIdx] THEN
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                END_IF;
+            END_IF;
+        END_FOR;
+        &quot;Valves_DB&quot;.W_UnexpMove[#w] := #packWord;
+    END_FOR;
+
+    FOR #w := 0 TO 5 DO
+        #packWord := 0;
+        FOR #b := 0 TO 15 DO
+            #bitIdx := #w * 16 + #b + 1;
+            IF #bitIdx &lt;= 88 THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].LocalMode THEN
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                END_IF;
+            END_IF;
+        END_FOR;
+        &quot;Valves_DB&quot;.W_Local[#w] := #packWord;
+    END_FOR;
+
+    // Simulated hardware health (indices 1..9) into a single word.
+    #packWord := 0;
+    FOR #b := 0 TO 8 DO
+        IF NOT &quot;Valves_DB&quot;.HwHealthy[#b + 1] THEN
+            #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+        END_IF;
+    END_FOR;
+    &quot;Valves_DB&quot;.HwWord := #packWord;
+
+    // ---- Paged table windows ------------------------------------------------
+    // The HMI valve table has 14 fixed slots. Copy whichever page each zone is showing into
+    // these windows so every HMI slot can bind to a constant tag name (e.g. ErTblState[3])
+    // rather than building the name in JavaScript from a page tag — that indirection is what
+    // forced the table onto ~126 polled scripts and made the screen slow to load.
+    // TblState = -1 marks a slot with no valve on this page (0 already means UNCONFIGURED).
+    // 14 iterations x 3 zones per scan is negligible next to the 88-valve loop above.
+
+    // AFT BALLAST: valves 1..28 (2 pages)
+    #base := 1 + &quot;Valves_DB&quot;.AftPage * 14;
+    FOR #j := 1 TO 14 DO
+        #idx := #base + #j - 1;
+        IF #idx &lt;= 28 THEN
+            &quot;Valves_DB&quot;.AftTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+            &quot;Valves_DB&quot;.AftTblNo[#j] := #idx;
+            // RIGHT() strips the leading sign-space INT_TO_STRING puts in front of a positive
+            // number: without it CONCAT yields 'CM- 29' rather than 'CM-29'.
+            IF #idx &lt; 10 THEN
+                &quot;Valves_DB&quot;.AftTblTag[#j] := CONCAT(IN1 := 'CM-0', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 1));
+            ELSE
+                &quot;Valves_DB&quot;.AftTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+            END_IF;
+            &quot;Valve_Meta_DB&quot;.AftTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+            &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                0: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'UNCONFIGURED';
+                1: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'FAULT';
+                2: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'LOCAL';
+                3: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'OPEN';
+                4: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'CLOSED';
+                ELSE &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'MOVING';
+            END_CASE;
+        ELSE
+            &quot;Valves_DB&quot;.AftTblState[#j] := 6;
+            &quot;Valves_DB&quot;.AftTblNo[#j] := 0;
+            &quot;Valves_DB&quot;.AftTblTag[#j] := '';
+            &quot;Valves_DB&quot;.AftTblStateTxt[#j] := '';
+            &quot;Valve_Meta_DB&quot;.AftTblName[#j] := '';
+            &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := '';
+        END_IF;
+    END_FOR;
+
+    // BILGE / ER: valves 29..56 (2 pages)
+    #base := 29 + &quot;Valves_DB&quot;.ErPage * 14;
+    FOR #j := 1 TO 14 DO
+        #idx := #base + #j - 1;
+        IF #idx &lt;= 56 THEN
+            &quot;Valves_DB&quot;.ErTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+            &quot;Valves_DB&quot;.ErTblNo[#j] := #idx - 28;
+            &quot;Valves_DB&quot;.ErTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+            &quot;Valve_Meta_DB&quot;.ErTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+            &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                0: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'UNCONFIGURED';
+                1: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'FAULT';
+                2: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'LOCAL';
+                3: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'OPEN';
+                4: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'CLOSED';
+                ELSE &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'MOVING';
+            END_CASE;
+        ELSE
+            &quot;Valves_DB&quot;.ErTblState[#j] := 6;
+            &quot;Valves_DB&quot;.ErTblNo[#j] := 0;
+            &quot;Valves_DB&quot;.ErTblTag[#j] := '';
+            &quot;Valves_DB&quot;.ErTblStateTxt[#j] := '';
+            &quot;Valve_Meta_DB&quot;.ErTblName[#j] := '';
+            &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := '';
+        END_IF;
+    END_FOR;
+
+    // FORWARD BALLAST: valves 57..88 (3 pages: 14/14/4)
+    #base := 57 + &quot;Valves_DB&quot;.FwdPage * 14;
+    FOR #j := 1 TO 14 DO
+        #idx := #base + #j - 1;
+        IF #idx &lt;= 88 THEN
+            &quot;Valves_DB&quot;.FwdTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+            &quot;Valves_DB&quot;.FwdTblNo[#j] := #idx - 56;
+            &quot;Valves_DB&quot;.FwdTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+            &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+            &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                0: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'UNCONFIGURED';
+                1: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'FAULT';
+                2: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'LOCAL';
+                3: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'OPEN';
+                4: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'CLOSED';
+                ELSE &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'MOVING';
+            END_CASE;
+        ELSE
+            &quot;Valves_DB&quot;.FwdTblState[#j] := 6;
+            &quot;Valves_DB&quot;.FwdTblNo[#j] := 0;
+            &quot;Valves_DB&quot;.FwdTblTag[#j] := '';
+            &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := '';
+            &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := '';
+            &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := '';
+        END_IF;
+    END_FOR;
+</Text>
 </StructuredText></NetworkSource>
           <ProgrammingLanguage>SCL</ProgrammingLanguage>
         </AttributeList>
