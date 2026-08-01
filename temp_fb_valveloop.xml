@@ -152,6 +152,13 @@
         &quot;Valves_DB&quot;.ClockCounter := 0;
     END_IF;
 
+    // Auto-initialize hardware health to TRUE (healthy until told otherwise) if all are FALSE at startup
+    IF NOT &quot;Valves_DB&quot;.HwHealthy[1] AND NOT &quot;Valves_DB&quot;.HwHealthy[8] THEN
+        FOR #b := 1 TO 9 DO
+            &quot;Valves_DB&quot;.HwHealthy[#b] := TRUE;
+        END_FOR;
+    END_IF;
+
     FOR #i := 1 TO 88 DO
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
             // Snapshot BEFORE this scan's command/timer processing runs — needed by the
@@ -203,13 +210,13 @@
             // stays true, so at 8s (well past the normal 3s travel) that's a genuine failure to
             // arrive, not just "still moving": latch Fail to Open/Close (C/D) and give up on the
             // sequence, leaving both feedbacks false (position genuinely unknown).
-            &quot;Valves_DB&quot;.Valve[#i].TimerOpen(IN := #SimStep[#i] = 1, PT := T#3S);
+            &quot;Valves_DB&quot;.Valve[#i].TimerOpen(IN := #SimStep[#i] = 1, PT := T#8S);
             IF #SimStep[#i] = 1 THEN
-                IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerOpen.Q THEN
+                IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerOpen.ET &gt;= T#3S THEN
                     &quot;Valves_DB&quot;.Valve[#i].OpenFB := TRUE;   // Reached OPEN position!
                     &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
                     #SimStep[#i] := 0;                       // Sequence complete
-                ELSIF &quot;Valves_DB&quot;.Valve[#i].TimerOpen.ET &gt;= T#8S THEN
+                ELSIF &quot;Valves_DB&quot;.Valve[#i].TimerOpen.Q THEN
                     &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] := TRUE;  // Fail to Open (C)
                     &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
                     &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
@@ -217,13 +224,13 @@
                 END_IF;
             END_IF;
 
-            &quot;Valves_DB&quot;.Valve[#i].TimerClose(IN := #SimStep[#i] = 2, PT := T#3S);
+            &quot;Valves_DB&quot;.Valve[#i].TimerClose(IN := #SimStep[#i] = 2, PT := T#8S);
             IF #SimStep[#i] = 2 THEN
-                IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerClose.Q THEN
+                IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerClose.ET &gt;= T#3S THEN
                     &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE; // Reached CLOSED position!
                     &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
                     #SimStep[#i] := 0;                       // Sequence complete
-                ELSIF &quot;Valves_DB&quot;.Valve[#i].TimerClose.ET &gt;= T#8S THEN
+                ELSIF &quot;Valves_DB&quot;.Valve[#i].TimerClose.Q THEN
                     &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i] := TRUE; // Fail to Close (D)
                     &quot;Valves_DB&quot;.Valve[#i].OpenFB := FALSE;
                     &quot;Valves_DB&quot;.Valve[#i].ClosedFB := FALSE;
@@ -374,7 +381,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
-                IF NOT &quot;Valves_DB&quot;.Valve[#bitIdx].Healthy THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND NOT &quot;Valves_DB&quot;.Valve[#bitIdx].Healthy THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
                 END_IF;
             END_IF;
@@ -387,7 +394,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
-                IF &quot;Valves_DB&quot;.Valve[#bitIdx].OpenFB AND &quot;Valves_DB&quot;.Valve[#bitIdx].ClosedFB THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.Valve[#bitIdx].OpenFB AND &quot;Valves_DB&quot;.Valve[#bitIdx].ClosedFB THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
                 END_IF;
             END_IF;
@@ -400,7 +407,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
-                IF &quot;Valves_DB&quot;.TimeoutOpenAlarm[#bitIdx] THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.TimeoutOpenAlarm[#bitIdx] THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
                 END_IF;
             END_IF;
@@ -413,7 +420,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
-                IF &quot;Valves_DB&quot;.TimeoutCloseAlarm[#bitIdx] THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.TimeoutCloseAlarm[#bitIdx] THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
                 END_IF;
             END_IF;
@@ -426,7 +433,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
-                IF &quot;Valves_DB&quot;.PosLostTmr[#bitIdx].Q THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.PosLostTmr[#bitIdx].Q THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
                 END_IF;
             END_IF;
@@ -439,7 +446,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
-                IF &quot;Valves_DB&quot;.UnexpMove[#bitIdx] THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.UnexpMove[#bitIdx] THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
                 END_IF;
             END_IF;
@@ -452,7 +459,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
-                IF &quot;Valves_DB&quot;.Valve[#bitIdx].LocalMode THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.Valve[#bitIdx].LocalMode THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
                 END_IF;
             END_IF;

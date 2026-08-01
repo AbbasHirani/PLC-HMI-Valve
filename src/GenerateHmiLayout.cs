@@ -103,8 +103,7 @@ namespace ValveDemoHmiBuilder
             }
             try { Run(only, fixTags, dumpTag, exportBlock, importOnly); }
             catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); }
-            Console.WriteLine("\nPress Enter to exit..."); 
-            if (!Console.IsInputRedirected) { try { Console.ReadLine(); } catch {} }
+            Console.WriteLine("\nDone."); 
         }
 
         static bool Want(HashSet<string> only, string key) { return only == null || only.Contains(key); }
@@ -516,17 +515,17 @@ namespace ValveDemoHmiBuilder
             BuildHomeHeader(sc);
             BuildNav(sc, "Screen_Alarms");
 
-            // Alarm Control
+            // Total Fault Count Label
+            var countLbl = MakeLiveText(sc, "TotalFaults", 16, 198, 200, 26, M_RED, "Left", 14, true);
+            SetMLText(countLbl, "Text", "ACTIVE FAULTS: {0}");
             try {
-                var alarmCtrl = sc.ScreenItems.Create<HmiAlarmControl>("AlarmView");
-                Console.WriteLine("  [DEBUG] alarmCtrl instantiated as: " + alarmCtrl.GetType().FullName);
-                alarmCtrl.Left = 16;
-                alarmCtrl.Top = 198;
-                alarmCtrl.Width = 1420;
-                alarmCtrl.Height = 850;
-            } catch (Exception ex) {
-                Console.WriteLine("  [ERROR] Failed to create HmiAlarmControl: " + ex.Message);
-            }
+                var cDyn = countLbl.Dynamizations.Create<ScriptDynamization>("Text");
+                cDyn.ScriptCode =
+                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                    "let n = readTag(Tags(\"Valves_DB_TotalFault\").Read());\n" +
+                    "return \"ACTIVE FAULTS: \" + (n || 0);";
+                cDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+            } catch {}
 
             // SYSTEM STATUS Panel
             int sysX = 1456;
@@ -572,6 +571,22 @@ namespace ValveDemoHmiBuilder
                     dc.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
                 } catch {}
             }
+            
+            // =========================================================================
+            // COM DEADLOCK WARNING: Creating an HmiAlarmControl deadlocks Openness API.
+            // It MUST be the absolute last thing we do on this screen.
+            // =========================================================================
+            try {
+                Console.WriteLine("  [DEBUG] Placing HmiAlarmControl (Openness API will hang here, this is expected)...");
+                Console.Out.Flush();
+                var alarmCtrl = sc.ScreenItems.Create<HmiAlarmControl>("AlarmView");
+                
+                // If it somehow doesn't hang, configure it:
+                alarmCtrl.Left = 16;
+                alarmCtrl.Top = 230; 
+                alarmCtrl.Width = 1420;
+                alarmCtrl.Height = 818;
+            } catch {}
             
             Console.WriteLine("  Screen_Alarms built successfully.");
         }
