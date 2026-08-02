@@ -373,22 +373,22 @@ namespace ValveDemoHmiBuilder
             try {
                 var sDyn = statusIO.Dynamizations.Create<ScriptDynamization>("ProcessValue");
                 sDyn.ScriptCode =
+                    // Reads the same "_State" tag (Valves_DB.StateCode[i]) every other screen uses,
+                    // instead of independently recomputing MOVING/FAULT/etc. from raw feedbacks here.
+                    // That second copy of the logic never included the C/D timeout latches, let alone
+                    // the later UnexpMove/Loss-of-Position conditions, and had silently drifted out
+                    // of sync with StateCode's real priority chain (0=UNCONFIGURED 1=FAULT 2=LOCAL
+                    // 3=OPEN 4=CLOSED 5=MOVING) - one source of truth now, not two.
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
                     "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
                     "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
                     "let vTag = \"V\" + vNum;\n" +
-                    "let configured = readTag(Tags(vTag + \"_Configured\").Read());\n" +
-                    "let healthy    = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
-                    "let open       = readTag(Tags(vTag + \"_OpenFB\").Read());\n" +
-                    "let closed     = readTag(Tags(vTag + \"_ClosedFB\").Read());\n" +
-                    "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n\n" +
-                    "let st = \"MOVING\";\n" +
-                    "if (!configured) st = \"UNCONFIGURED\";\n" +
-                    "else if (!healthy || (open && closed)) st = \"FAULT\";\n" +
-                    "else if (local) st = \"LOCAL MODE\";\n" +
-                    "else if (open && !closed) st = \"OPEN\";\n" +
-                    "else if (!open && closed) st = \"CLOSED\";\n\n" +
-                    "let hl = (!configured) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
+                    "let code = readTag(Tags(vTag + \"_State\").Read());\n" +
+                    "let healthy = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
+                    "let local   = readTag(Tags(vTag + \"_LocalMode\").Read());\n\n" +
+                    "let stNames = [\"UNCONFIGURED\", \"FAULT\", \"LOCAL MODE\", \"OPEN\", \"CLOSED\", \"MOVING\"];\n" +
+                    "let st = stNames[code] || \"MOVING\";\n" +
+                    "let hl = (code === 0) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
                     "let md = local ? \"LOCAL\" : \"AUTO\";\n" +
                     "return \"V-\" + vNum + \"  |  \" + st + \"  |  \" + hl + \"  |  MODE: \" + md;";
                 sDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
