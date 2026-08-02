@@ -391,7 +391,7 @@ namespace ValveDemoHmiBuilder
                     "let hl = (code === 0) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
                     "let md = local ? \"LOCAL\" : \"AUTO\";\n" +
                     "return \"V-\" + vNum + \"  |  \" + st + \"  |  \" + hl + \"  |  MODE: \" + md;";
-                sDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+                sDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
             // ─── OPEN / CLOSE Buttons (Y=96..144) ─────────────────────────────────
@@ -416,27 +416,26 @@ namespace ValveDemoHmiBuilder
             dot.CenterX = 230; dot.CenterY = 200; dot.RadiusX = 45; dot.RadiusY = 45;
             dot.BackColor = TEAL; dot.BorderColor = Color.White;
             try {
+                // Same fix as Pop_StatusText: read the single precomputed _State tag instead of an
+                // independent copy of the raw-feedback logic (which was missing UnexpMove/Loss-of-
+                // Position, same bug, just duplicated here too). Also cuts this from 7 tag reads
+                // every 100ms down to 2, and AutomaticTags means it only re-evaluates when a
+                // dependency actually changes - including the 1Hz clock tag on every tick, so the
+                // FAULT flash still works exactly as before.
                 var dotDyn = dot.Dynamizations.Create<ScriptDynamization>("BackColor");
                 dotDyn.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
                     "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let vTag = \"V\" + vNum;\n" +
-                    "let configured = readTag(Tags(vTag + \"_Configured\").Read());\n" +
-                    "let healthy    = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
-                    "let open       = readTag(Tags(vTag + \"_OpenFB\").Read());\n" +
-                    "let closed     = readTag(Tags(vTag + \"_ClosedFB\").Read());\n" +
-                    "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
-                    "let toOpen     = readTag(Tags(vTag + \"_TimeoutOpenAlarm\").Read());\n" +
-                    "let toClose    = readTag(Tags(vTag + \"_TimeoutCloseAlarm\").Read());\n" +
-                    "let flash      = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n\n" +
-                    "if (!configured) return 0xFF8E8E93;\n" +
-                    "if (!healthy || (open && closed) || toOpen || toClose) return flash ? 0xFFFF0000 : 0xFF3A0000;\n" +
-                    "if (local) return 0xFFFF9F0A;\n" +
-                    "if (open && !closed) return 0xFF32C785;\n" +
-                    "if (!open && closed) return 0xFF4B5563;\n" +
+                    "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
+                    "let code  = readTag(Tags(vTag + \"_State\").Read());\n" +
+                    "let flash = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n\n" +
+                    "if (code === 0) return 0xFF8E8E93;\n" +
+                    "if (code === 1) return flash ? 0xFFFF0000 : 0xFF3A0000;\n" +
+                    "if (code === 2) return 0xFFFF9F0A;\n" +
+                    "if (code === 3) return 0xFF32C785;\n" +
+                    "if (code === 4) return 0xFF4B5563;\n" +
                     "return 0xFF00A2FF;\n";
-                dotDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+                dotDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
             // State label below big circle (Y=255..281)
@@ -447,26 +446,17 @@ namespace ValveDemoHmiBuilder
             SetPropEnum(stateLabel, "IOFieldType", "Output");
             SetMLText(stateLabel, "Text", "STATE: INITIALIZING");
             try {
+                // Same _State-based fix as Pop_Dot/Pop_StatusText above - this was the third
+                // independent copy of the same now-fixed logic gap.
                 var slDyn = stateLabel.Dynamizations.Create<ScriptDynamization>("ProcessValue");
                 slDyn.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
                     "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let vTag = \"V\" + vNum;\n" +
-                    "let configured = readTag(Tags(vTag + \"_Configured\").Read());\n" +
-                    "let healthy    = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
-                    "let open       = readTag(Tags(vTag + \"_OpenFB\").Read());\n" +
-                    "let closed     = readTag(Tags(vTag + \"_ClosedFB\").Read());\n" +
-                    "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
-                    "let toOpen     = readTag(Tags(vTag + \"_TimeoutOpenAlarm\").Read());\n" +
-                    "let toClose    = readTag(Tags(vTag + \"_TimeoutCloseAlarm\").Read());\n\n" +
-                    "if (!configured) return \"⬤  UNCONFIGURED\";\n" +
-                    "if (!healthy || (open && closed) || toOpen || toClose) return \"⬤  FAULT\";\n" +
-                    "if (local) return \"⬤  LOCAL MODE\";\n" +
-                    "if (open && !closed) return \"⬤  FULLY OPEN\";\n" +
-                    "if (!open && closed) return \"⬤  FULLY CLOSED\";\n" +
-                    "return \"⬤  MOVING\";\n";
-                slDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+                    "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
+                    "let code = readTag(Tags(vTag + \"_State\").Read());\n" +
+                    "let names = [\"⬤  UNCONFIGURED\", \"⬤  FAULT\", \"⬤  LOCAL MODE\", \"⬤  FULLY OPEN\", \"⬤  FULLY CLOSED\", \"⬤  MOVING\"];\n" +
+                    "return names[code] || \"⬤  MOVING\";\n";
+                slDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
             // ─── RESET FAULT Button (Left=15, Y=292, Width=138, Height=46) ───────────
