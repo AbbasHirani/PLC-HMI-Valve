@@ -1216,7 +1216,7 @@ namespace ValveDemoHmiBuilder
             Console.WriteLine("\n[STEP 3] Generating Discrete Alarms...");
             
             // Ensure required AlarmClasses exist in project so WinCC compiler does not emit errors
-            string[] neededClasses = { "ValveFault", "ValveWarning", "System" };
+            string[] neededClasses = { "ValveFault", "ValveWarning", "ValveEvent", "System" };
             foreach (string cName in neededClasses) {
                 if (hmi.AlarmClasses.Find(cName) == null) {
                     try { hmi.AlarmClasses.Create(cName); } catch {}
@@ -1242,13 +1242,15 @@ namespace ValveDemoHmiBuilder
                 CreateDiscreteAlarm(hmi, vId + "_Conflict", "ValveFault", vId + " Command Conflict (Open and Close requested).", dbName + "_W_Conflict_" + ((i-1)/16), (i-1)%16);
                 CreateDiscreteAlarm(hmi, vId + "_FailOpen", "ValveWarning", vId + " Failed to Open in automatic mode.", dbName + "_W_FailOpen_" + ((i-1)/16), (i-1)%16);
                 CreateDiscreteAlarm(hmi, vId + "_FailClose", "ValveWarning", vId + " Failed to Close in automatic mode.", dbName + "_W_FailClose_" + ((i-1)/16), (i-1)%16);
-                
-                // Pass 2 (Commented out for now)
-                // CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveFault", vId + " Loss of Position Feedback.", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16);
-                // CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", vId + " Unexpected Movement detected.", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16);
-                // CreateDiscreteAlarm(hmi, vId + "_Local", "ValveWarning", vId + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16);
+
+                // Pass 2: E (Loss of Position, MED), F (Unexpected Movement, MED), G (Local Mode, LOW).
+                // Reuse ValveWarning for E/F (same tier as C/D's timeouts) and the new ValveEvent
+                // class for G, since Local Mode is a logged event rather than a real fault.
+                CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveWarning", vId + " Loss of Position Feedback (idle, no limit switch made).", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16);
+                CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", vId + " Unexpected Movement detected (uncommanded limit switch change).", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16);
+                CreateDiscreteAlarm(hmi, vId + "_Local", "ValveEvent", vId + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16);
             }
-            Console.WriteLine("  Created " + (88 * 4 + 9) + " discrete alarms.");
+            Console.WriteLine("  Created " + (88 * 7 + 9) + " discrete alarms.");
         }
 
         static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit)
