@@ -168,12 +168,18 @@
             // only the post-scan value can't distinguish either from true idle-the-whole-scan).
             #simStepAtStart := #SimStep[#i];
 
-            // Auto-initialize Healthy status to TRUE and Resting Position to CLOSED seat if uninitialized
-            IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB AND #SimStep[#i] = 0 THEN
-                &quot;Valves_DB&quot;.Valve[#i].Healthy := TRUE;
-                &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE;
-            ELSIF NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB AND #SimStep[#i] = 0 THEN
-                &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE;
+            // Auto-initialize Healthy status to TRUE and Resting Position to CLOSED seat — but
+            // ONLY the first scan a valve is ever seen, via the Initialized latch. Simulation-only
+            // scaffolding (see the Initialized member's comment in Valves_DB): without this
+            // one-time gate, this ran every scan and silently reset ClosedFB back to TRUE any time
+            // a valve was idle with both feedbacks false — which is exactly the state Loss of
+            // Position (E) needs to sustain for 2s to fire, so E could never actually trigger.
+            IF NOT &quot;Valves_DB&quot;.Initialized[#i] THEN
+                &quot;Valves_DB&quot;.Initialized[#i] := TRUE;
+                IF NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB AND #SimStep[#i] = 0 THEN
+                    &quot;Valves_DB&quot;.Valve[#i].Healthy := TRUE;
+                    &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE;
+                END_IF;
             END_IF;
 
             // 1. Failsafe Command and Motion Simulation

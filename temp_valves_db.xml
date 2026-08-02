@@ -144,6 +144,18 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
+    <!-- Simulation-only scaffolding: gates the one-time "assume closed seat" default a freshly
+         added valve gets (see FB_ValveLoop). Real OpenFB/ClosedFB will be genuine physical limit
+         switch inputs once the real Dynamic I/O Mapper replaces this simulation, at which point
+         this member (and the auto-init logic that reads it) should be removed entirely - real
+         hardware never needs to guess a starting position. -->
+    <Member Name="Initialized" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <!-- Split by direction (not one shared bit) since Fail to Open (C) and Fail to Close (D)
          are two separate alarms with separate messages/columns in the catalogue. -->
     <Member Name="TimeoutOpenAlarm" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
