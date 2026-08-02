@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Drawing;
 using Siemens.Engineering;
@@ -1424,7 +1425,9 @@ namespace ValveDemoHmiBuilder
 
             var scLogin = FindScreen(hmi, "Screen_Login");
             if (scLogin == null) { Console.WriteLine("[ERROR] Screen_Login not found."); }
-            else {
+            else if (scLogin.ScreenItems.Any(i => i.Name == "Btn_Login")) {
+                Console.WriteLine("  Screen_Login already has real content — skipping rebuild.");
+            } else {
                 foreach (var item in scLogin.ScreenItems) itemsToDelete.Add(item);
                 foreach (var item in itemsToDelete) {
                     try { item.Delete(); } catch (Exception ex) { Console.WriteLine("  [WARN] could not delete " + item.Name + ": " + Root(ex)); }
@@ -1434,6 +1437,18 @@ namespace ValveDemoHmiBuilder
                     BuildLoginScreen(scLogin);
                     Console.WriteLine("  Screen_Login rebuilt with real LOGIN/LOGOUT content.");
                 } catch (Exception ex) { Console.WriteLine("  [ERROR] BuildLoginScreen failed: " + Root(ex)); }
+            }
+
+            // Btn_AckAll lives on Screen_Alarms, which is deliberately excluded from every normal
+            // rebuild (--only never includes "Alarms") to protect the manually-configured Alarm
+            // Control columns. That means its Authorization was set in source but never actually
+            // applied live — fix it directly here without touching anything else on that screen.
+            var scAlarmsFix = FindScreen(hmi, "Screen_Alarms");
+            if (scAlarmsFix == null) { Console.WriteLine("  [WARN] Screen_Alarms not found — cannot fix Btn_AckAll."); }
+            else {
+                var ackBtn = scAlarmsFix.ScreenItems.FirstOrDefault(i => i.Name == "Btn_AckAll");
+                if (ackBtn == null) Console.WriteLine("  [WARN] Btn_AckAll not found on Screen_Alarms.");
+                else { SetStr(ackBtn, "Authorization", "Operate"); Console.WriteLine("  Screen_Alarms Btn_AckAll: Authorization set to Operate."); }
             }
 
             string[] zoneScreens = { "Screen_Bilge", "Screen_AftBallast", "Screen_FwdBallast" };
