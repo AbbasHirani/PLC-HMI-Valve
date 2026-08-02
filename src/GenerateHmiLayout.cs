@@ -88,6 +88,7 @@ namespace ValveDemoHmiBuilder
             string dumpTag = null;
             string exportBlock = null;
             bool importOnly = false;
+            bool finishLoginAuth = false;
             foreach (var a in args) {
                 if (a.StartsWith("--only=")) {
                     only = new HashSet<string>(a.Substring(7).Split(','), StringComparer.OrdinalIgnoreCase);
@@ -99,8 +100,11 @@ namespace ValveDemoHmiBuilder
                     exportBlock = a.Substring(15);
                 } else if (a == "--import-only") {
                     importOnly = true;
+                } else if (a == "--finish-login-auth") {
+                    finishLoginAuth = true;
                 }
             }
+            if (finishLoginAuth) { try { RunFinishLoginAuth(); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); } Console.WriteLine("\nDone."); return; }
             try { Run(only, fixTags, dumpTag, exportBlock, importOnly); }
             catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); }
             Console.WriteLine("\nDone."); 
@@ -227,6 +231,10 @@ namespace ValveDemoHmiBuilder
             if (Want(only, "Alarms")) EnsureAlarmScreen(hmi);
             else Console.WriteLine("  Skipping Screen_Alarms (not in --only)...");
 
+            // AlarmColumns-only: patch columns on the EXISTING AlarmView without deleting the screen.
+            // Run this after Pass-2 alarm additions (--only=DiscreteAlarms) to re-apply column config.
+            if (Want(only, "AlarmColumns")) PatchAlarmColumns(hmi);
+
             // The remaining nav targets have no dedicated screen design yet.
             // Rather than leave their nav buttons dead-clicking, each gets a
             if (Want(only, "Bilge")) {
@@ -249,13 +257,14 @@ namespace ValveDemoHmiBuilder
                 if (scDiag != null) BuildPlaceholderScreen(scDiag, "Screen_Diagnostics", "DIAGNOSTICS", "System diagnostics");
             } else Console.WriteLine("  Skipping Screen_Diagnostics (not in --only)...");
 
+            // Discrete alarms can be created/updated independently — does NOT touch Screen_Alarms layout.
             if (Want(only, "Alarms") || Want(only, "DiscreteAlarms")) {
                 CreateAlarms(hmi, "Valves_DB");
             }
 
             if (Want(only, "Login")) {
                 HmiScreen scLogin = RecreateScreen(hmi, "Screen_Login");
-                if (scLogin != null) BuildPlaceholderScreen(scLogin, "Screen_Login", "LOGIN", "User access control");
+                if (scLogin != null) BuildLoginScreen(scLogin);
             } else Console.WriteLine("  Skipping Screen_Login (not in --only)...");
 
             Console.WriteLine("\n=== Complete! ===");
@@ -298,6 +307,24 @@ namespace ValveDemoHmiBuilder
         {
             HmiScreen sc = RecreateScreen(hmi, "Screen_Alarms");
             if (sc != null) BuildAlarmScreen(sc);
+        }
+
+        // Patch columns on an EXISTING AlarmView without rebuilding the screen.
+        // Use --only=AlarmColumns after adding new alarms via --only=DiscreteAlarms.
+        static void PatchAlarmColumns(HmiSoftware hmi)
+        {
+            Console.WriteLine("  [AlarmColumns] Finding existing Screen_Alarms...");
+            HmiScreen sc = FindScreen(hmi, "Screen_Alarms");
+            if (sc == null) { Console.WriteLine("  [AlarmColumns] Screen_Alarms not found — run --only=Alarms first."); return; }
+            foreach (var item in sc.ScreenItems) {
+                if (item.Name == "AlarmView" && item is HmiAlarmControl) {
+                    Console.WriteLine("  [AlarmColumns] Found AlarmView. Applying column config...");
+                    ConfigureAlarmColumns((HmiAlarmControl)item);
+                    Console.WriteLine("  [AlarmColumns] Done.");
+                    return;
+                }
+            }
+            Console.WriteLine("  [AlarmColumns] AlarmView not found on Screen_Alarms.");
         }
 
         static void EnsurePopupScreen(HmiSoftware hmi)
@@ -372,6 +399,7 @@ namespace ValveDemoHmiBuilder
             btnOpen.BackColor = Color.FromArgb(255, 16, 185, 129); btnOpen.ForeColor = Color.White;
             btnOpen.BorderColor = Color.FromArgb(255, 52, 211, 153); btnOpen.BorderWidth = 2;
             SetMLText(btnOpen, "Text", "▲ OPEN VALVE");
+            SetStr(btnOpen, "Authorization", "Operate");
             AddPopupActionButton(btnOpen, "OpenCmd");
 
             var btnClose = sc.ScreenItems.Create<HmiButton>("Btn_Close");
@@ -379,6 +407,7 @@ namespace ValveDemoHmiBuilder
             btnClose.BackColor = Color.FromArgb(255, 55, 65, 81); btnClose.ForeColor = Color.White;
             btnClose.BorderColor = Color.FromArgb(255, 107, 114, 128); btnClose.BorderWidth = 2;
             SetMLText(btnClose, "Text", "▼ CLOSE VALVE");
+            SetStr(btnClose, "Authorization", "Operate");
             AddPopupActionButton(btnClose, "CloseCmd");
 
             // ─── Large Status Circle (Diameter=90, Y=155..245) ──
@@ -397,9 +426,11 @@ namespace ValveDemoHmiBuilder
                     "let open       = readTag(Tags(vTag + \"_OpenFB\").Read());\n" +
                     "let closed     = readTag(Tags(vTag + \"_ClosedFB\").Read());\n" +
                     "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
+                    "let toOpen     = readTag(Tags(vTag + \"_TimeoutOpenAlarm\").Read());\n" +
+                    "let toClose    = readTag(Tags(vTag + \"_TimeoutCloseAlarm\").Read());\n" +
                     "let flash      = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n\n" +
                     "if (!configured) return 0xFF8E8E93;\n" +
-                    "if (!healthy || (open && closed)) return flash ? 0xFFFF0000 : 0xFF3A0000;\n" +
+                    "if (!healthy || (open && closed) || toOpen || toClose) return flash ? 0xFFFF0000 : 0xFF3A0000;\n" +
                     "if (local) return 0xFFFF9F0A;\n" +
                     "if (open && !closed) return 0xFF32C785;\n" +
                     "if (!open && closed) return 0xFF4B5563;\n" +
@@ -425,9 +456,11 @@ namespace ValveDemoHmiBuilder
                     "let healthy    = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
                     "let open       = readTag(Tags(vTag + \"_OpenFB\").Read());\n" +
                     "let closed     = readTag(Tags(vTag + \"_ClosedFB\").Read());\n" +
-                    "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n\n" +
+                    "let local      = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
+                    "let toOpen     = readTag(Tags(vTag + \"_TimeoutOpenAlarm\").Read());\n" +
+                    "let toClose    = readTag(Tags(vTag + \"_TimeoutCloseAlarm\").Read());\n\n" +
                     "if (!configured) return \"⬤  UNCONFIGURED\";\n" +
-                    "if (!healthy || (open && closed)) return \"⬤  FAULT\";\n" +
+                    "if (!healthy || (open && closed) || toOpen || toClose) return \"⬤  FAULT\";\n" +
                     "if (local) return \"⬤  LOCAL MODE\";\n" +
                     "if (open && !closed) return \"⬤  FULLY OPEN\";\n" +
                     "if (!open && closed) return \"⬤  FULLY CLOSED\";\n" +
@@ -441,6 +474,7 @@ namespace ValveDemoHmiBuilder
             btnReset.BackColor = Color.FromArgb(255, 194, 65, 12); btnReset.ForeColor = Color.White;
             btnReset.BorderColor = Color.FromArgb(255, 249, 115, 22); btnReset.BorderWidth = 2;
             SetMLText(btnReset, "Text", "⚡ RESET FAULT");
+            SetStr(btnReset, "Authorization", "Operate");
             AddPopupActionButton(btnReset, "ResetFault");
 
             // ─── SERVICE ON/OFF Toggle Switch (Left=160, Y=292, Width=138, Height=46) ──
@@ -449,6 +483,7 @@ namespace ValveDemoHmiBuilder
             btnService.BackColor = Color.FromArgb(255, 58, 58, 60); btnService.ForeColor = Color.White;
             btnService.BorderColor = TEAL; btnService.BorderWidth = 2;
             SetMLText(btnService, "Text", "🛠️ SERVICE:  OFF");
+            SetStr(btnService, "Authorization", "Operate");
             AddPopupActionButton(btnService, "ToggleService");
             try {
                 var srvDyn = btnService.Dynamizations.Create<ScriptDynamization>("Text");
@@ -479,6 +514,7 @@ namespace ValveDemoHmiBuilder
             btnStuck.BackColor = Color.FromArgb(255, 58, 58, 60); btnStuck.ForeColor = Color.White;
             btnStuck.BorderColor = Color.FromArgb(255, 234, 179, 8); btnStuck.BorderWidth = 2;
             SetMLText(btnStuck, "Text", "⚠️ STUCK: OFF");
+            SetStr(btnStuck, "Authorization", "Operate");
             AddPopupActionButton(btnStuck, "ToggleStuck");
             try {
                 var stkDyn = btnStuck.Dynamizations.Create<ScriptDynamization>("Text");
@@ -522,9 +558,17 @@ namespace ValveDemoHmiBuilder
                 var cDyn = countLbl.Dynamizations.Create<ScriptDynamization>("Text");
                 cDyn.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let n = readTag(Tags(\"Valves_DB_TotalFault\").Read());\n" +
-                    "return \"ACTIVE FAULTS: \" + (n || 0);";
-                cDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                    "let n = readTag(Tags(\"Valves_DB_TotalFault\").Read()) || 0;\n" +
+                    "let prev = readTag(Tags(\"Internal_PrevFaultCount\").Read()) || 0;\n" +
+                    "if (prev == 0 && n > 0) {\n" +
+                    "  if (!globalThis._beepTimer) globalThis._beepTimer = setInterval(function() { try { fetch('http://127.0.0.1:8081/beep/'); } catch(e){} }, 1500);\n" +
+                    "}\n" +
+                    "if (prev > 0 && n == 0) {\n" + 
+                    "  if (globalThis._beepTimer) { clearInterval(globalThis._beepTimer); globalThis._beepTimer = null; }\n" +
+                    "}\n" +
+                    "Tags(\"Internal_PrevFaultCount\").Write(n);\n" +
+                    "return \"ACTIVE FAULTS: \" + n;";
+                cDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T1s");
             } catch {}
 
             // SYSTEM STATUS Panel
@@ -572,23 +616,71 @@ namespace ValveDemoHmiBuilder
                 } catch {}
             }
             
+            // ── UX Controls (marine-themed: MakeBtn uses M_* constants from MarineScreens.cs) ─────
+            // ACTIVE ALARMS — accent blue, active state indicator
+            var btnActive = MakeBtn(sc, "Btn_ActiveAlarms", 16, 230, 190, 46, "ACTIVE ALARMS", M_ACCENT, M_HDRTXT, M_BORDER, 1, 14, true);
+            AddScriptEvent(btnActive, "Screen.Items(\"AlarmView\").AlarmSourceType = 1;");
+
+            // ALARM HISTORY — navy panel header colour
+            var btnHist = MakeBtn(sc, "Btn_AlarmHistory", 216, 230, 190, 46, "ALARM HISTORY", M_HDR, M_HDRTXT, M_BORDER, 1, 14, false);
+            AddScriptEvent(btnHist, "Screen.Items(\"AlarmView\").AlarmSourceType = 2;");
+
+            // ACKNOWLEDGE ALL — warning yellow, right-aligned to alarm view edge (16+1420=1436, 1436-300=1136)
+            var btnAck = MakeBtn(sc, "Btn_AckAll", 1136, 230, 300, 46, "ACKNOWLEDGE ALL", M_YELLOW, M_TEXT, M_BORDER, 1, 14, true);
+            SetStr(btnAck, "Authorization", "Operate");
+            AddScriptEvent(btnAck,
+                "if (globalThis._beepTimer) { clearInterval(globalThis._beepTimer); globalThis._beepTimer = null; }\n" +
+                "try {\n" +
+                "  HMIRuntime.Alarming.GetActiveAlarms(HMIRuntime.Language).then(function(alarms) {\n" +
+                "    for (var i = 0; i < alarms.length; i++) {\n" +
+                "      try { HMIRuntime.Alarming.Alarms(alarms[i].Name).Acknowledge(); } catch(e) {}\n" +
+                "    }\n" +
+                "  });\n" +
+                "} catch(e) {}");
+
             // =========================================================================
             // COM DEADLOCK WARNING: Creating an HmiAlarmControl deadlocks Openness API.
             // It MUST be the absolute last thing we do on this screen.
             // =========================================================================
             try {
-                Console.WriteLine("  [DEBUG] Placing HmiAlarmControl (Openness API will hang here, this is expected)...");
+                Console.WriteLine("  [DEBUG] Placing HmiAlarmControl (this may take several minutes)...");
                 Console.Out.Flush();
                 var alarmCtrl = sc.ScreenItems.Create<HmiAlarmControl>("AlarmView");
-                
-                // If it somehow doesn't hang, configure it:
                 alarmCtrl.Left = 16;
-                alarmCtrl.Top = 230; 
+                alarmCtrl.Top = 286;
                 alarmCtrl.Width = 1420;
-                alarmCtrl.Height = 818;
-            } catch {}
+                alarmCtrl.Height = 762;
+                Console.WriteLine("  [DEBUG] HmiAlarmControl placed. Configuring columns...");
+                Console.Out.Flush();
+                ConfigureAlarmColumns(alarmCtrl);
+                Console.WriteLine("  [DEBUG] Column configuration done.");
+            } catch (Exception ex) {
+                Console.WriteLine("  [WARN] AlarmControl creation/config failed: " + ex.Message);
+            }
             
             Console.WriteLine("  Screen_Alarms built successfully.");
+        }
+
+        // ── Column configuration ────────────────────────────────────────────────────────
+        // Live-verified column names from TIA V20 (49 total). Previous code used wrong
+        // names (RaiseTime, AlarmID, EventText, AlarmState) — these are the real ones.
+        // Widths: 180+100+150+600+200+180 = 1410px (AlarmView is 1420px wide).
+        static void ConfigureAlarmColumns(HmiAlarmControl alarmCtrl)
+        {
+            int applied = 0;
+            foreach (var col in alarmCtrl.AlarmView.Columns) {
+                switch (col.Name) {
+                    case "Raise time":  col.Visible = true;  col.Width = 180; SetMLText(col.Header, "Text", "TIME");        applied++; break;
+                    case "Priority":    col.Visible = true;  col.Width = 100; SetMLText(col.Header, "Text", "PRIORITY");     applied++; break;
+                    case "Name":        col.Visible = true;  col.Width = 150; SetMLText(col.Header, "Text", "ALARM ID");     applied++; break;
+                    case "Alarm text":  col.Visible = true;  col.Width = 600; SetMLText(col.Header, "Text", "DESCRIPTION");  applied++; break;
+                    case "Area":        col.Visible = true;  col.Width = 200; SetMLText(col.Header, "Text", "SYSTEM");       applied++; break;
+                    case "Alarm state": col.Visible = true;  col.Width = 180; SetMLText(col.Header, "Text", "STATUS");       applied++; break;
+                    default:            col.Visible = false; break;
+                }
+            }
+            Console.WriteLine("  [Columns] Applied to " + applied + "/6 target columns (" + alarmCtrl.AlarmView.Columns.Count + " total).");
+            if (applied < 6) Console.WriteLine("  [Columns] WARNING: expected 6, got " + applied + " — check column name spelling.");
         }
 
         static void BuildOverviewScreen(HmiScreen sc)
@@ -1017,20 +1109,25 @@ namespace ValveDemoHmiBuilder
 
         static void AddNavScript(HmiButton btn, string targetScreen)
         {
+            AddScriptEvent(btn, "HMIRuntime.UI.SysFct.ChangeScreen(\"" + targetScreen + "\", \"~\");");
+        }
+
+        static void AddScriptEvent(HmiButton btn, string scriptCode)
+        {
             try {
                 PropertyInfo evProp = null;
                 foreach (var p in btn.GetType().GetProperties())
                     if (p.Name == "EventHandlers") { evProp = p; if (p.DeclaringType == btn.GetType()) break; }
-                if (evProp == null) { Console.WriteLine("  [NavScript ERR] No EventHandlers property on " + btn.GetType().Name); return; }
+                if (evProp == null) { Console.WriteLine("  [ScriptEvent ERR] No EventHandlers property on " + btn.GetType().Name); return; }
                 object evObj = evProp.GetValue(btn, null);
                 object handler = CreateTappedHandler(evObj);
-                if (handler == null) { Console.WriteLine("  [NavScript ERR] Could not create Tapped handler for " + btn.GetType().Name); return; }
+                if (handler == null) { Console.WriteLine("  [ScriptEvent ERR] Could not create Tapped handler for " + btn.GetType().Name); return; }
                 var sp = handler.GetType().GetProperty("Script");
                 object script = sp.GetValue(handler, null);
                 var scp = script.GetType().GetProperty("ScriptCode");
                 if (scp != null && scp.CanWrite)
-                    scp.SetValue(script, "HMIRuntime.UI.SysFct.ChangeScreen(\"" + targetScreen + "\", \"~\");", null);
-            } catch (Exception ex) { Console.WriteLine("  [NavScript ERR] " + ex.Message); }
+                    scp.SetValue(script, scriptCode, null);
+            } catch (Exception ex) { Console.WriteLine("  [ScriptEvent ERR] " + ex.Message); }
         }
 
         static void SetPropEnum(object obj, string propName, string enumValueName)
@@ -1177,6 +1274,7 @@ namespace ValveDemoHmiBuilder
             // BilgePage tracks which page (0 or 1) of the Bilge valve table is currently shown —
             // internal only, no PLC binding, same pattern as SelectedValve.
             CreateInternalTag(hmi, "BilgePage", "Int");
+            CreateInternalTag(hmi, "Internal_PrevFaultCount", "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalOpen",   "Valves_DB.TotalOpen",   "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalClosed", "Valves_DB.TotalClosed", "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalTransit","Valves_DB.TotalTransit","Int");
@@ -1297,6 +1395,69 @@ namespace ValveDemoHmiBuilder
                 Console.WriteLine("  [ERROR] Error creating internal tag " + tagName + ": " + ex.Message);
             }
         }
+
+        // Small, targeted, low-risk fixup: (1) replace Screen_Login's still-unbuilt placeholder
+        // content with the real BuildLoginScreen content, (2) set Authorization="Operate" on the
+        // 84 per-slot table OPEN/CLOSE buttons across the 3 zone screens (Tr_Open_*/Tr_Close_*),
+        // which bypass the popup entirely and so need the same protection. Deliberately does NOT
+        // touch anything else — no screen deletion/recreation beyond Screen_Login's stale
+        // placeholder items, no Alarms/column work. Added after the popup's 6 buttons already got
+        // their Authorization set directly in the normal screen-build path.
+        static void RunFinishLoginAuth()
+        {
+            var procs = TiaPortal.GetProcesses();
+            if (procs.Count == 0) { Console.WriteLine("[ERROR] TIA Portal not running."); return; }
+            TiaPortal portal = null; Project project = null;
+            foreach (var p in procs) {
+                try {
+                    var att = p.Attach();
+                    if (att != null && att.Projects.Count > 0) { portal = att; project = att.Projects[0]; break; }
+                } catch (Exception ex) { Console.WriteLine("  [DEBUG] Attach() threw: " + ex.GetType().Name + ": " + ex.Message); }
+            }
+            if (portal == null || project == null) { Console.WriteLine("[ERROR] Could not attach to active TIA Portal project."); return; }
+            Console.WriteLine("Attached to Project: " + project.Name);
+
+            Device hmiDevice = FindDeviceByPartialName(project, "HMI");
+            if (hmiDevice == null) { Console.WriteLine("[ERROR] HMI device not found."); return; }
+            HmiSoftware hmi = FindHmiSoftware(hmiDevice);
+            if (hmi == null) { Console.WriteLine("[ERROR] HMI software not found."); return; }
+
+            var scLogin = FindScreen(hmi, "Screen_Login");
+            if (scLogin == null) { Console.WriteLine("[ERROR] Screen_Login not found."); }
+            else {
+                foreach (var item in scLogin.ScreenItems) itemsToDelete.Add(item);
+                foreach (var item in itemsToDelete) {
+                    try { item.Delete(); } catch (Exception ex) { Console.WriteLine("  [WARN] could not delete " + item.Name + ": " + Root(ex)); }
+                }
+                itemsToDelete.Clear();
+                try {
+                    BuildLoginScreen(scLogin);
+                    Console.WriteLine("  Screen_Login rebuilt with real LOGIN/LOGOUT content.");
+                } catch (Exception ex) { Console.WriteLine("  [ERROR] BuildLoginScreen failed: " + Root(ex)); }
+            }
+
+            string[] zoneScreens = { "Screen_Bilge", "Screen_AftBallast", "Screen_FwdBallast" };
+            int totalSet = 0;
+            foreach (var scName in zoneScreens) {
+                var sc = FindScreen(hmi, scName);
+                if (sc == null) { Console.WriteLine("  [SKIP] " + scName + " not found"); continue; }
+                int count = 0;
+                foreach (var item in sc.ScreenItems) {
+                    if (item.Name.StartsWith("Tr_Open", StringComparison.OrdinalIgnoreCase) ||
+                        item.Name.StartsWith("Tr_Close", StringComparison.OrdinalIgnoreCase)) {
+                        SetStr(item, "Authorization", "Operate");
+                        count++;
+                    }
+                }
+                Console.WriteLine("  " + scName + ": set Authorization on " + count + " buttons");
+                totalSet += count;
+            }
+            Console.WriteLine("\nTotal table buttons updated: " + totalSet + " (expected 84)");
+
+            try { project.Save(); Console.WriteLine("\n[SAVE] Project saved."); }
+            catch (Exception ex) { Console.WriteLine("\n[SAVE ERR] " + ex.Message); }
+        }
+        static List<HmiScreenItemBase> itemsToDelete = new List<HmiScreenItemBase>();
 
         static HmiScreen FindScreen(HmiSoftware hmi, string name)
         {

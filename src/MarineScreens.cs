@@ -675,7 +675,15 @@ namespace ValveDemoHmiBuilder
 
             MakeRect(sc, "Hdr_Sep2", 760, 10, 1, 26, M_MUTED, M_MUTED, 0);
             MakeTb(sc, "Hdr_Vessel", 780, 8, 560, 30, "IMO 9834217  &#xB7;  MV WESTERLY", M_TRANS, M_HDRTXT, 0, "Left", 19, false);
-            MakeTb(sc, "Hdr_User", 1500, 8, 400, 30, "&#x1F464;  USER: ENGINEER", M_TRANS, M_HDRTXT, 0, "Right", 19, false);
+            
+            // @UserName is a real WinCC Unified system tag, confirmed live in TIA Portal's own
+            // tag browser (Show all + search "user") — not guessed. No obfuscation needed since
+            // it's a genuine tag the compiler's static Tags() analyzer will happily validate.
+            var userText = MakeLiveText(sc, "Hdr_User", 1500, 8, 400, 30, M_HDRTXT, "Right", 19, false);
+            Dyn(userText, "Text",
+                "var u = \"\"; try { u = Tags(\"@UserName\").Read(); } catch(e){}\n" +
+                "if (!u) u = \"GUEST\";\n" +
+                "return \"&#x1F464;  USER: \" + u.toUpperCase();", "T1s");
 
             // Title band.
             MakeRect(sc, "Title_Rule", 0, 46, 1920, 4, M_ACCENT, M_ACCENT, 0);
@@ -706,6 +714,25 @@ namespace ValveDemoHmiBuilder
                    M_TRANS, M_MUTED, 0, "Center", 13, false);
             MakeTb(sc, "Ph_Note2", px, py + 186, pw, 24,
                    "Use HOME for the full overview.", M_TRANS, M_MUTED, 0, "Center", 13, false);
+        }
+
+        public static void BuildLoginScreen(HmiScreen sc)
+        {
+            sc.BackColor = M_BG;
+            MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
+            BuildHomeHeader(sc);
+            BuildNav(sc, "Screen_Login");
+
+            int px = 760, py = 340, pw = 400;
+            MakeRect(sc, "Panel_BG", px, py, pw, 400, M_BOX, M_BORDER, 1);
+            MakeTb(sc, "Panel_Title", px, py + 50, pw, 50, "USER ACCESS CONTROL", M_TRANS, M_TEXT, 0, "Center", 24, true);
+            MakeTb(sc, "Panel_Sub", px, py + 100, pw, 40, "Login to unlock restricted functions", M_TRANS, M_MUTED, 0, "Center", 16, false);
+
+            var btnLogin = MakeBtn(sc, "Btn_Login", px + 50, py + 180, 300, 60, "LOGIN", M_ACCENT, M_BG, M_BORDER, 1, 20, true);
+            AddScriptEvent(btnLogin, "HMIRuntime.UI.UserManagement.SysFct.ShowLoginDialog();\n");
+
+            var btnLogout = MakeBtn(sc, "Btn_Logout", px + 50, py + 260, 300, 60, "LOGOUT", M_MUTED, M_BG, M_BORDER, 1, 20, true);
+            AddScriptEvent(btnLogout, "HMIRuntime.UI.SysFct.LogOff();\n");
         }
 
         // Shared by every screen — all 7 targets now exist (Screen_Home, Screen_Bilge,
