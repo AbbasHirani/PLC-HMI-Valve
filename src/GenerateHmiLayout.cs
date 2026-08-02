@@ -572,51 +572,12 @@ namespace ValveDemoHmiBuilder
                 cDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T1s");
             } catch {}
 
-            // SYSTEM STATUS Panel
-            int sysX = 1456;
-            int sysY = 198;
-            MakeRect(sc, "SysStat_BG", sysX, sysY, 448, 500, M_BOX, M_BORDER, 1);
-            MakeTb(sc, "SysStat_Title", sysX + 10, sysY + 10, 428, 30, "SYSTEM STATUS", M_TRANS, M_HDRTXT, 0, "Center", 16, true);
-            
-            string[] sysAlarmText = {
-                "PLC CPU",
-                "Aft Ballast RIO",
-                "Bilge/ER RIO",
-                "Fwd Ballast RIO",
-                "I/O Module",
-                "Power / UPS",
-                "Network",
-                "HMI Heartbeat",
-                "System Fault"
-            };
-            
-            for (int i = 0; i < 9; i++) {
-                int rowY = sysY + 60 + i * 40;
-                var lbl = MakeLiveText(sc, "SysStat_Lbl_" + i, sysX + 20, rowY, 200, 30, M_TEXT, "Left", 14, false);
-                SetMLText(lbl, "Text", sysAlarmText[i]);
-                
-                var stat = MakeLiveText(sc, "SysStat_Val_" + i, sysX + 240, rowY, 188, 30, M_TEXT, "Center", 14, true);
-                SetMLText(stat, "Text", "UNKNOWN");
-                
-                try {
-                    var d = stat.Dynamizations.Create<ScriptDynamization>("Text");
-                    d.ScriptCode = 
-                        "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                        "let word = readTag(Tags(\"Valves_DB_HwWord\").Read());\n" +
-                        "let bit = (word & (1 << " + i + ")) !== 0;\n" +
-                        "return bit ? \"FAULT\" : \"HEALTHY\";";
-                    d.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-                    
-                    var dc = stat.Dynamizations.Create<ScriptDynamization>("ForeColor");
-                    dc.ScriptCode = 
-                        "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                        "let word = readTag(Tags(\"Valves_DB_HwWord\").Read());\n" +
-                        "let bit = (word & (1 << " + i + ")) !== 0;\n" +
-                        "return bit ? 0xFFFF0000 : 0xFF00FF00;";
-                    dc.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-                } catch {}
-            }
-            
+            // SYSTEM STATUS panel removed per user request - the alarm table now takes the full
+            // screen width instead. System health is still fully covered by the 9 System_* alarms
+            // (PLC CPU/RIO x3/I-O Module/Power-UPS/Network/HMI Heartbeat/General) already showing
+            // in the same table when active, so no information was lost, just the redundant
+            // always-visible side panel.
+
             // ── UX Controls (marine-themed: MakeBtn uses M_* constants from MarineScreens.cs) ─────
             // ACTIVE ALARMS — accent blue, active state indicator
             var btnActive = MakeBtn(sc, "Btn_ActiveAlarms", 16, 230, 190, 46, "ACTIVE ALARMS", M_ACCENT, M_HDRTXT, M_BORDER, 1, 14, true);
@@ -626,8 +587,9 @@ namespace ValveDemoHmiBuilder
             var btnHist = MakeBtn(sc, "Btn_AlarmHistory", 216, 230, 190, 46, "ALARM HISTORY", M_HDR, M_HDRTXT, M_BORDER, 1, 14, false);
             AddScriptEvent(btnHist, "Screen.Items(\"AlarmView\").AlarmSourceType = 2;");
 
-            // ACKNOWLEDGE ALL — warning yellow, right-aligned to alarm view edge (16+1420=1436, 1436-300=1136)
-            var btnAck = MakeBtn(sc, "Btn_AckAll", 1136, 230, 300, 46, "ACKNOWLEDGE ALL", M_YELLOW, M_TEXT, M_BORDER, 1, 14, true);
+            // ACKNOWLEDGE ALL — warning yellow, right-aligned to the widened alarm view edge
+            // (16 + 1888 = 1904, the same 1920-16px right margin every other screen uses; 1904-300=1604)
+            var btnAck = MakeBtn(sc, "Btn_AckAll", 1604, 230, 300, 46, "ACKNOWLEDGE ALL", M_YELLOW, M_TEXT, M_BORDER, 1, 14, true);
             SetStr(btnAck, "Authorization", "Operate");
             AddScriptEvent(btnAck,
                 "if (globalThis._beepTimer) { clearInterval(globalThis._beepTimer); globalThis._beepTimer = null; }\n" +
@@ -649,7 +611,7 @@ namespace ValveDemoHmiBuilder
                 var alarmCtrl = sc.ScreenItems.Create<HmiAlarmControl>("AlarmView");
                 alarmCtrl.Left = 16;
                 alarmCtrl.Top = 286;
-                alarmCtrl.Width = 1420;
+                alarmCtrl.Width = 1888; // full width now that the System Status side panel is gone
                 alarmCtrl.Height = 762;
                 // Without this, native WinCC runtime system alarms (PlcInStopAlarm,
                 // PlcDisconnectedAlarm, PhysicalMemorySpace, etc.) show up mixed in with our own
@@ -678,18 +640,23 @@ namespace ValveDemoHmiBuilder
             int applied = 0;
             foreach (var col in alarmCtrl.AlarmView.Columns) {
                 switch (col.Name) {
-                    case "Raise time":  col.Visible = true;  col.Width = 180; SetMLText(col.Header, "Text", "TIME");        applied++; break;
-                    case "Priority":    col.Visible = true;  col.Width = 100; SetMLText(col.Header, "Text", "PRIORITY");     applied++; break;
-                    case "Name":        col.Visible = true;  col.Width = 150; SetMLText(col.Header, "Text", "ALARM ID");     applied++; break;
-                    case "Alarm text":  col.Visible = true;  col.Width = 600; SetMLText(col.Header, "Text", "DESCRIPTION");  applied++; break;
-                    case "Area":        col.Visible = true;  col.Width = 200; SetMLText(col.Header, "Text", "SYSTEM");       applied++; break;
-                    case "Alarm state": col.Visible = true;  col.Width = 180; SetMLText(col.Header, "Text", "STATUS");       applied++; break;
-                    case "User name":   col.Visible = true;  col.Width = 160; SetMLText(col.Header, "Text", "ACKNOWLEDGED BY"); applied++; break;
-                    default:            col.Visible = false; break;
+                    case "Raise time":       col.Visible = true;  col.Width = 170; SetMLText(col.Header, "Text", "TIME");        applied++; break;
+                    case "Priority":         col.Visible = true;  col.Width = 90;  SetMLText(col.Header, "Text", "PRIORITY");     applied++; break;
+                    case "Name":             col.Visible = true;  col.Width = 140; SetMLText(col.Header, "Text", "ALARM ID");     applied++; break;
+                    case "Alarm text":       col.Visible = true;  col.Width = 750; SetMLText(col.Header, "Text", "DESCRIPTION");  applied++; break;
+                    case "Area":             col.Visible = true;  col.Width = 180; SetMLText(col.Header, "Text", "SYSTEM");       applied++; break;
+                    case "Alarm state":      col.Visible = true;  col.Width = 160; SetMLText(col.Header, "Text", "STATUS");       applied++; break;
+                    // ACKNOWLEDGED BY ("User name") removed - confirmed never populates regardless
+                    // of acknowledge path (native toolbar icon or our script), even when genuinely
+                    // logged in. Real "who did what" tracking belongs to the Audit Trail work
+                    // (InsertElectronicRecord) instead, not this column - see the memory note.
+                    case "Acknowledge time": col.Visible = true;  col.Width = 170; SetMLText(col.Header, "Text", "ACK TIME");     applied++; break;
+                    case "Duration":         col.Visible = true;  col.Width = 140; SetMLText(col.Header, "Text", "DURATION");     applied++; break;
+                    default:                 col.Visible = false; break;
                 }
             }
-            Console.WriteLine("  [Columns] Applied to " + applied + "/7 target columns (" + alarmCtrl.AlarmView.Columns.Count + " total).");
-            if (applied < 7) Console.WriteLine("  [Columns] WARNING: expected 7, got " + applied + " — check column name spelling.");
+            Console.WriteLine("  [Columns] Applied to " + applied + "/8 target columns (" + alarmCtrl.AlarmView.Columns.Count + " total).");
+            if (applied < 8) Console.WriteLine("  [Columns] WARNING: expected 8, got " + applied + " — check column name spelling.");
         }
 
         // The Alarm Control turned out to have a much richer styling surface than assumed - never
