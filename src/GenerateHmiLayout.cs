@@ -651,6 +651,10 @@ namespace ValveDemoHmiBuilder
                 alarmCtrl.Top = 286;
                 alarmCtrl.Width = 1420;
                 alarmCtrl.Height = 762;
+                // Without this, native WinCC runtime system alarms (PlcInStopAlarm,
+                // PlcDisconnectedAlarm, PhysicalMemorySpace, etc.) show up mixed in with our own
+                // valve/system alarms - confirmed live via reflection that Filter defaults to "".
+                alarmCtrl.Filter = "AlarmClassName=\"ValveFault\" OR AlarmClassName=\"ValveWarning\" OR AlarmClassName=\"ValveEvent\" OR AlarmClassName=\"System\"";
                 Console.WriteLine("  [DEBUG] HmiAlarmControl placed. Configuring columns...");
                 Console.Out.Flush();
                 ConfigureAlarmColumns(alarmCtrl);
@@ -677,11 +681,12 @@ namespace ValveDemoHmiBuilder
                     case "Alarm text":  col.Visible = true;  col.Width = 600; SetMLText(col.Header, "Text", "DESCRIPTION");  applied++; break;
                     case "Area":        col.Visible = true;  col.Width = 200; SetMLText(col.Header, "Text", "SYSTEM");       applied++; break;
                     case "Alarm state": col.Visible = true;  col.Width = 180; SetMLText(col.Header, "Text", "STATUS");       applied++; break;
+                    case "User name":   col.Visible = true;  col.Width = 160; SetMLText(col.Header, "Text", "ACKNOWLEDGED BY"); applied++; break;
                     default:            col.Visible = false; break;
                 }
             }
-            Console.WriteLine("  [Columns] Applied to " + applied + "/6 target columns (" + alarmCtrl.AlarmView.Columns.Count + " total).");
-            if (applied < 6) Console.WriteLine("  [Columns] WARNING: expected 6, got " + applied + " — check column name spelling.");
+            Console.WriteLine("  [Columns] Applied to " + applied + "/7 target columns (" + alarmCtrl.AlarmView.Columns.Count + " total).");
+            if (applied < 7) Console.WriteLine("  [Columns] WARNING: expected 7, got " + applied + " — check column name spelling.");
         }
 
         static void BuildOverviewScreen(HmiScreen sc)
