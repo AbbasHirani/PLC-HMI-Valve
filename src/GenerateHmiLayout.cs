@@ -658,7 +658,10 @@ namespace ValveDemoHmiBuilder
                 Console.WriteLine("  [DEBUG] HmiAlarmControl placed. Configuring columns...");
                 Console.Out.Flush();
                 ConfigureAlarmColumns(alarmCtrl);
-                Console.WriteLine("  [DEBUG] Column configuration done.");
+                Console.WriteLine("  [DEBUG] Column configuration done. Applying marine theme...");
+                Console.Out.Flush();
+                ApplyAlarmMarineTheme(alarmCtrl);
+                Console.WriteLine("  [DEBUG] Theme applied.");
             } catch (Exception ex) {
                 Console.WriteLine("  [WARN] AlarmControl creation/config failed: " + ex.Message);
             }
@@ -687,6 +690,38 @@ namespace ValveDemoHmiBuilder
             }
             Console.WriteLine("  [Columns] Applied to " + applied + "/7 target columns (" + alarmCtrl.AlarmView.Columns.Count + " total).");
             if (applied < 7) Console.WriteLine("  [Columns] WARNING: expected 7, got " + applied + " — check column name spelling.");
+        }
+
+        // The Alarm Control turned out to have a much richer styling surface than assumed - never
+        // checked properly until now. UseAlarmColors stays true so active/raised alarms still show
+        // their native red/priority coloring; this only re-themes the "normal" (no-alarm) look to
+        // match the marine light theme used everywhere else, plus bumps row height/font size for a
+        // touchscreen panel instead of the default desktop-grid sizing (28px rows, size-14 font).
+        static void ApplyAlarmMarineTheme(HmiAlarmControl alarmCtrl)
+        {
+            try {
+                alarmCtrl.BackColor = M_BOX;
+                var av = alarmCtrl.AlarmView;
+                av.BackColor = M_BOX;
+                av.ForeColor = M_TEXT;
+                av.AlternateBackColor = M_ZEBRA;
+                av.AlternateForeColor = M_TEXT;
+                av.GridLineColor = M_LINE;
+                av.RowHeight = 40;
+                av.Font.Size = 15;
+
+                var hs = av.HeaderSettings;
+                hs.HeaderBackColor = M_HDRBAND;
+                hs.HeaderForeColor = M_TEXT;
+                hs.HeaderGridLineColor = M_BORDER;
+                var weightProp = hs.Font.GetType().GetProperty("Weight");
+                weightProp.SetValue(hs.Font, Enum.Parse(weightProp.PropertyType, "Bold"), null);
+                hs.Font.Size = 15;
+
+                Console.WriteLine("  [Theme] Marine theme applied to Alarm Control (row height 40, font 15, header band).");
+            } catch (Exception ex) {
+                Console.WriteLine("  [Theme] WARNING: could not fully apply theme: " + Root(ex));
+            }
         }
 
         static void BuildOverviewScreen(HmiScreen sc)
