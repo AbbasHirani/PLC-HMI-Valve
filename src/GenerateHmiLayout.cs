@@ -1208,17 +1208,35 @@ namespace ValveDemoHmiBuilder
             }
         }
 
+        static System.Collections.Generic.Dictionary<string, byte> _classPriorities;
+
         static void CreateAlarms(HmiSoftware hmi, string dbName = "Valves_DB")
         {
             Console.WriteLine("\n[STEP 3] Generating Discrete Alarms...");
             
-            // Ensure required AlarmClasses exist in project so WinCC compiler does not emit errors
-            string[] neededClasses = { "ValveFault", "ValveWarning", "ValveEvent", "System" };
-            foreach (string cName in neededClasses) {
-                if (hmi.AlarmClasses.Find(cName) == null) {
-                    try { hmi.AlarmClasses.Create(cName); } catch {}
-                }
+            // Ensure required AlarmClasses exist, each with a distinct Priority so the PRIORITY
+            // column actually means something (every alarm was showing Priority=0 before - the
+            // classes were created but never assigned one). WinCC Unified's priority range is 0-16;
+            // higher = more urgent (consistent with OPC UA's severity convention, which Unified
+            // aligns with) - not exhaustively confirmed in Siemens' own docs, but this is the
+            // best-supported reading; easy to flip later if sorting by Priority looks backwards
+            // once alarms are visible.
+            var classPriorities = new System.Collections.Generic.Dictionary<string, byte> {
+                { "ValveFault",   14 }, // A/B - Unhealthy, Position Conflict: most severe
+                { "System",       12 }, // hardware/infrastructure faults
+                { "ValveWarning",  8 }, // C/D/E/F - timeouts, Loss of Position, Unexpected Movement
+                { "ValveEvent",    3 }, // G - Local Mode: logged event, not a real fault
+            };
+            foreach (var kvp in classPriorities) {
+                var cls = hmi.AlarmClasses.Find(kvp.Key);
+                if (cls == null) { try { cls = hmi.AlarmClasses.Create(kvp.Key); } catch {} }
+                if (cls != null) { try { cls.Priority = kvp.Value; } catch {} }
             }
+            // Setting the class's Priority does NOT flow through to alarms already assigned to it -
+            // confirmed live: after setting ValveFault.Priority = 14, V001_Unhealthy.Priority (its
+            // own, separate property) still read 0. Each alarm instance carries its own Priority
+            // that CreateDiscreteAlarm must set explicitly, matching its class's value.
+            _classPriorities = classPriorities;
             
             // Generate 9 System Alarms (HwWord bits 0..8)
             CreateDiscreteAlarm(hmi, "System_PLC_CPU_Fault", "System", "PLC CPU fault detected.", dbName + "_HwWord", 0, "PLC", "SYSTEM");
@@ -1258,6 +1276,10 @@ namespace ValveDemoHmiBuilder
                 var al = hmi.DiscreteAlarms.Find(name);
                 if (al == null) al = hmi.DiscreteAlarms.Create(name);
                 al.AlarmClass = className;
+                byte pri;
+                if (_classPriorities != null && _classPriorities.TryGetValue(className, out pri)) {
+                    try { al.Priority = pri; } catch {}
+                }
                 // The real property is EventText, NOT AlarmText - confirmed live via reflection
                 // (dumping an existing alarm's full property list showed no AlarmText property at
                 // all; SetMLText(al, "AlarmText", ...) was silently no-oping every single call).
