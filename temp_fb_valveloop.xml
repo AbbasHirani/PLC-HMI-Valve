@@ -298,8 +298,13 @@
             // StateCode is assigned in these same branches (0=UNCONFIGURED 1=FAULT 2=LOCAL
             // 3=OPEN 4=CLOSED 5=MOVING) so the HMI reads one Int per valve instead of
             // recombining five raw bits in JavaScript on every refresh.
+            // UnexpMove (F) and PosLostTmr.Q (E) added here so a valve with a genuine position
+            // problem shows FAULT instead of falling through to the default MOVING bucket below,
+            // which was otherwise indistinguishable from a normal in-flight transition - the exact
+            // blind spot E was designed to close, but the display logic was never updated to match.
             IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy OR (&quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB)
-               OR &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] OR &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i] THEN
+               OR &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] OR &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i]
+               OR &quot;Valves_DB&quot;.UnexpMove[#i] OR &quot;Valves_DB&quot;.PosLostTmr[#i].Q THEN
                 &quot;Valves_DB&quot;.StateCode[#i] := 1;
                 #tempFault := #tempFault + 1;
                 IF #i &lt;= 28 THEN #tempAftFault := #tempAftFault + 1;

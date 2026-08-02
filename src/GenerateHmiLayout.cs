@@ -1224,45 +1224,52 @@ namespace ValveDemoHmiBuilder
             }
             
             // Generate 9 System Alarms (HwWord bits 0..8)
-            CreateDiscreteAlarm(hmi, "System_PLC_CPU_Fault", "System", "PLC CPU fault detected.", dbName + "_HwWord", 0);
-            CreateDiscreteAlarm(hmi, "System_Aft_RIO_Fault", "System", "Aft Ballast RIO station failure.", dbName + "_HwWord", 1);
-            CreateDiscreteAlarm(hmi, "System_Bilge_RIO_Fault", "System", "Bilge/ER RIO station failure.", dbName + "_HwWord", 2);
-            CreateDiscreteAlarm(hmi, "System_Fwd_RIO_Fault", "System", "Fwd Ballast RIO station failure.", dbName + "_HwWord", 3);
-            CreateDiscreteAlarm(hmi, "System_IO_Module_Fault", "System", "I/O Module fault detected.", dbName + "_HwWord", 4);
-            CreateDiscreteAlarm(hmi, "System_Power_UPS_Fault", "System", "Power/UPS fault detected.", dbName + "_HwWord", 5);
-            CreateDiscreteAlarm(hmi, "System_Network_Loss", "System", "Network loss detected.", dbName + "_HwWord", 6);
-            CreateDiscreteAlarm(hmi, "System_Heartbeat_Fault", "System", "HMI Heartbeat loss detected.", dbName + "_HwWord", 7);
-            CreateDiscreteAlarm(hmi, "System_General_Fault", "System", "System fault detected.", dbName + "_HwWord", 8);
-            
+            CreateDiscreteAlarm(hmi, "System_PLC_CPU_Fault", "System", "PLC CPU fault detected.", dbName + "_HwWord", 0, "PLC", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_Aft_RIO_Fault", "System", "Aft Ballast RIO station failure.", dbName + "_HwWord", 1, "RIO", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_Bilge_RIO_Fault", "System", "Bilge/ER RIO station failure.", dbName + "_HwWord", 2, "RIO", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_Fwd_RIO_Fault", "System", "Fwd Ballast RIO station failure.", dbName + "_HwWord", 3, "RIO", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_IO_Module_Fault", "System", "I/O Module fault detected.", dbName + "_HwWord", 4, "I/O", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_Power_UPS_Fault", "System", "Power/UPS fault detected.", dbName + "_HwWord", 5, "POWER", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_Network_Loss", "System", "Network loss detected.", dbName + "_HwWord", 6, "NETWORK", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_Heartbeat_Fault", "System", "HMI Heartbeat loss detected.", dbName + "_HwWord", 7, "HMI", "SYSTEM");
+            CreateDiscreteAlarm(hmi, "System_General_Fault", "System", "System fault detected.", dbName + "_HwWord", 8, "SYSTEM", "SYSTEM");
+
             for (int i = 1; i <= 88; i++) {
                 string vId = string.Format("V{0:D3}", i);
-                
+                // Position-based zone boundaries: AFT 1-28, BILGE/ER 29-56, FWD 57-88.
+                string zoneArea = (i <= 28) ? "BALLAST AFT" : (i <= 56) ? "BILGE-ER" : "BALLAST FWD";
+
                 // Pass 1: High priority alarms
-                CreateDiscreteAlarm(hmi, vId + "_Unhealthy", "ValveFault", vId + " reported Unhealthy status.", dbName + "_W_Unhealthy_" + ((i-1)/16), (i-1)%16);
-                CreateDiscreteAlarm(hmi, vId + "_Conflict", "ValveFault", vId + " Command Conflict (Open and Close requested).", dbName + "_W_Conflict_" + ((i-1)/16), (i-1)%16);
-                CreateDiscreteAlarm(hmi, vId + "_FailOpen", "ValveWarning", vId + " Failed to Open in automatic mode.", dbName + "_W_FailOpen_" + ((i-1)/16), (i-1)%16);
-                CreateDiscreteAlarm(hmi, vId + "_FailClose", "ValveWarning", vId + " Failed to Close in automatic mode.", dbName + "_W_FailClose_" + ((i-1)/16), (i-1)%16);
+                CreateDiscreteAlarm(hmi, vId + "_Unhealthy", "ValveFault", vId + " reported Unhealthy status.", dbName + "_W_Unhealthy_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_Conflict", "ValveFault", vId + " Command Conflict (Open and Close requested).", dbName + "_W_Conflict_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_FailOpen", "ValveWarning", vId + " Failed to Open in automatic mode.", dbName + "_W_FailOpen_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_FailClose", "ValveWarning", vId + " Failed to Close in automatic mode.", dbName + "_W_FailClose_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
 
                 // Pass 2: E (Loss of Position, MED), F (Unexpected Movement, MED), G (Local Mode, LOW).
                 // Reuse ValveWarning for E/F (same tier as C/D's timeouts) and the new ValveEvent
                 // class for G, since Local Mode is a logged event rather than a real fault.
-                CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveWarning", vId + " Loss of Position Feedback (idle, no limit switch made).", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16);
-                CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", vId + " Unexpected Movement detected (uncommanded limit switch change).", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16);
-                CreateDiscreteAlarm(hmi, vId + "_Local", "ValveEvent", vId + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16);
+                CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveWarning", vId + " Loss of Position Feedback (idle, no limit switch made).", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", vId + " Unexpected Movement detected (uncommanded limit switch change).", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_Local", "ValveEvent", vId + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
             }
             Console.WriteLine("  Created " + (88 * 7 + 9) + " discrete alarms.");
         }
 
-        static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit)
+        static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit, string origin, string area)
         {
             try {
                 var al = hmi.DiscreteAlarms.Find(name);
                 if (al == null) al = hmi.DiscreteAlarms.Create(name);
                 al.AlarmClass = className;
-                SetMLText(al, "AlarmText", text);
+                // The real property is EventText, NOT AlarmText - confirmed live via reflection
+                // (dumping an existing alarm's full property list showed no AlarmText property at
+                // all; SetMLText(al, "AlarmText", ...) was silently no-oping every single call).
+                SetMLText(al, "EventText", text);
+                al.Origin = origin;
+                al.Area = area;
                 al.RaisedStateTag = triggerTag;
                 al.RaisedStateTagBitNumber = (uint)triggerBit;
-                
+
                 Console.WriteLine("    -> Created " + name + " | Tag: " + triggerTag + " | Bit: " + triggerBit);
             } catch (Exception ex) {
                 Console.WriteLine("  [ERROR] Alarm " + name + ": " + ex.Message);
