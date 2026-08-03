@@ -932,23 +932,25 @@ namespace ValveDemoHmiBuilder
                 string scriptBody = "";
                 string helper = "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n";
                 if (action == "OpenCmd") {
-                    scriptBody = 
+                    scriptBody =
                         helper +
                         "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
                         "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
                         "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                         "if (!cfg) return;\n" +
                         "Tags(vTag + \"_CloseCmd\").Write(false);\n" +
-                        "Tags(vTag + \"_OpenCmd\").Write(true);";
+                        "Tags(vTag + \"_OpenCmd\").Write(true);\n" +
+                        "HMIRuntime.Audit.SysFct.InsertElectronicRecord(vTag, \"ValveCommand\", \"Update\", false, true, \"None\");";
                 } else if (action == "CloseCmd") {
-                    scriptBody = 
+                    scriptBody =
                         helper +
                         "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
                         "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
                         "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                         "if (!cfg) return;\n" +
                         "Tags(vTag + \"_OpenCmd\").Write(false);\n" +
-                        "Tags(vTag + \"_CloseCmd\").Write(true);";
+                        "Tags(vTag + \"_CloseCmd\").Write(true);\n" +
+                        "HMIRuntime.Audit.SysFct.InsertElectronicRecord(vTag, \"ValveCommand\", \"Update\", true, false, \"None\");";
                 } else if (action == "ResetFault") {
                     // Just writing Healthy:=true isn't enough for a double-indication fault
                     // (OpenFB && ClosedFB both true) — FB_ValveLoop re-derives Healthy:=false from
@@ -965,7 +967,8 @@ namespace ValveDemoHmiBuilder
                         "Tags(vTag + \"_ClosedFB\").Write(false);\n" +
                         "Tags(vTag + \"_TimeoutOpenAlarm\").Write(false);\n" +
                         "Tags(vTag + \"_TimeoutCloseAlarm\").Write(false);\n" +
-                        "Tags(vTag + \"_UnexpMove\").Write(false);";
+                        "Tags(vTag + \"_UnexpMove\").Write(false);\n" +
+                        "HMIRuntime.Audit.SysFct.InsertElectronicRecord(vTag, \"ValveCommand\", \"Update\", false, true, \"None\");";
                 } else if (action == "ToggleService") {
                     scriptBody = 
                         helper +
