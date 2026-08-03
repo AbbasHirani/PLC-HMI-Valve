@@ -584,6 +584,39 @@
             &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := '';
         END_IF;
     END_FOR;
+
+    // CONFIGURATION SCREEN: all 88 valves in one global sequence (7 pages of 14), not zone-scoped
+    // like the three windows above - this screen shows the whole fleet, so #idx IS the absolute
+    // valve number directly, no zone-start offset needed.
+    #base := 1 + &quot;Valves_DB&quot;.CfgPage * 14;
+    FOR #j := 1 TO 14 DO
+        #idx := #base + #j - 1;
+        IF #idx &lt;= 88 THEN
+            &quot;Valves_DB&quot;.CfgTblNo[#j] := #idx;
+            IF #idx &lt; 10 THEN
+                &quot;Valves_DB&quot;.CfgTblTag[#j] := CONCAT(IN1 := 'CM-0', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 1));
+            ELSE
+                &quot;Valves_DB&quot;.CfgTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+            END_IF;
+            IF #idx &lt;= 28 THEN
+                &quot;Valves_DB&quot;.CfgTblZone[#j] := 'AFT BALLAST';
+            ELSIF #idx &lt;= 56 THEN
+                &quot;Valves_DB&quot;.CfgTblZone[#j] := 'BILGE-ER';
+            ELSE
+                &quot;Valves_DB&quot;.CfgTblZone[#j] := 'BALLAST FWD';
+            END_IF;
+            &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+            &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            &quot;Valves_DB&quot;.CfgTblConfigured[#j] := &quot;Valves_DB&quot;.Valve[#idx].Configured;
+        ELSE
+            &quot;Valves_DB&quot;.CfgTblNo[#j] := 0;
+            &quot;Valves_DB&quot;.CfgTblTag[#j] := '';
+            &quot;Valves_DB&quot;.CfgTblZone[#j] := '';
+            &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := '';
+            &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := '';
+            &quot;Valves_DB&quot;.CfgTblConfigured[#j] := FALSE;
+        END_IF;
+    END_FOR;
 </Text>
 </StructuredText></NetworkSource>
           <ProgrammingLanguage>SCL</ProgrammingLanguage>

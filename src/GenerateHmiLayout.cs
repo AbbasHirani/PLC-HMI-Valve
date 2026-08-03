@@ -272,7 +272,7 @@ namespace ValveDemoHmiBuilder
 
             if (Want(only, "Diag")) {
                 HmiScreen scDiag = RecreateScreen(hmi, "Screen_Diagnostics");
-                if (scDiag != null) BuildPlaceholderScreen(scDiag, "Screen_Diagnostics", "DIAGNOSTICS", "System diagnostics");
+                if (scDiag != null) BuildConfigScreen(scDiag);
             } else Console.WriteLine("  Skipping Screen_Diagnostics (not in --only)...");
 
             // Discrete alarms can be created/updated independently — does NOT touch Screen_Alarms layout.
@@ -1379,6 +1379,19 @@ namespace ValveDemoHmiBuilder
                 // future zone screen (not just Bilge/ER) can reuse them without another pass.
                 CreateSummaryTag(hmi, vTag + "_Name",     "Valve_Meta_DB.Name[" + i + "]",     "String", forceRefreshNewTags);
                 CreateSummaryTag(hmi, vTag + "_Location", "Valve_Meta_DB.Location[" + i + "]", "String", forceRefreshNewTags);
+            }
+
+            // Configuration screen's global (all-88) paged window - same naming convention as the
+            // Aft/Er/Fwd_Tbl* tags the zone tables already use (Aft_TblNo_1..14 etc., confirmed live
+            // in the project's ValveTags table - 1563 tags total).
+            CreateSummaryTag(hmi, "Valves_DB_CfgPage", "Valves_DB.CfgPage", "Int", forceRefreshNewTags);
+            for (int slot = 1; slot <= 14; slot++) {
+                CreateSummaryTag(hmi, "Cfg_TblNo_" + slot,   "Valves_DB.CfgTblNo[" + slot + "]",   "Int",    forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblTag_" + slot,  "Valves_DB.CfgTblTag[" + slot + "]",  "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblZone_" + slot, "Valves_DB.CfgTblZone[" + slot + "]", "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblConfigured_" + slot, "Valves_DB.CfgTblConfigured[" + slot + "]", "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblName_" + slot, "Valve_Meta_DB.CfgTblName[" + slot + "]", "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblLoc_" + slot,  "Valve_Meta_DB.CfgTblLoc[" + slot + "]",  "String", forceRefreshNewTags);
             }
         }
 
