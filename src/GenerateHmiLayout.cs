@@ -939,8 +939,7 @@ namespace ValveDemoHmiBuilder
                         "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                         "if (!cfg) return;\n" +
                         "Tags(vTag + \"_CloseCmd\").Write(false);\n" +
-                        "Tags(vTag + \"_OpenCmd\").Write(true);\n" +
-                        "HMIRuntime.Audit.SysFct.InsertElectronicRecord(vTag, \"ValveCommand\", \"Update\", false, true, \"None\");";
+                        "Tags(vTag + \"_OpenCmd\").Write(true);";
                 } else if (action == "CloseCmd") {
                     scriptBody =
                         helper +
@@ -949,8 +948,7 @@ namespace ValveDemoHmiBuilder
                         "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                         "if (!cfg) return;\n" +
                         "Tags(vTag + \"_OpenCmd\").Write(false);\n" +
-                        "Tags(vTag + \"_CloseCmd\").Write(true);\n" +
-                        "HMIRuntime.Audit.SysFct.InsertElectronicRecord(vTag, \"ValveCommand\", \"Update\", true, false, \"None\");";
+                        "Tags(vTag + \"_CloseCmd\").Write(true);";
                 } else if (action == "ResetFault") {
                     // Just writing Healthy:=true isn't enough for a double-indication fault
                     // (OpenFB && ClosedFB both true) — FB_ValveLoop re-derives Healthy:=false from
@@ -967,8 +965,7 @@ namespace ValveDemoHmiBuilder
                         "Tags(vTag + \"_ClosedFB\").Write(false);\n" +
                         "Tags(vTag + \"_TimeoutOpenAlarm\").Write(false);\n" +
                         "Tags(vTag + \"_TimeoutCloseAlarm\").Write(false);\n" +
-                        "Tags(vTag + \"_UnexpMove\").Write(false);\n" +
-                        "HMIRuntime.Audit.SysFct.InsertElectronicRecord(vTag, \"ValveCommand\", \"Update\", false, true, \"None\");";
+                        "Tags(vTag + \"_UnexpMove\").Write(false);";
                 } else if (action == "ToggleService") {
                     scriptBody = 
                         helper +
@@ -1235,7 +1232,6 @@ namespace ValveDemoHmiBuilder
         }
 
         static System.Collections.Generic.Dictionary<string, byte> _classPriorities;
-        static System.Collections.Generic.Dictionary<string, string> _classAuditClasses;
 
         static void CreateAlarms(HmiSoftware hmi, string dbName = "Valves_DB")
         {
@@ -1264,18 +1260,6 @@ namespace ValveDemoHmiBuilder
             // own, separate property) still read 0. Each alarm instance carries its own Priority
             // that CreateDiscreteAlarm must set explicitly, matching its class's value.
             _classPriorities = classPriorities;
-
-            // Audit Trail: 11 standard Alarm Audit Classes already exist once GMP mode is on
-            // (confirmed live) - custom classes can't be created via Openness (HmiAlarmAuditClass.
-            // Create() crashes TIA Portal outright, confirmed live, twice). Serious faults require a
-            // comment on acknowledge so there's a record of why/what was done; lighter warnings and
-            // events just need a plain logged acknowledge.
-            _classAuditClasses = new System.Collections.Generic.Dictionary<string, string> {
-                { "ValveFault",   "HMI_Audit_Alarm_Acknowledge_Comment" },
-                { "System",       "HMI_Audit_Alarm_Acknowledge_Comment" },
-                { "ValveWarning", "HMI_Audit_Alarm_Acknowledge" },
-                { "ValveEvent",   "HMI_Audit_Alarm_Acknowledge" },
-            };
 
             // Generate 9 System Alarms (HwWord bits 0..8)
             CreateDiscreteAlarm(hmi, "System_PLC_CPU_Fault", "System", "PLC CPU fault detected.", dbName + "_HwWord", 0, "PLC", "SYSTEM");
@@ -1318,10 +1302,6 @@ namespace ValveDemoHmiBuilder
                 byte pri;
                 if (_classPriorities != null && _classPriorities.TryGetValue(className, out pri)) {
                     try { al.Priority = pri; } catch {}
-                }
-                string auditClass;
-                if (_classAuditClasses != null && _classAuditClasses.TryGetValue(className, out auditClass)) {
-                    try { al.AuditClass = auditClass; } catch {}
                 }
                 // The real property is EventText, NOT AlarmText - confirmed live via reflection
                 // (dumping an existing alarm's full property list showed no AlarmText property at
