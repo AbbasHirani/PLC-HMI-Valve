@@ -110,9 +110,9 @@ namespace ValveDemoHmiBuilder
                                   int fontSize = 14, bool bold = false)
         {
             var b = sc.ScreenItems.Create<HmiButton>(name);
-            b.Left = x; b.Top = y; b.Width = (uint)w; b.Height = (uint)h;
+            b.Left = SX(x); b.Top = SY(y); b.Width = (uint)SX(w); b.Height = (uint)SY(h);
             b.BackColor = bg; b.ForeColor = fg; b.BorderColor = border; b.BorderWidth = (byte)bw;
-            SetFont(b, fontSize, bold);
+            SetFont(b, SFont(fontSize), bold);
             SetText(b, "Text", label);
             return b;
         }
@@ -122,11 +122,11 @@ namespace ValveDemoHmiBuilder
                                    int fontSize = 14, bool bold = false)
         {
             var tb = sc.ScreenItems.Create<HmiTextBox>(name);
-            tb.Left = x; tb.Top = y; tb.Width = (uint)w; tb.Height = (uint)h;
+            tb.Left = SX(x); tb.Top = SY(y); tb.Width = (uint)SX(w); tb.Height = (uint)SY(h);
             tb.BackColor = bg; tb.ForeColor = fg; tb.BorderWidth = (byte)bw;
             SetProp(tb, "HorizontalTextAlignment", align);
             SetProp(tb, "VerticalTextAlignment", "Middle");
-            SetFont(tb, fontSize, bold);
+            SetFont(tb, SFont(fontSize), bold);
             SetText(tb, "Text", label);
             return tb;
         }
@@ -137,11 +137,11 @@ namespace ValveDemoHmiBuilder
                                        Color fg, string align, int fontSize, bool bold)
         {
             var b = sc.ScreenItems.Create<HmiButton>(name);
-            b.Left = x; b.Top = y; b.Width = (uint)w; b.Height = (uint)h;
+            b.Left = SX(x); b.Top = SY(y); b.Width = (uint)SX(w); b.Height = (uint)SY(h);
             b.BackColor = M_TRANS; b.ForeColor = fg;
             b.BorderColor = M_TRANS; b.BorderWidth = 0;
             SetProp(b, "HorizontalTextAlignment", align);
-            SetFont(b, fontSize, bold);
+            SetFont(b, SFont(fontSize), bold);
             SetText(b, "Text", "--");
             return b;
         }
@@ -428,8 +428,8 @@ namespace ValveDemoHmiBuilder
                                    Color fill, Color border, int bw = 2)
         {
             var e = sc.ScreenItems.Create<HmiEllipse>(name);
-            e.CenterX = cx; e.CenterY = cy;
-            e.RadiusX = (uint)rx; e.RadiusY = (uint)ry;
+            e.CenterX = SX(cx); e.CenterY = SY(cy);
+            e.RadiusX = (uint)SX(rx); e.RadiusY = (uint)SY(ry);
             e.BackColor = fill; e.BorderColor = border; e.BorderWidth = (byte)bw;
             return e;
         }
@@ -447,6 +447,12 @@ namespace ValveDemoHmiBuilder
         static void MakeDiagLine(HmiScreen sc, string name, double x1, double y1, double x2, double y2,
                                    int thickness, Color color)
         {
+            // Scale endpoints to real-panel space first so length/angle are computed from the
+            // final on-screen geometry, not the 1920x1080 design-space one.
+            x1 = SX((int)Math.Round(x1)); y1 = SY((int)Math.Round(y1));
+            x2 = SX((int)Math.Round(x2)); y2 = SY((int)Math.Round(y2));
+            int scaledThickness = Math.Max(1, SY(thickness));
+
             double dx = x2 - x1, dy = y2 - y1;
             double length = Math.Sqrt(dx * dx + dy * dy);
             double angleDeg = Math.Atan2(dy, dx) * 180.0 / Math.PI;
@@ -454,9 +460,9 @@ namespace ValveDemoHmiBuilder
 
             var r = sc.ScreenItems.Create<HmiRectangle>(name);
             r.Left = (int)Math.Round(midX - length / 2.0);
-            r.Top  = (int)Math.Round(midY - thickness / 2.0);
+            r.Top  = (int)Math.Round(midY - scaledThickness / 2.0);
             r.Width  = (uint)Math.Round(length);
-            r.Height = (uint)thickness;
+            r.Height = (uint)scaledThickness;
             r.BackColor = color; r.BorderColor = color; r.BorderWidth = 0;
             SetRotation(r, (short)Math.Round(angleDeg));
         }
@@ -602,23 +608,23 @@ namespace ValveDemoHmiBuilder
 
             // 2. Bowtie glyph on top of the badge — fixed white, legible against all 6 states.
             var sym = sc.ScreenItems.Create<HmiTextBox>(name + "_sym");
-            sym.Left = cx - R; sym.Top = cy - R; sym.Width = (uint)(R * 2); sym.Height = (uint)(R * 2);
+            sym.Left = SX(cx - R); sym.Top = SY(cy - R); sym.Width = (uint)SX(R * 2); sym.Height = (uint)SY(R * 2);
             sym.BackColor = M_TRANS; sym.ForeColor = Color.White; sym.BorderWidth = 0;
             SetProp(sym, "HorizontalTextAlignment", "Center");
             SetProp(sym, "VerticalTextAlignment", "Middle");
-            SetFont(sym, 20, true);
+            SetFont(sym, SFont(20), true);
             SetText(sym, "Text", "&#x22C8;");
 
             // 3. Transparent button spanning badge + label area: its own Text (bottom-aligned)
             // IS the CM-nn label, and its native click opens the SBO popup — one item doing
             // both jobs instead of a separate label textbox plus a separate hit-target button.
             var hit = sc.ScreenItems.Create<HmiButton>(name + "_hit");
-            hit.Left = cx - 30; hit.Top = cy - R; hit.Width = 60; hit.Height = (uint)(R * 2 + 18);
+            hit.Left = SX(cx - 30); hit.Top = SY(cy - R); hit.Width = (uint)SX(60); hit.Height = (uint)SY(R * 2 + 18);
             hit.BackColor = M_TRANS; hit.ForeColor = M_TEXT;
             hit.BorderColor = M_TRANS; hit.BorderWidth = 0;
             SetProp(hit, "HorizontalTextAlignment", "Center");
             SetProp(hit, "VerticalTextAlignment", "Bottom");
-            SetFont(hit, 13, true);
+            SetFont(hit, SFont(13), true);
             SetText(hit, "Text", Disp(tagNum));
             try { hit.GetType().GetProperty("ShowFocusVisual").SetValue(hit, false, null); } catch {}
             AddPopupScript(hit, vTag);

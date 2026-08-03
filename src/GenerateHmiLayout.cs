@@ -40,6 +40,23 @@ namespace ValveDemoHmiBuilder
 
         private const int SCREEN_W    = 1920;
         private const int SCREEN_H    = 1080;
+
+        // Real target panel (MTP1500, 6AV2128-3QB06-0AX1) is 1366x768, not 1920x1080. Every screen
+        // in this file was designed against the SCREEN_W/SCREEN_H virtual canvas above; rather than
+        // rewrite every coordinate, TARGET_W/TARGET_H + the SX()/SY() scale functions convert
+        // design-space pixels to real-panel pixels at the point they're written to a screen item
+        // (inside MakeRect/MakeBtn/MakeTb/MakeLiveText/MakePanel, plus a few raw assignment sites
+        // that don't go through those helpers). Width and height scale by very slightly different
+        // factors (1366/1920 vs 768/1080) because 1366x768 isn't an exact 16:9 ratio - it's rounded
+        // up from 1365.33 for even pixel width - so SX/SY are kept separate rather than one constant.
+        private const int TARGET_W = 1366;
+        private const int TARGET_H = 768;
+        private const int MIN_FONT_SIZE = 10; // floor so scaled-down text stays legible
+
+        private static int SX(int v) { return (int)Math.Round(v * (double)TARGET_W / SCREEN_W); }
+        private static int SY(int v) { return (int)Math.Round(v * (double)TARGET_H / SCREEN_H); }
+        private static int SFont(int v) { return Math.Max(MIN_FONT_SIZE, (int)Math.Round(v * (double)TARGET_H / SCREEN_H)); }
+
         private const int HEADER_H    = 48;
         private const int SUMMARY_H   = 44;
         private const int CONTENT_TOP = HEADER_H + SUMMARY_H + 8; // 100px
@@ -298,8 +315,10 @@ namespace ValveDemoHmiBuilder
 
             HmiScreen newScreen = (HmiScreen)cm.Invoke(screens, new object[]{ screenName });
             if (newScreen != null) {
-                SetPropUInt(newScreen, "Width",  (uint)SCREEN_W);
-                SetPropUInt(newScreen, "Height", (uint)SCREEN_H);
+                // Exact target panel resolution (MTP1500, 1366x768) - not run through SX()/SY()
+                // rounding since this is the actual physical canvas size, not a scaled element.
+                SetPropUInt(newScreen, "Width",  (uint)TARGET_W);
+                SetPropUInt(newScreen, "Height", (uint)TARGET_H);
             }
             return newScreen;
         }
@@ -332,8 +351,8 @@ namespace ValveDemoHmiBuilder
         {
             HmiScreen sc = RecreateScreen(hmi, "Screen_Popup");
             if (sc == null) return;
-            SetPropUInt(sc, "Width", 460);
-            SetPropUInt(sc, "Height", 360);
+            SetPropUInt(sc, "Width", (uint)SX(460));
+            SetPropUInt(sc, "Height", (uint)SY(360));
             sc.BackColor = BG_DARK;
 
             // Outer canvas
@@ -344,7 +363,7 @@ namespace ValveDemoHmiBuilder
 
             // Valve name (centered horizontally across 460px width)
             var titleIO = sc.ScreenItems.Create<HmiIOField>("Pop_Title");
-            titleIO.Left = 0; titleIO.Top = 6; titleIO.Width = 460; titleIO.Height = 26;
+            titleIO.Left = SX(0); titleIO.Top = SY(6); titleIO.Width = (uint)SX(460); titleIO.Height = (uint)SY(26);
             titleIO.BackColor = BG_HEADER; titleIO.ForeColor = Color.White;
             titleIO.BorderColor = BG_HEADER; titleIO.BorderWidth = 0;
             SetPropEnum(titleIO, "IOFieldType", "Output");
@@ -365,7 +384,7 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Pop_StatusCard", 15, 46, 430, 40, BG_CARD, BORDER, 1);
 
             var statusIO = sc.ScreenItems.Create<HmiIOField>("Pop_StatusText");
-            statusIO.Left = 20; statusIO.Top = 50; statusIO.Width = 420; statusIO.Height = 32;
+            statusIO.Left = SX(20); statusIO.Top = SY(50); statusIO.Width = (uint)SX(420); statusIO.Height = (uint)SY(32);
             statusIO.BackColor = BG_CARD; statusIO.ForeColor = Color.White;
             statusIO.BorderColor = BG_CARD; statusIO.BorderWidth = 0;
             SetPropEnum(statusIO, "IOFieldType", "Output");
@@ -396,7 +415,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── OPEN / CLOSE Buttons (Y=96..144) ─────────────────────────────────
             var btnOpen = sc.ScreenItems.Create<HmiButton>("Btn_Open");
-            btnOpen.Left = 20; btnOpen.Top = 96; btnOpen.Width = 200; btnOpen.Height = 48;
+            btnOpen.Left = SX(20); btnOpen.Top = SY(96); btnOpen.Width = (uint)SX(200); btnOpen.Height = (uint)SY(48);
             btnOpen.BackColor = Color.FromArgb(255, 16, 185, 129); btnOpen.ForeColor = Color.White;
             btnOpen.BorderColor = Color.FromArgb(255, 52, 211, 153); btnOpen.BorderWidth = 2;
             SetMLText(btnOpen, "Text", "▲ OPEN VALVE");
@@ -404,7 +423,7 @@ namespace ValveDemoHmiBuilder
             AddPopupActionButton(btnOpen, "OpenCmd");
 
             var btnClose = sc.ScreenItems.Create<HmiButton>("Btn_Close");
-            btnClose.Left = 240; btnClose.Top = 96; btnClose.Width = 200; btnClose.Height = 48;
+            btnClose.Left = SX(240); btnClose.Top = SY(96); btnClose.Width = (uint)SX(200); btnClose.Height = (uint)SY(48);
             btnClose.BackColor = Color.FromArgb(255, 55, 65, 81); btnClose.ForeColor = Color.White;
             btnClose.BorderColor = Color.FromArgb(255, 107, 114, 128); btnClose.BorderWidth = 2;
             SetMLText(btnClose, "Text", "▼ CLOSE VALVE");
@@ -413,7 +432,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── Large Status Circle (Diameter=90, Y=155..245) ──
             var dot = sc.ScreenItems.Create<HmiEllipse>("Pop_Dot");
-            dot.CenterX = 230; dot.CenterY = 200; dot.RadiusX = 45; dot.RadiusY = 45;
+            dot.CenterX = SX(230); dot.CenterY = SY(200); dot.RadiusX = (uint)SX(45); dot.RadiusY = (uint)SY(45);
             dot.BackColor = TEAL; dot.BorderColor = Color.White;
             try {
                 // Same fix as Pop_StatusText: read the single precomputed _State tag instead of an
@@ -440,7 +459,7 @@ namespace ValveDemoHmiBuilder
 
             // State label below big circle (Y=255..281)
             var stateLabel = sc.ScreenItems.Create<HmiIOField>("Pop_StateLabel");
-            stateLabel.Left = 30; stateLabel.Top = 255; stateLabel.Width = 400; stateLabel.Height = 26;
+            stateLabel.Left = SX(30); stateLabel.Top = SY(255); stateLabel.Width = (uint)SX(400); stateLabel.Height = (uint)SY(26);
             stateLabel.BackColor = BG_DARK; stateLabel.ForeColor = Color.White;
             stateLabel.BorderColor = BG_DARK; stateLabel.BorderWidth = 0;
             SetPropEnum(stateLabel, "IOFieldType", "Output");
@@ -461,7 +480,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── RESET FAULT Button (Left=15, Y=292, Width=138, Height=46) ───────────
             var btnReset = sc.ScreenItems.Create<HmiButton>("Btn_Reset");
-            btnReset.Left = 15; btnReset.Top = 292; btnReset.Width = 138; btnReset.Height = 46;
+            btnReset.Left = SX(15); btnReset.Top = SY(292); btnReset.Width = (uint)SX(138); btnReset.Height = (uint)SY(46);
             btnReset.BackColor = Color.FromArgb(255, 194, 65, 12); btnReset.ForeColor = Color.White;
             btnReset.BorderColor = Color.FromArgb(255, 249, 115, 22); btnReset.BorderWidth = 2;
             SetMLText(btnReset, "Text", "⚡ RESET FAULT");
@@ -470,7 +489,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── SERVICE ON/OFF Toggle Switch (Left=160, Y=292, Width=138, Height=46) ──
             var btnService = sc.ScreenItems.Create<HmiButton>("Btn_Service");
-            btnService.Left = 160; btnService.Top = 292; btnService.Width = 138; btnService.Height = 46;
+            btnService.Left = SX(160); btnService.Top = SY(292); btnService.Width = (uint)SX(138); btnService.Height = (uint)SY(46);
             btnService.BackColor = Color.FromArgb(255, 58, 58, 60); btnService.ForeColor = Color.White;
             btnService.BorderColor = TEAL; btnService.BorderWidth = 2;
             SetMLText(btnService, "Text", "🛠️ SERVICE:  OFF");
@@ -501,7 +520,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── SIMULATE STUCK Toggle Switch (Left=305, Y=292, Width=140, Height=46) ──
             var btnStuck = sc.ScreenItems.Create<HmiButton>("Btn_Stuck");
-            btnStuck.Left = 305; btnStuck.Top = 292; btnStuck.Width = 140; btnStuck.Height = 46;
+            btnStuck.Left = SX(305); btnStuck.Top = SY(292); btnStuck.Width = (uint)SX(140); btnStuck.Height = (uint)SY(46);
             btnStuck.BackColor = Color.FromArgb(255, 58, 58, 60); btnStuck.ForeColor = Color.White;
             btnStuck.BorderColor = Color.FromArgb(255, 234, 179, 8); btnStuck.BorderWidth = 2;
             SetMLText(btnStuck, "Text", "⚠️ STUCK: OFF");
@@ -599,10 +618,10 @@ namespace ValveDemoHmiBuilder
                 Console.WriteLine("  [DEBUG] Placing HmiAlarmControl (this may take several minutes)...");
                 Console.Out.Flush();
                 var alarmCtrl = sc.ScreenItems.Create<HmiAlarmControl>("AlarmView");
-                alarmCtrl.Left = 16;
-                alarmCtrl.Top = 286;
-                alarmCtrl.Width = 1888; // full width now that the System Status side panel is gone
-                alarmCtrl.Height = 762;
+                alarmCtrl.Left = SX(16);
+                alarmCtrl.Top = SY(286);
+                alarmCtrl.Width = (uint)SX(1888); // full width now that the System Status side panel is gone
+                alarmCtrl.Height = (uint)SY(762);
                 // Without this, native WinCC runtime system alarms (PlcInStopAlarm,
                 // PlcDisconnectedAlarm, PhysicalMemorySpace, etc.) show up mixed in with our own
                 // valve/system alarms - confirmed live via reflection that Filter defaults to "".
@@ -630,18 +649,18 @@ namespace ValveDemoHmiBuilder
             int applied = 0;
             foreach (var col in alarmCtrl.AlarmView.Columns) {
                 switch (col.Name) {
-                    case "Raise time":       col.Visible = true;  col.Width = 170; SetMLText(col.Header, "Text", "TIME");        applied++; break;
-                    case "Priority":         col.Visible = true;  col.Width = 90;  SetMLText(col.Header, "Text", "PRIORITY");     applied++; break;
-                    case "Name":             col.Visible = true;  col.Width = 140; SetMLText(col.Header, "Text", "ALARM ID");     applied++; break;
-                    case "Alarm text":       col.Visible = true;  col.Width = 750; SetMLText(col.Header, "Text", "DESCRIPTION");  applied++; break;
-                    case "Area":             col.Visible = true;  col.Width = 180; SetMLText(col.Header, "Text", "SYSTEM");       applied++; break;
-                    case "Alarm state":      col.Visible = true;  col.Width = 160; SetMLText(col.Header, "Text", "STATUS");       applied++; break;
+                    case "Raise time":       col.Visible = true;  col.Width = (uint)SX(170); SetMLText(col.Header, "Text", "TIME");        applied++; break;
+                    case "Priority":         col.Visible = true;  col.Width = (uint)SX(90);  SetMLText(col.Header, "Text", "PRIORITY");     applied++; break;
+                    case "Name":             col.Visible = true;  col.Width = (uint)SX(140); SetMLText(col.Header, "Text", "ALARM ID");     applied++; break;
+                    case "Alarm text":       col.Visible = true;  col.Width = (uint)SX(750); SetMLText(col.Header, "Text", "DESCRIPTION");  applied++; break;
+                    case "Area":             col.Visible = true;  col.Width = (uint)SX(180); SetMLText(col.Header, "Text", "SYSTEM");       applied++; break;
+                    case "Alarm state":      col.Visible = true;  col.Width = (uint)SX(160); SetMLText(col.Header, "Text", "STATUS");       applied++; break;
                     // ACKNOWLEDGED BY ("User name") removed - confirmed never populates regardless
                     // of acknowledge path (native toolbar icon or our script), even when genuinely
                     // logged in. Real "who did what" tracking belongs to the Audit Trail work
                     // (InsertElectronicRecord) instead, not this column - see the memory note.
-                    case "Acknowledge time": col.Visible = true;  col.Width = 170; SetMLText(col.Header, "Text", "ACK TIME");     applied++; break;
-                    case "Duration":         col.Visible = true;  col.Width = 140; SetMLText(col.Header, "Text", "DURATION");     applied++; break;
+                    case "Acknowledge time": col.Visible = true;  col.Width = (uint)SX(170); SetMLText(col.Header, "Text", "ACK TIME");     applied++; break;
+                    case "Duration":         col.Visible = true;  col.Width = (uint)SX(140); SetMLText(col.Header, "Text", "DURATION");     applied++; break;
                     default:                 col.Visible = false; break;
                 }
             }
@@ -705,8 +724,8 @@ namespace ValveDemoHmiBuilder
 
                 // Card Button
                 var btn = sc.ScreenItems.Create<HmiButton>(name);
-                btn.Left = left; btn.Top = top;
-                btn.Width = (uint)CARD_W; btn.Height = (uint)CARD_H;
+                btn.Left = SX(left); btn.Top = SY(top);
+                btn.Width = (uint)SX(CARD_W); btn.Height = (uint)SY(CARD_H);
                 btn.BackColor = BG_CARD; btn.BorderColor = BORDER; btn.BorderWidth = 1;
                 btn.ForeColor = Color.White;
                 SetMLText(btn, "Text", string.Format("VALVE V-{0:D3}", v));
@@ -773,16 +792,16 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Hdr_Logo", 12, 10, 28, 28, TEAL, TEAL, 0);
 
             var titleIO = sc.ScreenItems.Create<HmiIOField>("Hdr_Title");
-            titleIO.Left = 50; titleIO.Top = 12;
-            titleIO.Width = 600; titleIO.Height = 24;
+            titleIO.Left = SX(50); titleIO.Top = SY(12);
+            titleIO.Width = (uint)SX(600); titleIO.Height = (uint)SY(24);
             titleIO.BackColor = BG_HEADER; titleIO.ForeColor = TEAL;
             titleIO.BorderColor = BG_HEADER; titleIO.BorderWidth = 0;
             SetPropEnum(titleIO, "IOFieldType", "Output");
             SetMLText(titleIO, "Text", title);
 
             var btnOv = sc.ScreenItems.Create<HmiButton>("Nav_Overview");
-            btnOv.Left = SCREEN_W - 240; btnOv.Top = 8;
-            btnOv.Width = 110; btnOv.Height = 32;
+            btnOv.Left = SX(SCREEN_W - 240); btnOv.Top = SY(8);
+            btnOv.Width = (uint)SX(110); btnOv.Height = (uint)SY(32);
             btnOv.BackColor = isOverview ? TEAL : BG_HEADER;
             btnOv.ForeColor = isOverview ? Color.Black : TEAL;
             btnOv.BorderColor = TEAL; btnOv.BorderWidth = 1;
@@ -790,8 +809,8 @@ namespace ValveDemoHmiBuilder
             AddNavScript(btnOv, "Screen_Home");
 
             var btnAl = sc.ScreenItems.Create<HmiButton>("Nav_Alarms");
-            btnAl.Left = SCREEN_W - 122; btnAl.Top = 8;
-            btnAl.Width = 110; btnAl.Height = 32;
+            btnAl.Left = SX(SCREEN_W - 122); btnAl.Top = SY(8);
+            btnAl.Width = (uint)SX(110); btnAl.Height = (uint)SY(32);
             btnAl.BackColor = !isOverview ? TEAL : BG_HEADER;
             btnAl.ForeColor = !isOverview ? Color.Black : COLOR_FAIL;
             btnAl.BorderColor = COLOR_FAIL; btnAl.BorderWidth = 1;
@@ -815,13 +834,13 @@ namespace ValveDemoHmiBuilder
                 MakeRect(sc, "Sum_Tile_" + i, tileX, tileY, tileW, tileH, BG_HEADER, BORDER, 1);
 
                 var dot = sc.ScreenItems.Create<HmiEllipse>("Sum_Dot_" + i);
-                dot.CenterX = tileX + 16; dot.CenterY = tileY + 18;
-                dot.RadiusX = 6; dot.RadiusY = 6;
+                dot.CenterX = SX(tileX + 16); dot.CenterY = SY(tileY + 18);
+                dot.RadiusX = (uint)SX(6); dot.RadiusY = (uint)SY(6);
                 dot.BackColor = colors[i]; dot.BorderColor = colors[i];
 
                 var cnt = sc.ScreenItems.Create<HmiIOField>("Sum_Cnt_" + i);
-                cnt.Left = tileX + 32; cnt.Top = tileY + 9;
-                cnt.Width = 50; cnt.Height = 18;
+                cnt.Left = SX(tileX + 32); cnt.Top = SY(tileY + 9);
+                cnt.Width = (uint)SX(50); cnt.Height = (uint)SY(18);
                 cnt.BackColor = BG_HEADER; cnt.ForeColor = Color.White;
                 cnt.BorderColor = BG_HEADER; cnt.BorderWidth = 0;
                 SetPropEnum(cnt, "IOFieldType", "Output");
@@ -851,8 +870,8 @@ namespace ValveDemoHmiBuilder
                 }
 
                 var lbl = sc.ScreenItems.Create<HmiButton>("Sum_Lbl_" + i);
-                lbl.Left = tileX + 85; lbl.Top = tileY + 6;
-                lbl.Width = 210; lbl.Height = 24;
+                lbl.Left = SX(tileX + 85); lbl.Top = SY(tileY + 6);
+                lbl.Width = (uint)SX(210); lbl.Height = (uint)SY(24);
                 lbl.BackColor = BG_HEADER; lbl.ForeColor = colors[i];
                 lbl.BorderColor = BG_HEADER; lbl.BorderWidth = 0;
                 SetMLText(lbl, "Text", tiles[i]);
@@ -1039,8 +1058,8 @@ namespace ValveDemoHmiBuilder
         static HmiRectangle MakeRect(HmiScreen sc, string name, int left, int top, int w, int h, Color bg, Color border, int bw)
         {
             var r = sc.ScreenItems.Create<HmiRectangle>(name);
-            r.Left = left; r.Top = top;
-            r.Width = (uint)w; r.Height = (uint)h;
+            r.Left = SX(left); r.Top = SY(top);
+            r.Width = (uint)SX(w); r.Height = (uint)SY(h);
             r.BackColor = bg; r.BorderColor = border; r.BorderWidth = (byte)bw;
             return r;
         }
