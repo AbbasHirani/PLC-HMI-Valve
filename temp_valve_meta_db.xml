@@ -113,14 +113,14 @@
     </Member>
     <!-- Configuration screen's global (all-88) paged window - same mirroring pattern as the
          per-zone Aft/Er/FwdTblName/Loc above. -->
-    <Member Name="CfgTblName" Datatype="Array[1..14] of String[20]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CfgTblName" Datatype="Array[1..16] of String[20]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="CfgTblLoc" Datatype="Array[1..14] of String[20]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CfgTblLoc" Datatype="Array[1..16] of String[20]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>

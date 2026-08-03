@@ -387,30 +387,44 @@
     </Member>
     <!-- Configuration screen: same paged-window pattern as the zone tables above, but spanning
          all 88 valves directly (no zone offset) since this screen shows the whole fleet across one
-         global 7-page sequence rather than one zone at a time. -->
+         global 6-page sequence (16/page) rather than one zone at a time. -->
     <Member Name="CfgPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="CfgTblNo" Datatype="Array[1..14] of Int" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CfgTblNo" Datatype="Array[1..16] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="CfgTblTag" Datatype="Array[1..14] of String[8]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CfgTblTag" Datatype="Array[1..16] of String[8]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="CfgTblZone" Datatype="Array[1..14] of String[12]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CfgTblZone" Datatype="Array[1..16] of String[12]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="CfgTblConfigured" Datatype="Array[1..14] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CfgTblConfigured" Datatype="Array[1..16] of Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="CfgTblState" Datatype="Array[1..16] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="CfgTblStateTxt" Datatype="Array[1..16] of String[14]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>

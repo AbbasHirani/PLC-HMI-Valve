@@ -1250,104 +1250,167 @@ namespace ValveDemoHmiBuilder
         }
 
         // ── CONFIGURATION SCREEN — all 88 valves, one global paged table ───────────────────
-        // Replaces the old Screen_Diagnostics placeholder. Shows every valve's Zone/Name/Location
-        // plus a Configured on/off toggle - the same flag that gates whether FB_ValveLoop runs a
-        // slot's control logic at all (the pre-allocated-UDT-pool "enable" mechanism from the
-        // original spec). Name/Location are read-only display here (PLC-mirrored, same mechanism
-        // as the zone tables' NAME/LOCATION columns) - editable text fields need a write-on-edit
-        // event that hasn't been proven safe in this codebase yet, so that's deferred.
+        // Replaces the old Screen_Diagnostics placeholder. Shows every valve's Zone/Name/Location/
+        // live Status plus a Configured on/off toggle - the same flag that gates whether
+        // FB_ValveLoop runs a slot's control logic at all (the pre-allocated-UDT-pool "enable"
+        // mechanism from the original spec). Single-column, full-width rows (v2 rework) - the
+        // original 2-column layout wasted vertical space (~103px design-space rows for content
+        // that needs ~44) and made NAME/LOCATION cramped; this fits 16 rows/page (6 pages total,
+        // down from 7) with more room per field. Name/Location edit happens in a separate popup
+        // (Screen_ValveEdit), not inline - the table's cells are PLC-mirrored display tags that
+        // FB_ValveLoop overwrites every scan, so binding an editable field directly to them would
+        // race against the PLC's own re-mirroring and could lose the edit before it's ever read.
+        const int CFG_ROWS_PER_PAGE = 16;
+        const int CFG_MAX_PAGE = 5; // 88 valves / 16 per page - 1, 0-based
+
         static void BuildConfigScreen(HmiScreen sc)
         {
-            Console.WriteLine("  Drawing Screen_Diagnostics as VALVE CONFIGURATION (88 valves, 7 pages)...");
+            Console.WriteLine("  Drawing Screen_Diagnostics as VALVE CONFIGURATION (88 valves, 6 pages)...");
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
             BuildHomeHeader(sc);
             BuildNav(sc, "Screen_Diagnostics");
 
-            const int px = 16, py = 198, pw = 1888, ph = 800;
+            const int px = 16, py = 198, pw = 1888, ph = 760;
             BuildConfigTable(sc, px, py, pw, ph);
 
-            // Page UP/DOWN, matching the zone screens' page-nav pattern and PLC tag.
-            const int pbW = 95, pbY = py + ph + 14;
-            var upBtn   = MakeBtn(sc, "Cfg_PageUp",   px,               pbY, pbW, 46, "&#x25B2; UP",   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
-            var downBtn = MakeBtn(sc, "Cfg_PageDown", px + pbW + 10,    pbY, pbW, 46, "&#x25BC; DN",   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
-            const int maxPage = 6; // 88 valves / 14 per page - 1, 0-based
-            AddPageNavScript(upBtn, "Valves_DB_CfgPage", -1, maxPage);
-            AddPageNavScript(downBtn, "Valves_DB_CfgPage", 1, maxPage);
+            // ── Control bar row 1: page nav, live PAGE label, GO TO VALVE# jump, summary count ──
+            const int pbW = 95, pbY = py + ph + 12;
+            var upBtn   = MakeBtn(sc, "Cfg_PageUp",   px,            pbY, pbW, 42, "&#x25B2; UP",   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
+            var downBtn = MakeBtn(sc, "Cfg_PageDown", px + pbW + 8,  pbY, pbW, 42, "&#x25BC; DN",   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
+            AddPageNavScript(upBtn, "Valves_DB_CfgPage", -1, CFG_MAX_PAGE);
+            AddPageNavScript(downBtn, "Valves_DB_CfgPage", 1, CFG_MAX_PAGE);
             AddValueMap(DynTag(upBtn, "BackColor", "Valves_DB_CfgPage"), new int[] { 0 }, new object[] { Color.FromArgb(255, 58, 67, 86) });
             AddValueMap(DynTag(upBtn, "ForeColor", "Valves_DB_CfgPage"), new int[] { 0 }, new object[] { Color.FromArgb(255, 122, 132, 148) });
-            AddValueMap(DynTag(downBtn, "BackColor", "Valves_DB_CfgPage"), new int[] { maxPage }, new object[] { Color.FromArgb(255, 58, 67, 86) });
-            AddValueMap(DynTag(downBtn, "ForeColor", "Valves_DB_CfgPage"), new int[] { maxPage }, new object[] { Color.FromArgb(255, 122, 132, 148) });
+            AddValueMap(DynTag(downBtn, "BackColor", "Valves_DB_CfgPage"), new int[] { CFG_MAX_PAGE }, new object[] { Color.FromArgb(255, 58, 67, 86) });
+            AddValueMap(DynTag(downBtn, "ForeColor", "Valves_DB_CfgPage"), new int[] { CFG_MAX_PAGE }, new object[] { Color.FromArgb(255, 122, 132, 148) });
 
-            var pageLbl = MakeLiveText(sc, "Cfg_PageLbl", px + 2 * pbW + 24, pbY + 12, 200, 22, M_MUTED, "Left", 14, false);
+            int xAfterPage = px + 2 * pbW + 8 + 20;
+            var pageLbl = MakeLiveText(sc, "Cfg_PageLbl", xAfterPage, pbY + 10, 130, 22, M_MUTED, "Left", 14, false);
             Dyn(pageLbl, "Text",
-                JS_READ + "let p=r(Tags(\"Valves_DB_CfgPage\").Read())||0;\nreturn \"PAGE \" + (p+1) + \" / 7\";",
+                JS_READ + "let p=r(Tags(\"Valves_DB_CfgPage\").Read())||0;\nreturn \"PAGE \" + (p+1) + \" / 6\";",
                 "AutomaticTags");
+
+            int xJump = xAfterPage + 140;
+            MakeTb(sc, "Cfg_JumpLbl", xJump, pbY + 10, 100, 22, "GO TO VALVE#", M_TRANS, M_MUTED, 0, "Left", 13, false);
+            var jumpField = sc.ScreenItems.Create<HmiIOField>("Cfg_JumpInput");
+            jumpField.Left = SX(xJump + 104); jumpField.Top = SY(pbY); jumpField.Width = (uint)SX(60); jumpField.Height = (uint)SY(42);
+            jumpField.BackColor = Color.White; jumpField.ForeColor = M_TEXT; jumpField.BorderColor = M_BORDER; jumpField.BorderWidth = 1;
+            SetPropEnum(jumpField, "IOFieldType", "InputOutput");
+            SetPropEnum(jumpField, "TextHorizontalAlignment", "Center");
+            DynTag(jumpField, "ProcessValue", "CfgJumpTarget");
+
+            var goBtn = MakeBtn(sc, "Cfg_JumpGo", xJump + 104 + 66, pbY, 60, 42, "GO", M_ACCENT, Color.White, M_ACCENT, 1, 14, true);
+            AddScriptEvent(goBtn,
+                JS_READ +
+                "let t=r(Tags(\"CfgJumpTarget\").Read())||1;\n" +
+                "if(t<1)t=1; if(t>88)t=88;\n" +
+                "let pg=Math.floor((t-1)/" + CFG_ROWS_PER_PAGE + ");\n" +
+                "if(pg<0)pg=0; if(pg>" + CFG_MAX_PAGE + ")pg=" + CFG_MAX_PAGE + ";\n" +
+                "Tags(\"Valves_DB_CfgPage\").Write(pg);");
+
+            int xSummary = xJump + 104 + 66 + 60 + 30;
+            var sumVal = MakeLiveText(sc, "Cfg_SummaryVal", xSummary, pbY + 10, 40, 22, M_GREEN, "Right", 15, true);
+            DynTag(sumVal, "Text", "Valves_DB_TotalConfigured");
+            MakeTb(sc, "Cfg_SummaryLbl", xSummary + 44, pbY + 10, 160, 22, "/ 88 CONFIGURED", M_TRANS, M_MUTED, 0, "Left", 13, false);
+
+            // ── Control bar row 2: bulk configure per zone ──
+            int pbY2 = pbY + 50;
+            MakeTb(sc, "Cfg_BulkLbl", px, pbY2 + 4, 140, 26, "CONFIGURE ALL:", M_TRANS, M_MUTED, 0, "Left", 13, false);
+            int bulkX = px + 150;
+            var aftBtn = MakeBtn(sc, "Cfg_BulkAft", bulkX, pbY2, 150, 34, "AFT BALLAST", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
+            SetStr(aftBtn, "Authorization", "Operate");
+            AddScriptEvent(aftBtn, ZoneConfigureAllScript(1, 28));
+
+            var bilgeBtn = MakeBtn(sc, "Cfg_BulkBilge", bulkX + 160, pbY2, 150, 34, "BILGE / ER", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
+            SetStr(bilgeBtn, "Authorization", "Operate");
+            AddScriptEvent(bilgeBtn, ZoneConfigureAllScript(29, 56));
+
+            var fwdBtn = MakeBtn(sc, "Cfg_BulkFwd", bulkX + 320, pbY2, 150, 34, "BALLAST FWD", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
+            SetStr(fwdBtn, "Authorization", "Operate");
+            AddScriptEvent(fwdBtn, ZoneConfigureAllScript(57, 88));
+        }
+
+        // One-time cost on tap only (not recurring per-scan work) - loops the zone's fixed valve
+        // range writing Configured=true + Healthy=true (matching the popup's SERVICE-ON behaviour)
+        // for every valve in it. Only "configure all ON" - mass-disabling a zone is a much riskier
+        // bulk action than mass-enabling, so it's left to the per-row toggle (which itself confirms
+        // before disabling an active valve) rather than offered as a one-tap bulk option.
+        static string ZoneConfigureAllScript(int start, int end)
+        {
+            return
+                "for (let i = " + start + "; i <= " + end + "; i++) {\n" +
+                "  let v = \"V\" + (\"000\" + i).slice(-3);\n" +
+                "  Tags(v + \"_Configured\").Write(true);\n" +
+                "  Tags(v + \"_Healthy\").Write(true);\n" +
+                "}";
         }
 
         static void BuildConfigTable(HmiScreen sc, int px, int py, int pw, int ph)
         {
             MakePanel(sc, "CfgTbl_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             MakeRect(sc, "CfgTbl_Hdr", px, py, pw, 38, M_HDR, M_HDR, 0);
-            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 88 VALVES", M_TRANS, M_HDRTXT, 0, "Left", 18, true);
+            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 88 VALVES  (tap a row to edit name/location)", M_TRANS, M_HDRTXT, 0, "Left", 16, true);
 
-            const int cols = 2;
-            const int rowsPerCol = 7;
-            int colGutter = 24;
-            int colW = (pw - 32 - colGutter) / cols;
-            const int colHdrH = 30;
-            int rowH = (ph - 38 - colHdrH - 10) / rowsPerCol;
+            const int colHdrH = 28;
+            int rowH = (ph - 38 - colHdrH - 8) / CFG_ROWS_PER_PAGE;
 
-            // Field widths within one column - wider NAME/LOCATION than the zone tables since this
-            // screen has no illustration competing for width, and no STATUS column to make room for.
-            const int noW = 34, tagW = 72, zoneW = 130, nameW = 220, locW = 200, cfgW = 130, pad = 10;
+            // Full-width single column - field widths chosen against the ~1856px usable content
+            // width (pw - 32 side margins), with room to spare rather than the old 2-column split
+            // which forced everything narrow.
+            const int tagW = 90, zoneW = 160, nameW = 340, locW = 320, statusW = 160, cfgW = 180, pad = 16;
 
             int bodyTop = py + 38 + 2 + colHdrH + 4;
             MakeRect(sc, "CfgTbl_HdrBand", px + 1, py + 38, pw - 2, colHdrH + 6, M_HDRBAND, M_HDRBAND, 0);
 
-            int divX = px + 16 + colW + colGutter / 2;
-            MakeRect(sc, "CfgTbl_Div", divX, py + 42, 2, ph - 48, M_ACCENT, M_ACCENT, 0);
+            int cx0 = px + 16;
+            int hy = py + 38 + 2;
+            int hxZone = cx0 + tagW + pad;
+            int hxName = hxZone + zoneW + pad;
+            int hxLoc = hxName + nameW + pad;
+            int hxStatus = hxLoc + locW + pad;
+            int hxCfg = hxStatus + statusW + pad;
 
-            for (int col = 0; col < cols; col++) {
-                int cx0 = px + 16 + col * (colW + colGutter);
-                int hy = py + 38 + 2;
-                int hxTag  = cx0 + noW + pad;
-                int hxZone = hxTag + tagW + pad;
-                int hxName = hxZone + zoneW + pad;
-                int hxLoc  = hxName + nameW + pad;
-                int hxCfg  = hxLoc + locW + pad;
+            MakeTb(sc, "CfgTbl_H_Tag",    cx0,      hy, tagW,    colHdrH, "TAG",         M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Zone",   hxZone,   hy, zoneW,   colHdrH, "ZONE",        M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Name",   hxName,   hy, nameW,   colHdrH, "NAME",        M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Loc",    hxLoc,    hy, locW,    colHdrH, "LOCATION",    M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Status", hxStatus, hy, statusW, colHdrH, "STATUS",      M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Cfg",    hxCfg,    hy, cfgW,    colHdrH, "CONFIGURED",  M_TRANS, M_MUTED, 0, "Center", 13, true);
 
-                MakeTb(sc, "CfgTbl_H_No"   + col, cx0,    hy, noW,   colHdrH, "NO.",         M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "CfgTbl_H_Tag"  + col, hxTag,  hy, tagW,  colHdrH, "TAG",         M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "CfgTbl_H_Zone" + col, hxZone, hy, zoneW, colHdrH, "ZONE",        M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "CfgTbl_H_Name" + col, hxName, hy, nameW, colHdrH, "NAME",        M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "CfgTbl_H_Loc"  + col, hxLoc,  hy, locW,  colHdrH, "LOCATION",    M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "CfgTbl_H_Cfg"  + col, hxCfg,  hy, cfgW,  colHdrH, "CONFIGURED",  M_TRANS, M_MUTED, 0, "Center", 14, true);
+            int rowW = (hxCfg - 6) - (cx0 - 6); // hit-area + zebra span TAG..STATUS, stopping short of the toggle column
 
-                for (int r = 0; r < rowsPerCol; r++) {
-                    int slot = col * rowsPerCol + r + 1;
-                    int rY = bodyTop + r * rowH;
-                    string sfx = "_" + col + "_" + r;
+            for (int r = 0; r < CFG_ROWS_PER_PAGE; r++) {
+                int slot = r + 1;
+                int rY = bodyTop + r * rowH;
+                string sfx = "_" + r;
 
-                    if (r % 2 == 1)
-                        MakeRect(sc, "CfgTr_Zeb" + sfx, cx0 - 6, rY, colW + 6, rowH, M_ZEBRA, M_ZEBRA, 0);
+                if (r % 2 == 1)
+                    MakeRect(sc, "CfgTr_Zeb" + sfx, cx0 - 6, rY, rowW, rowH, M_ZEBRA, M_ZEBRA, 0);
 
-                    var noTb = MakeTb(sc, "CfgTr_No" + sfx, cx0, rY, noW, rowH, "", M_TRANS, M_MUTED, 0, "Center", 15, false);
-                    DynTag(noTb, "Text", "Cfg_TblNo_" + slot);
-                    var tagTb = MakeTb(sc, "CfgTr_Tag" + sfx, cx0 + noW, rY, tagW, rowH, "", M_TRANS, M_TEXT, 0, "Center", 15, true);
-                    DynTag(tagTb, "Text", "Cfg_TblTag_" + slot);
-                    var zoneTb = MakeLiveText(sc, "CfgTr_Zone" + sfx, hxZone, rY, zoneW, rowH, M_MUTED, "Center", 12, false);
-                    DynTag(zoneTb, "Text", "Cfg_TblZone_" + slot);
-                    var nameVal = MakeLiveText(sc, "CfgTr_Name" + sfx, hxName, rY, nameW, rowH, M_TEXT, "Center", 13, false);
-                    DynTag(nameVal, "Text", "Cfg_TblName_" + slot);
-                    var locVal = MakeLiveText(sc, "CfgTr_Loc" + sfx, hxLoc, rY, locW, rowH, M_MUTED, "Center", 13, false);
-                    DynTag(locVal, "Text", "Cfg_TblLoc_" + slot);
+                var tagTb = MakeTb(sc, "CfgTr_Tag" + sfx, cx0, rY, tagW, rowH, "", M_TRANS, M_TEXT, 0, "Center", 14, true);
+                DynTag(tagTb, "Text", "Cfg_TblTag_" + slot);
+                var zoneTb = MakeLiveText(sc, "CfgTr_Zone" + sfx, hxZone, rY, zoneW, rowH, M_MUTED, "Center", 12, false);
+                DynTag(zoneTb, "Text", "Cfg_TblZone_" + slot);
+                var nameVal = MakeLiveText(sc, "CfgTr_Name" + sfx, hxName, rY, nameW, rowH, M_TEXT, "Center", 13, false);
+                DynTag(nameVal, "Text", "Cfg_TblName_" + slot);
+                var locVal = MakeLiveText(sc, "CfgTr_Loc" + sfx, hxLoc, rY, locW, rowH, M_MUTED, "Center", 13, false);
+                DynTag(locVal, "Text", "Cfg_TblLoc_" + slot);
+                var statusVal = MakeLiveText(sc, "CfgTr_Status" + sfx, hxStatus, rY, statusW, rowH, M_MUTED, "Center", 13, true);
+                DynTag(statusVal, "Text", "Cfg_TblStateTxt_" + slot);
+                AddValueMap(DynTag(statusVal, "ForeColor", "Cfg_TblState_" + slot), TBL_CODES, TBL_COLORS);
 
-                    var cfgBtn = MakeBtn(sc, "CfgTr_Toggle" + sfx, hxCfg, rY + 2, cfgW, rowH - 4, "", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
-                    SetStr(cfgBtn, "Authorization", "Operate");
-                    AddConfigToggleTextAndColor(cfgBtn, slot);
-                    AddSlotConfigToggleScript(cfgBtn, slot);
-                }
+                // Row-tap hit area, created LAST so it sits on top of the (non-interactive) text
+                // above it and reliably captures the tap - same pattern DrawValveSym's own "hit"
+                // button uses over its badge/glyph. Stops short of the CONFIGURED column so it
+                // never competes with that button's own tap.
+                var hit = MakeBtn(sc, "CfgTr_Hit" + sfx, cx0 - 6, rY, rowW, rowH, "", M_TRANS, M_TRANS, M_TRANS, 0, 10, false);
+                AddScriptEvent(hit, ConfigRowTapScript(slot));
+
+                var cfgBtn = MakeBtn(sc, "CfgTr_Toggle" + sfx, hxCfg, rY + 2, cfgW, rowH - 4, "", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
+                SetStr(cfgBtn, "Authorization", "Operate");
+                AddConfigToggleTextAndColor(cfgBtn, slot);
+                AddScriptEvent(cfgBtn, ConfigToggleScript(slot));
             }
         }
 
@@ -1364,35 +1427,143 @@ namespace ValveDemoHmiBuilder
                 "T1s");
         }
 
-        // Same resolve-at-click-time pattern as AddSlotCmdScript: the absolute valve number comes
-        // from this slot's live NO. tag (so it's always correct regardless of which page is
-        // showing), then writes the same two tags the popup's SERVICE toggle does - Configured
-        // itself, plus Healthy=true when turning a valve ON so it doesn't immediately show FAULT.
-        static void AddSlotConfigToggleScript(HmiButton btn, int slot)
+        // Tapping a row opens the Edit Valve popup - reads the tapped row's live NO. tag (so it's
+        // always correct regardless of which page is showing) rather than anything baked in at
+        // build time, sets SelectedValve, pre-fills the edit buffers from that valve's OWN Name/
+        // Location tags (not the table's PLC-mirrored display tags, which FB_ValveLoop overwrites
+        // every scan), then opens the popup.
+        static string ConfigRowTapScript(int slot)
         {
-            try {
-                PropertyInfo evProp = null;
-                foreach (var p in btn.GetType().GetProperties())
-                    if (p.Name == "EventHandlers") { evProp = p; break; }
-                if (evProp == null) { Console.WriteLine("  [CfgToggle ERR] No EventHandlers on " + btn.GetType().Name); return; }
-                object evObj = evProp.GetValue(btn, null);
-                object handler = CreateTappedHandler(evObj);
-                if (handler == null) { Console.WriteLine("  [CfgToggle ERR] No Tapped handler for slot " + slot); return; }
-                var sp = handler.GetType().GetProperty("Script");
-                object script = sp.GetValue(handler, null);
-                var scp = script.GetType().GetProperty("ScriptCode");
-                if (scp == null || !scp.CanWrite) return;
+            return JS_READ +
+                "let no=r(Tags(\"Cfg_TblNo_" + slot + "\").Read());\n" +
+                "if(!no) return;\n" +
+                "Tags(\"SelectedValve\").Write(no);\n" +
+                "let vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
+                "Tags(\"EditNameBuffer\").Write(r(Tags(vTag+\"_Name\").Read())||\"\");\n" +
+                "Tags(\"EditLocBuffer\").Write(r(Tags(vTag+\"_Location\").Read())||\"\");\n" +
+                "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", false, \" \", " + SX(760) + ", " + SY(400) + ", false);";
+        }
 
-                string js = JS_READ +
-                    "var no=r(Tags(\"Cfg_TblNo_" + slot + "\").Read());\n" +
-                    "if(!no) return;\n" +
-                    "var vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
-                    "var cur=r(Tags(vTag+\"_Configured\").Read());\n" +
-                    "var newVal=!cur;\n" +
-                    "Tags(vTag+\"_Configured\").Write(newVal);\n" +
-                    "if(newVal) Tags(vTag+\"_Healthy\").Write(true);";
-                scp.SetValue(script, js, null);
-            } catch (Exception ex) { Console.WriteLine("  [CfgToggle ERR] " + ex.Message); }
+        // Resolves the absolute valve number from the row's live NO. tag at click time (same
+        // pattern as AddSlotCmdScript). Turning a valve ON writes Configured+Healthy immediately,
+        // same as the popup's SERVICE toggle. Turning OFF checks the row's own live STATUS first -
+        // if the valve is currently OPEN(3) or MOVING(5), it doesn't write immediately; it stashes
+        // the valve number and opens a confirm popup instead, since disabling control logic on a
+        // valve mid-operation seems like it should need a second thought.
+        static string ConfigToggleScript(int slot)
+        {
+            return JS_READ +
+                "let no=r(Tags(\"Cfg_TblNo_" + slot + "\").Read());\n" +
+                "if(!no) return;\n" +
+                "let vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
+                "let cur=r(Tags(vTag+\"_Configured\").Read());\n" +
+                "if(!cur) {\n" +
+                "  Tags(vTag+\"_Configured\").Write(true);\n" +
+                "  Tags(vTag+\"_Healthy\").Write(true);\n" +
+                "  return;\n" +
+                "}\n" +
+                "let st=r(Tags(\"Cfg_TblState_" + slot + "\").Read());\n" +
+                "if(st===3||st===5) {\n" +
+                "  Tags(\"ConfirmValveIdx\").Write(no);\n" +
+                "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(750) + ", " + SY(430) + ", false);\n" +
+                "  return;\n" +
+                "}\n" +
+                "Tags(vTag+\"_Configured\").Write(false);";
+        }
+
+        // ── EDIT VALVE popup — Name/Location, opened by tapping a Configuration screen row ──────
+        // Fields bind to plain internal buffer tags (EditNameBuffer/EditLocBuffer), pre-filled by
+        // the row's tap script and written through to the real per-valve tags only on SAVE - this
+        // sidesteps the paged-mirror race condition entirely (see BuildConfigScreen comment above).
+        static void BuildValveEditScreen(HmiScreen sc)
+        {
+            Console.WriteLine("  Drawing Screen_ValveEdit...");
+            SetPropUInt(sc, "Width", (uint)SX(400));
+            SetPropUInt(sc, "Height", (uint)SY(280));
+            sc.BackColor = BG_DARK;
+
+            MakeRect(sc, "Edit_Header", 0, 0, 400, 38, BG_HEADER, BORDER, 1);
+            var titleIO = sc.ScreenItems.Create<HmiIOField>("Edit_Title");
+            titleIO.Left = SX(0); titleIO.Top = SY(6); titleIO.Width = (uint)SX(370); titleIO.Height = (uint)SY(26);
+            titleIO.BackColor = BG_HEADER; titleIO.ForeColor = Color.White;
+            titleIO.BorderColor = BG_HEADER; titleIO.BorderWidth = 0;
+            SetPropEnum(titleIO, "IOFieldType", "Output");
+            SetPropEnum(titleIO, "TextHorizontalAlignment", "Center");
+            SetMLText(titleIO, "Text", "EDIT VALVE DETAILS");
+            var tDyn = titleIO.Dynamizations.Create<ScriptDynamization>("ProcessValue");
+            tDyn.ScriptCode =
+                JS_READ + "let idx=r(Tags(\"SelectedValve\").Read());\nlet num=(\"000\"+(idx||1)).slice(-3);\nreturn \"EDIT V-\" + num;";
+            tDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+
+            var closeBtn = MakeBtn(sc, "Edit_CloseX", 368, 4, 28, 28, "&#x2715;", BG_HEADER, Color.White, BG_HEADER, 0, 15, true);
+            AddScriptEvent(closeBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
+
+            MakeTb(sc, "Edit_NameLbl", 20, 54, 360, 22, "NAME", M_TRANS, M_MUTED, 0, "Left", 13, false);
+            var nameField = sc.ScreenItems.Create<HmiIOField>("Edit_NameField");
+            nameField.Left = SX(20); nameField.Top = SY(78); nameField.Width = (uint)SX(360); nameField.Height = (uint)SY(36);
+            nameField.BackColor = Color.White; nameField.ForeColor = M_TEXT; nameField.BorderColor = BORDER; nameField.BorderWidth = 1;
+            SetPropEnum(nameField, "IOFieldType", "InputOutput");
+            DynTag(nameField, "ProcessValue", "EditNameBuffer");
+
+            MakeTb(sc, "Edit_LocLbl", 20, 122, 360, 22, "LOCATION", M_TRANS, M_MUTED, 0, "Left", 13, false);
+            var locField = sc.ScreenItems.Create<HmiIOField>("Edit_LocField");
+            locField.Left = SX(20); locField.Top = SY(146); locField.Width = (uint)SX(360); locField.Height = (uint)SY(36);
+            locField.BackColor = Color.White; locField.ForeColor = M_TEXT; locField.BorderColor = BORDER; locField.BorderWidth = 1;
+            SetPropEnum(locField, "IOFieldType", "InputOutput");
+            DynTag(locField, "ProcessValue", "EditLocBuffer");
+
+            var saveBtn = MakeBtn(sc, "Edit_Save", 20, 200, 170, 46, "&#x2713; SAVE", Color.FromArgb(255, 16, 185, 129), Color.White, Color.FromArgb(255, 52, 211, 153), 2, 15, true);
+            SetStr(saveBtn, "Authorization", "Operate");
+            AddScriptEvent(saveBtn,
+                JS_READ +
+                "let idx=r(Tags(\"SelectedValve\").Read());\n" +
+                "let vTag=\"V\"+(\"000\"+(idx||1)).slice(-3);\n" +
+                "Tags(vTag+\"_Name\").Write(r(Tags(\"EditNameBuffer\").Read())||\"\");\n" +
+                "Tags(vTag+\"_Location\").Write(r(Tags(\"EditLocBuffer\").Read())||\"\");\n" +
+                "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
+
+            var cancelBtn = MakeBtn(sc, "Edit_Cancel", 210, 200, 170, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 15, true);
+            AddScriptEvent(cancelBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
+        }
+
+        // ── CONFIRM DISABLE popup — shown when un-configuring an OPEN/MOVING valve ──────────────
+        static void BuildConfirmDisableScreen(HmiScreen sc)
+        {
+            Console.WriteLine("  Drawing Screen_ConfirmDisable...");
+            SetPropUInt(sc, "Width", (uint)SX(420));
+            SetPropUInt(sc, "Height", (uint)SY(220));
+            sc.BackColor = BG_DARK;
+
+            MakeRect(sc, "Confirm_Header", 0, 0, 420, 38, Color.FromArgb(255, 194, 65, 12), BORDER, 1);
+            MakeTb(sc, "Confirm_Title", 0, 8, 420, 24, "&#x26A0; CONFIRM", Color.FromArgb(255, 194, 65, 12), Color.White, 0, "Center", 15, true);
+
+            var msgIO = sc.ScreenItems.Create<HmiIOField>("Confirm_Message");
+            msgIO.Left = SX(20); msgIO.Top = SY(54); msgIO.Width = (uint)SX(380); msgIO.Height = (uint)SY(80);
+            msgIO.BackColor = BG_DARK; msgIO.ForeColor = Color.White;
+            msgIO.BorderColor = BG_DARK; msgIO.BorderWidth = 0;
+            SetPropEnum(msgIO, "IOFieldType", "Output");
+            SetPropEnum(msgIO, "TextHorizontalAlignment", "Center");
+            SetMLText(msgIO, "Text", "This valve is currently active. Disable anyway?");
+            var mDyn = msgIO.Dynamizations.Create<ScriptDynamization>("ProcessValue");
+            mDyn.ScriptCode =
+                JS_READ +
+                "let idx=r(Tags(\"ConfirmValveIdx\").Read());\n" +
+                "let num=(\"000\"+(idx||1)).slice(-3);\n" +
+                "return \"V-\" + num + \" is currently OPEN or MOVING.\\nDisable its Configured flag anyway?\";";
+            mDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+
+            var yesBtn = MakeBtn(sc, "Confirm_Yes", 40, 150, 160, 46, "YES, DISABLE", Color.FromArgb(255, 205, 32, 38), Color.White, Color.FromArgb(255, 255, 100, 100), 2, 14, true);
+            SetStr(yesBtn, "Authorization", "Operate");
+            AddScriptEvent(yesBtn,
+                JS_READ +
+                "let idx=r(Tags(\"ConfirmValveIdx\").Read());\n" +
+                "if(!idx) return;\n" +
+                "let vTag=\"V\"+(\"000\"+idx).slice(-3);\n" +
+                "Tags(vTag+\"_Configured\").Write(false);\n" +
+                "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
+
+            var noBtn = MakeBtn(sc, "Confirm_No", 220, 150, 160, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 14, true);
+            AddScriptEvent(noBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
         }
     }
 }

@@ -585,11 +585,11 @@
         END_IF;
     END_FOR;
 
-    // CONFIGURATION SCREEN: all 88 valves in one global sequence (7 pages of 14), not zone-scoped
+    // CONFIGURATION SCREEN: all 88 valves in one global sequence (6 pages of 16), not zone-scoped
     // like the three windows above - this screen shows the whole fleet, so #idx IS the absolute
     // valve number directly, no zone-start offset needed.
-    #base := 1 + &quot;Valves_DB&quot;.CfgPage * 14;
-    FOR #j := 1 TO 14 DO
+    #base := 1 + &quot;Valves_DB&quot;.CfgPage * 16;
+    FOR #j := 1 TO 16 DO
         #idx := #base + #j - 1;
         IF #idx &lt;= 88 THEN
             &quot;Valves_DB&quot;.CfgTblNo[#j] := #idx;
@@ -608,6 +608,15 @@
             &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
             &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
             &quot;Valves_DB&quot;.CfgTblConfigured[#j] := &quot;Valves_DB&quot;.Valve[#idx].Configured;
+            &quot;Valves_DB&quot;.CfgTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                0: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'UNCONFIGURED';
+                1: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'FAULT';
+                2: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'LOCAL';
+                3: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'OPEN';
+                4: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'CLOSED';
+                ELSE &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'MOVING';
+            END_CASE;
         ELSE
             &quot;Valves_DB&quot;.CfgTblNo[#j] := 0;
             &quot;Valves_DB&quot;.CfgTblTag[#j] := '';
@@ -615,6 +624,8 @@
             &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := '';
             &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := '';
             &quot;Valves_DB&quot;.CfgTblConfigured[#j] := FALSE;
+            &quot;Valves_DB&quot;.CfgTblState[#j] := 6;
+            &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := '';
         END_IF;
     END_FOR;
 </Text>
