@@ -1008,10 +1008,14 @@ namespace ValveDemoHmiBuilder
                 int vIndex = int.Parse(vTag.Substring(1));
                 string vNum = string.Format("{0:D3}", vIndex);
                 // showHeader=false: we have a custom header with Btn_CloseX inside Screen_Popup.
+                // The 730/360 position centers the popup on its parent screen — originally computed
+                // for a 1920x1080 parent ((1920-460)/2=730, (1080-360)/2=360). Both the parent canvas
+                // and the popup's own size now scale by SX()/SY() (1366x768 target), so the position
+                // must scale the same way to stay centered instead of drifting toward one corner.
                 string jsCode = string.Format(
                     "Tags(\"SelectedValve\").Write({0});\n" +
-                    "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", 730, 360, false);",
-                    vIndex
+                    "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", {1}, {2}, false);",
+                    vIndex, SX(730), SY(360)
                 );
 
                 scp.SetValue(script, jsCode, null);
