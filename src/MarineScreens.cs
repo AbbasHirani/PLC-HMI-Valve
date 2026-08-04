@@ -604,7 +604,7 @@ namespace ValveDemoHmiBuilder
                     Console.WriteLine("  [DrawValveSym] native colour mapping unavailable — falling back to script for all badges.");
                 }
             }
-            if (!s_nativeBadgeOk) Dyn(badge, "BackColor", ValveStateColorScript(vTag), "T1s");
+            if (!s_nativeBadgeOk) Dyn(badge, "BackColor", ValveStateColorScript(vTag), "AutomaticTags");
 
             // 2. Bowtie glyph on top of the badge — fixed white, legible against all 6 states.
             var sym = sc.ScreenItems.Create<HmiTextBox>(name + "_sym");
@@ -689,7 +689,7 @@ namespace ValveDemoHmiBuilder
             Dyn(userText, "Text",
                 "var u = \"\"; try { u = Tags(\"@UserName\").Read(); } catch(e){}\n" +
                 "if (!u) u = \"GUEST\";\n" +
-                "return \"&#x1F464;  USER: \" + u.toUpperCase();", "T1s");
+                "return \"\\uD83D\\uDC64  USER: \" + u.toUpperCase();", "AutomaticTags");
 
             // Title band.
             MakeRect(sc, "Title_Rule", 0, 46, 1920, 4, M_ACCENT, M_ACCENT, 0);
@@ -873,7 +873,7 @@ namespace ValveDemoHmiBuilder
                 MakeTb(sc, "Zone_Lbl" + z, capX, botY + 10, 200, 26, zoneNames[z], M_TRANS, M_TEXT, 0, "Center", 18, true);
                 var cnt = MakeLiveText(sc, "Zone_Cnt" + z, capX, botY + 38, 200, 22, M_MUTED, "Center", 15, false);
                 Dyn(cnt, "Text", JS_READ + "return \"\"+r(Tags(\"Valves_DB_" + zonePfx[z] + "Configured\").Read())+\" / " +
-                        (zoneVEnd[z] - zoneVStart[z] + 1) + " CONFIGURED\";", "T1s");
+                        (zoneVEnd[z] - zoneVStart[z] + 1) + " CONFIGURED\";", "AutomaticTags");
             }
 
             // Bow / stern orientation markers — now correctly aligned: AFT zone sits at the
@@ -997,8 +997,8 @@ namespace ValveDemoHmiBuilder
             // Not worth it; the win from native binding is in the 88 badges and 15 KPI cells.
             string readFaultTotal = JS_READ + "var n=r(Tags(\"Valves_DB_TotalFault\").Read());\n";
             var state = MakeLiveText(sc, "Alm_State", x + 112, y + 48, w - 126, 26, M_GREEN, "Left", 18, true);
-            Dyn(state, "Text", readFaultTotal + "return n>0?\"ALARM ACTIVE\":\"ALL NORMAL\";", "T1s");
-            Dyn(state, "ForeColor", readFaultTotal + "return n>0?0xFFCD2026:0xFF009E4A;", "T1s");
+            Dyn(state, "Text", readFaultTotal + "return n>0?\"ALARM ACTIVE\":\"ALL NORMAL\";", "AutomaticTags");
+            Dyn(state, "ForeColor", readFaultTotal + "return n>0?0xFFCD2026:0xFF009E4A;", "AutomaticTags");
 
             MakeTb(sc, "Alm_Hint", x + 112, y + 78, w - 126, 22, "Tap to open annunciator", M_TRANS, M_MUTED, 0, "Left", 13, false);
 
@@ -1420,11 +1420,11 @@ namespace ValveDemoHmiBuilder
         {
             string tagName = "Cfg_TblConfigured_" + slot;
             Dyn(btn, "Text",
-                JS_READ + "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? \"&#x2713; CONFIGURED\" : \"DISABLED\";",
-                "T1s");
+                JS_READ + "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? \"\\u2713 CONFIGURED\" : \"DISABLED\";",
+                "AutomaticTags");
             Dyn(btn, "BackColor",
                 JS_READ + "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? 0xFF00C7BE : 0xFF3A3A3C;",
-                "T1s");
+                "AutomaticTags");
         }
 
         // Tapping a row opens the Edit Valve popup - reads the tapped row's live NO. tag (so it's
@@ -1441,6 +1441,7 @@ namespace ValveDemoHmiBuilder
                 "let vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
                 "Tags(\"EditNameBuffer\").Write(r(Tags(vTag+\"_Name\").Read())||\"\");\n" +
                 "Tags(\"EditLocBuffer\").Write(r(Tags(vTag+\"_Location\").Read())||\"\");\n" +
+                PopupCloseOthersJs("Popup_ValveEdit") +
                 "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", false, \" \", " + SX(760) + ", " + SY(400) + ", false);";
         }
 
@@ -1465,6 +1466,7 @@ namespace ValveDemoHmiBuilder
                 "let st=r(Tags(\"Cfg_TblState_" + slot + "\").Read());\n" +
                 "if(st===3||st===5) {\n" +
                 "  Tags(\"ConfirmValveIdx\").Write(no);\n" +
+                PopupCloseOthersJs("Popup_ConfirmDisable") +
                 "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(750) + ", " + SY(430) + ", false);\n" +
                 "  return;\n" +
                 "}\n" +

@@ -414,7 +414,16 @@ namespace ValveDemoHmiBuilder
                     "let hl = (code === 0) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
                     "let md = local ? \"LOCAL\" : \"AUTO\";\n" +
                     "return \"V-\" + vNum + \"  |  \" + st + \"  |  \" + hl + \"  |  MODE: \" + md;";
-                sDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                // T500ms, not AutomaticTags: this reads a DYNAMICALLY computed tag name
+                // (vTag + "_State", where vTag depends on SelectedValve's current value) rather
+                // than a fixed literal tag - reopening the same popup instance for a different
+                // valve didn't reliably re-trigger AutomaticTags's dependency tracking, leaving
+                // the previous valve's stale status on screen (confirmed live: V-004 shown OPEN
+                // elsewhere, popup still showed CLOSED). A light 500ms poll on 3 elements costs
+                // nothing next to the ~126-element T100ms problem this session already fixed
+                // elsewhere, and guarantees correctness on every popup open regardless of trigger
+                // edge cases.
+                sDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
 
             // ─── OPEN / CLOSE Buttons (Y=96..144) ─────────────────────────────────
@@ -458,7 +467,7 @@ namespace ValveDemoHmiBuilder
                     "if (code === 3) return 0xFF32C785;\n" +
                     "if (code === 4) return 0xFF4B5563;\n" +
                     "return 0xFF00A2FF;\n";
-                dotDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                dotDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
 
             // State label below big circle (Y=255..281)
@@ -479,7 +488,7 @@ namespace ValveDemoHmiBuilder
                     "let code = readTag(Tags(vTag + \"_State\").Read());\n" +
                     "let names = [\"⬤  UNCONFIGURED\", \"⬤  FAULT\", \"⬤  LOCAL MODE\", \"⬤  FULLY OPEN\", \"⬤  FULLY CLOSED\", \"⬤  MOVING\"];\n" +
                     "return names[code] || \"⬤  MOVING\";\n";
-                slDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                slDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
 
             // ─── RESET FAULT Button (Left=15, Y=292, Width=138, Height=46) ───────────
@@ -488,6 +497,7 @@ namespace ValveDemoHmiBuilder
             btnReset.BackColor = Color.FromArgb(255, 194, 65, 12); btnReset.ForeColor = Color.White;
             btnReset.BorderColor = Color.FromArgb(255, 249, 115, 22); btnReset.BorderWidth = 2;
             SetMLText(btnReset, "Text", "⚡ RESET FAULT");
+            SetFont(btnReset, SFont(12), true);
             SetStr(btnReset, "Authorization", "Operate");
             AddPopupActionButton(btnReset, "ResetFault");
 
@@ -497,6 +507,7 @@ namespace ValveDemoHmiBuilder
             btnService.BackColor = Color.FromArgb(255, 58, 58, 60); btnService.ForeColor = Color.White;
             btnService.BorderColor = TEAL; btnService.BorderWidth = 2;
             SetMLText(btnService, "Text", "🛠️ SERVICE:  OFF");
+            SetFont(btnService, SFont(12), true);
             SetStr(btnService, "Authorization", "Operate");
             AddPopupActionButton(btnService, "ToggleService");
             try {
@@ -508,7 +519,7 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                     "return cfg ? \"🛠️ SERVICE:  ON\" : \"🛠️ SERVICE:  OFF\";\n";
-                srvDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+                srvDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
             try {
                 var srvBg = btnService.Dynamizations.Create<ScriptDynamization>("BackColor");
@@ -519,7 +530,7 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                     "return cfg ? 0xFF00C7BE : 0xFF3A3A3C;\n";
-                srvBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+                srvBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
             // ─── SIMULATE STUCK Toggle Switch (Left=305, Y=292, Width=140, Height=46) ──
@@ -528,6 +539,7 @@ namespace ValveDemoHmiBuilder
             btnStuck.BackColor = Color.FromArgb(255, 58, 58, 60); btnStuck.ForeColor = Color.White;
             btnStuck.BorderColor = Color.FromArgb(255, 234, 179, 8); btnStuck.BorderWidth = 2;
             SetMLText(btnStuck, "Text", "⚠️ STUCK: OFF");
+            SetFont(btnStuck, SFont(12), true);
             SetStr(btnStuck, "Authorization", "Operate");
             AddPopupActionButton(btnStuck, "ToggleStuck");
             try {
@@ -539,7 +551,7 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
                     "return stk ? \"⚠️ STUCK: ON\" : \"⚠️ STUCK: OFF\";\n";
-                stkDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+                stkDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
             try {
                 var stkBg = btnStuck.Dynamizations.Create<ScriptDynamization>("BackColor");
@@ -550,7 +562,7 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
                     "return stk ? 0xFF00A2FF : 0xFF3A3A3C;\n";
-                stkBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T100ms");
+                stkBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
             Console.WriteLine("  Screen_Popup built: Direct PLC tag reading for live status, bracket-notation close button.");
@@ -884,6 +896,23 @@ namespace ValveDemoHmiBuilder
             }
         }
 
+        // All three popups this project uses. Only one should ever be visibly open at once -
+        // without this, opening a second popup (e.g. the Confirm dialog from a Configured toggle)
+        // while a first one (e.g. Edit Valve) is still open leaves both stacked on screen, which
+        // reads as "the dialog doesn't close" even though each one's own Close call works fine.
+        // Wrapped in try/catch per call since closing an already-closed popup is expected to be a
+        // harmless no-op, not something that should ever block the popup actually being opened.
+        static readonly string[] ALL_POPUP_NAMES = { "Popup_Valve", "Popup_ValveEdit", "Popup_ConfirmDisable" };
+        static string PopupCloseOthersJs(string exceptName)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var name in ALL_POPUP_NAMES) {
+                if (name == exceptName) continue;
+                sb.Append("try { HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"" + name + "\"); } catch(e) {}\n");
+            }
+            return sb.ToString();
+        }
+
         static void AddPopupCloseXScript(HmiButton btn)
         {
             try {
@@ -1016,11 +1045,15 @@ namespace ValveDemoHmiBuilder
                 // for a 1920x1080 parent ((1920-460)/2=730, (1080-360)/2=360). Both the parent canvas
                 // and the popup's own size now scale by SX()/SY() (1366x768 target), so the position
                 // must scale the same way to stay centered instead of drifting toward one corner.
-                string jsCode = string.Format(
-                    "Tags(\"SelectedValve\").Write({0});\n" +
-                    "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", {1}, {2}, false);",
-                    vIndex, SX(730), SY(360)
-                );
+                // Plain concatenation, not string.Format: PopupCloseOthersJs()'s JS contains literal
+                // { } from its try/catch blocks, which string.Format would misparse as (invalid)
+                // placeholders - confirmed live, threw FormatException on every single valve tile's
+                // popup script, silently breaking "tap to open popup" everywhere via the outer
+                // try/catch here.
+                string jsCode =
+                    "Tags(\"SelectedValve\").Write(" + vIndex + ");\n" +
+                    PopupCloseOthersJs("Popup_Valve") +
+                    "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", " + SX(730) + ", " + SY(360) + ", false);";
 
                 scp.SetValue(script, jsCode, null);
             } catch (Exception ex) {
@@ -1463,10 +1496,15 @@ namespace ValveDemoHmiBuilder
                 if (table == null) { table = hmi.TagTables.Create("ValveTags"); }
                 if (table.Tags.Find(tagName) != null) return; // already exists, nothing to do
                 var tag = table.Tags.Create(tagName, "ValveTags");
-                // Do NOT set Connection or address - internal tag has no PLC binding
+                // Do NOT set Connection or address - internal tag has no PLC binding.
+                // WinCC Unified's actual DataType value for text is "WString", not "String" -
+                // confirmed live: passing "String" here silently fails (caught below) and leaves
+                // the tag at its Create()-time default (Int), which is why EditNameBuffer/
+                // EditLocBuffer briefly only accepted numeric input.
+                string realDataType = dataType == "String" ? "WString" : dataType;
                 try {
                     var dtProp = tag.GetType().GetProperty("DataType");
-                    if (dtProp != null && dtProp.CanWrite) { try { dtProp.SetValue(tag, dataType, null); } catch {} }
+                    if (dtProp != null && dtProp.CanWrite) { try { dtProp.SetValue(tag, realDataType, null); } catch {} }
                 } catch {}
                 Console.WriteLine("  Created internal HMI tag: " + tagName);
             } catch (Exception ex) {
