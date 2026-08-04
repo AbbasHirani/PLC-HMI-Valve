@@ -1434,15 +1434,16 @@ namespace ValveDemoHmiBuilder
         // every scan), then opens the popup.
         static string ConfigRowTapScript(int slot)
         {
+            // No AnyPopupOpen guard needed: Popup_ValveEdit is modal, so the underlying screen (and
+            // its row-tap targets) is non-interactive while it's open - stacking is structurally
+            // impossible without any extra tracking.
             return JS_READ +
-                PopupOpenGuardJs() +
                 "let no=r(Tags(\"Cfg_TblNo_" + slot + "\").Read());\n" +
                 "if(!no) return;\n" +
                 "Tags(\"SelectedValve\").Write(no);\n" +
                 "let vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
                 "Tags(\"EditNameBuffer\").Write(r(Tags(vTag+\"_Name\").Read())||\"\");\n" +
                 "Tags(\"EditLocBuffer\").Write(r(Tags(vTag+\"_Location\").Read())||\"\");\n" +
-                PopupMarkOpenJs() +
                 "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", true, \" \", " + SX(760) + ", " + SY(400) + ", false);";
         }
 
@@ -1466,9 +1467,7 @@ namespace ValveDemoHmiBuilder
                 "}\n" +
                 "let st=r(Tags(\"Cfg_TblState_" + slot + "\").Read());\n" +
                 "if(st===3||st===5) {\n" +
-                "  if(r(Tags(\"AnyPopupOpen\").Read())) return;\n" +
                 "  Tags(\"ConfirmValveIdx\").Write(no);\n" +
-                "  Tags(\"AnyPopupOpen\").Write(true);\n" +
                 "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", true, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
                 "  return;\n" +
                 "}\n" +
@@ -1500,7 +1499,7 @@ namespace ValveDemoHmiBuilder
             tDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
 
             var closeBtn = MakeBtn(sc, "Edit_CloseX", 368, 4, 28, 28, "&#x2715;", BG_HEADER, Color.White, BG_HEADER, 0, 15, true);
-            AddScriptEvent(closeBtn, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
+            AddScriptEvent(closeBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
 
             MakeTb(sc, "Edit_NameLbl", 20, 54, 360, 22, "NAME", M_TRANS, M_MUTED, 0, "Left", 13, false);
             var nameField = sc.ScreenItems.Create<HmiIOField>("Edit_NameField");
@@ -1518,17 +1517,20 @@ namespace ValveDemoHmiBuilder
 
             var saveBtn = MakeBtn(sc, "Edit_Save", 20, 200, 170, 46, "&#x2713; SAVE", Color.FromArgb(255, 16, 185, 129), Color.White, Color.FromArgb(255, 52, 211, 153), 2, 15, true);
             SetStr(saveBtn, "Authorization", "Operate");
+            // Write FIRST, close LAST: confirmed live that closing before the writes silently
+            // dropped them - CloseScreenInPopup appears to interrupt/tear down script execution,
+            // so anything scheduled after it doesn't reliably run. Back to the original, simpler
+            // order.
             AddScriptEvent(saveBtn,
                 JS_READ +
                 "let idx=r(Tags(\"SelectedValve\").Read());\n" +
                 "let vTag=\"V\"+(\"000\"+(idx||1)).slice(-3);\n" +
                 "Tags(vTag+\"_Name\").Write(r(Tags(\"EditNameBuffer\").Read())||\"\");\n" +
                 "Tags(vTag+\"_Location\").Write(r(Tags(\"EditLocBuffer\").Read())||\"\");\n" +
-                PopupMarkClosedJs() +
                 "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
 
             var cancelBtn = MakeBtn(sc, "Edit_Cancel", 210, 200, 170, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 15, true);
-            AddScriptEvent(cancelBtn, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
+            AddScriptEvent(cancelBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
         }
 
         // ── CONFIRM DISABLE popup — shown when un-configuring an OPEN/MOVING valve ──────────────
@@ -1563,17 +1565,19 @@ namespace ValveDemoHmiBuilder
 
             var yesBtn = MakeBtn(sc, "Confirm_Yes", 60, 150, 160, 46, "YES, DISABLE", Color.FromArgb(255, 205, 32, 38), Color.White, Color.FromArgb(255, 255, 100, 100), 2, 14, true);
             SetStr(yesBtn, "Authorization", "Operate");
+            // Write FIRST, close LAST: confirmed live that closing before the write silently
+            // dropped it - CloseScreenInPopup appears to interrupt/tear down script execution, so
+            // anything scheduled after it doesn't reliably run.
             AddScriptEvent(yesBtn,
                 JS_READ +
                 "let idx=r(Tags(\"ConfirmValveIdx\").Read());\n" +
                 "if(!idx) return;\n" +
                 "let vTag=\"V\"+(\"000\"+idx).slice(-3);\n" +
                 "Tags(vTag+\"_Configured\").Write(false);\n" +
-                PopupMarkClosedJs() +
                 "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
 
             var noBtn = MakeBtn(sc, "Confirm_No", 240, 150, 160, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 14, true);
-            AddScriptEvent(noBtn, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
+            AddScriptEvent(noBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
         }
     }
 }

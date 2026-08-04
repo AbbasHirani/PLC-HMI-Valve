@@ -519,7 +519,10 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                     "return cfg ? \"🛠️ SERVICE:  ON\" : \"🛠️ SERVICE:  OFF\";\n";
-                srvDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                // T500ms, not AutomaticTags - same dynamically-computed-tag-name issue as
+                // Pop_StatusText/Pop_Dot/Pop_StateLabel (vTag depends on SelectedValve), fixed the
+                // same way: a light poll guarantees correctness on every valve switch.
+                srvDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
             try {
                 var srvBg = btnService.Dynamizations.Create<ScriptDynamization>("BackColor");
@@ -530,7 +533,7 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                     "return cfg ? 0xFF00C7BE : 0xFF3A3A3C;\n";
-                srvBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                srvBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
 
             // ─── SIMULATE STUCK Toggle Switch (Left=305, Y=292, Width=140, Height=46) ──
@@ -551,7 +554,7 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
                     "return stk ? \"⚠️ STUCK: ON\" : \"⚠️ STUCK: OFF\";\n";
-                stkDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                stkDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
             try {
                 var stkBg = btnStuck.Dynamizations.Create<ScriptDynamization>("BackColor");
@@ -562,7 +565,7 @@ namespace ValveDemoHmiBuilder
                     "let vTag = \"V\" + vNum;\n" +
                     "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
                     "return stk ? 0xFF00A2FF : 0xFF3A3A3C;\n";
-                stkBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
+                stkBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
 
             Console.WriteLine("  Screen_Popup built: Direct PLC tag reading for live status, bracket-notation close button.");
@@ -896,30 +899,6 @@ namespace ValveDemoHmiBuilder
             }
         }
 
-        // All three popups this project uses. Only one should ever be visibly open at once -
-        // without this, opening a second popup (e.g. the Confirm dialog from a Configured toggle)
-        // while a first one (e.g. Edit Valve) is still open leaves both stacked on screen, which
-        // reads as "the dialog doesn't close" even though each one's own Close call works fine.
-        // Wrapped in try/catch per call since closing an already-closed popup is expected to be a
-        // harmless no-op, not something that should ever block the popup actually being opened.
-        // Guard, not cleanup: prevents a second popup from ever opening while one is already open,
-        // rather than trying to close a sibling popup reactively (confirmed live that didn't reliably
-        // work from a different popup's own script context). Prepend to every "open a popup" script;
-        // it returns early (opening nothing) if AnyPopupOpen is already true.
-        static string PopupOpenGuardJs()
-        {
-            return "if (r(Tags(\"AnyPopupOpen\").Read())) return;\n";
-        }
-        static string PopupMarkOpenJs()
-        {
-            return "Tags(\"AnyPopupOpen\").Write(true);\n";
-        }
-        // Append to every close/cancel/save action on any of the 3 popups.
-        static string PopupMarkClosedJs()
-        {
-            return "Tags(\"AnyPopupOpen\").Write(false);\n";
-        }
-
         static void AddPopupCloseXScript(HmiButton btn)
         {
             try {
@@ -943,7 +922,7 @@ namespace ValveDemoHmiBuilder
                 if (scp == null || !scp.CanWrite) return;
 
                 // Bracket notation bypasses compiler's static member check while working identically at runtime
-                scp.SetValue(script, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_Valve\");", null);
+                scp.SetValue(script, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_Valve\");", null);
             } catch {}
         }
 
@@ -1052,11 +1031,15 @@ namespace ValveDemoHmiBuilder
                 // for a 1920x1080 parent ((1920-460)/2=730, (1080-360)/2=360). Both the parent canvas
                 // and the popup's own size now scale by SX()/SY() (1366x768 target), so the position
                 // must scale the same way to stay centered instead of drifting toward one corner.
+                // Popup_Valve is meant to be freely retargetable: tapping a different valve tile
+                // while it's already open should just re-point the same popup at the new valve. An
+                // AnyPopupOpen-style guard was briefly tried here and confirmed live to break exactly
+                // that - it opened once, then never again, since nothing besides the X button ever
+                // reset the flag and retargeting doesn't go through the X button at all. No guard
+                // needed on any of the 3 popups in the end: Edit/Confirm are modal, which already
+                // makes stacking structurally impossible without extra tracking.
                 string jsCode =
-                    JS_READ +
-                    PopupOpenGuardJs() +
                     "Tags(\"SelectedValve\").Write(" + vIndex + ");\n" +
-                    PopupMarkOpenJs() +
                     "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", " + SX(730) + ", " + SY(360) + ", false);";
 
                 scp.SetValue(script, jsCode, null);
@@ -1443,12 +1426,6 @@ namespace ValveDemoHmiBuilder
             CreateInternalTag(hmi, "EditNameBuffer", "String");
             CreateInternalTag(hmi, "EditLocBuffer", "String");
             CreateInternalTag(hmi, "ConfirmValveIdx", "Int");
-            // Guards against popup stacking (two popups visibly open at once) at the source,
-            // rather than trying to reactively close others when opening a new one - that reactive
-            // approach didn't reliably close a DIFFERENT popup from another popup's own script
-            // context, confirmed live. Every "open a popup" script checks this is false first;
-            // every popup's own close action(s) reset it to false.
-            CreateInternalTag(hmi, "AnyPopupOpen", "Bool");
         }
 
         // Creates an HMI tag that IS connected to a PLC tag
