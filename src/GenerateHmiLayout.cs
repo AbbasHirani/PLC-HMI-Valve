@@ -986,15 +986,27 @@ namespace ValveDemoHmiBuilder
                         "Tags(vTag + \"_TimeoutCloseAlarm\").Write(false);\n" +
                         "Tags(vTag + \"_UnexpMove\").Write(false);";
                 } else if (action == "ToggleService") {
-                    scriptBody = 
+                    // SERVICE and CONFIGURED are the same underlying flag (this toggle just flips
+                    // vTag+"_Configured", same as the Config screen's toggle) - reusing the exact
+                    // same Screen_ConfirmDisable/ConfirmValveIdx mechanism already built for that,
+                    // rather than a second copy of the same popup. Turning ON is unchanged; turning
+                    // OFF now checks live state first, same as the Config screen's toggle does.
+                    scriptBody =
                         helper +
                         "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
                         "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
                         "let cur = readTag(Tags(vTag + \"_Configured\").Read());\n" +
-                        "let newVal = !cur;\n" +
-                        "Tags(vTag + \"_Configured\").Write(newVal);\n" +
-                        "if (newVal) {\n" +
+                        "if (!cur) {\n" +
+                        "  Tags(vTag + \"_Configured\").Write(true);\n" +
                         "  Tags(vTag + \"_Healthy\").Write(true);\n" +
+                        "} else {\n" +
+                        "  let st = readTag(Tags(vTag + \"_State\").Read());\n" +
+                        "  if (st === 3 || st === 5) {\n" +
+                        "    Tags(\"ConfirmValveIdx\").Write(idx || 1);\n" +
+                        "    HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
+                        "  } else {\n" +
+                        "    Tags(vTag + \"_Configured\").Write(false);\n" +
+                        "  }\n" +
                         "}";
                 } else if (action == "ToggleStuck") {
                     scriptBody = 

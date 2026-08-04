@@ -1434,9 +1434,12 @@ namespace ValveDemoHmiBuilder
         // every scan), then opens the popup.
         static string ConfigRowTapScript(int slot)
         {
-            // No AnyPopupOpen guard needed: Popup_ValveEdit is modal, so the underlying screen (and
-            // its row-tap targets) is non-interactive while it's open - stacking is structurally
-            // impossible without any extra tracking.
+            // Non-modal, no guard - tried modal+guard earlier and it made closing unreliable
+            // (Confirm/Edit's own Yes/Cancel/Save stopped visibly closing themselves once modal was
+            // on, while the always-reliable Popup_Valve close button has stayed non-modal the whole
+            // session). Visual stacking isn't actually a problem in practice - confirmed live, the
+            // Confirm popup renders cleanly on top of Popup_Valve with no corruption - so there's
+            // nothing modal was actually fixing that's worth the closing reliability it cost.
             return JS_READ +
                 "let no=r(Tags(\"Cfg_TblNo_" + slot + "\").Read());\n" +
                 "if(!no) return;\n" +
@@ -1444,7 +1447,7 @@ namespace ValveDemoHmiBuilder
                 "let vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
                 "Tags(\"EditNameBuffer\").Write(r(Tags(vTag+\"_Name\").Read())||\"\");\n" +
                 "Tags(\"EditLocBuffer\").Write(r(Tags(vTag+\"_Location\").Read())||\"\");\n" +
-                "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", true, \" \", " + SX(760) + ", " + SY(400) + ", false);";
+                "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", false, \" \", " + SX(760) + ", " + SY(400) + ", false);";
         }
 
         // Resolves the absolute valve number from the row's live NO. tag at click time (same
@@ -1468,7 +1471,7 @@ namespace ValveDemoHmiBuilder
                 "let st=r(Tags(\"Cfg_TblState_" + slot + "\").Read());\n" +
                 "if(st===3||st===5) {\n" +
                 "  Tags(\"ConfirmValveIdx\").Write(no);\n" +
-                "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", true, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
+                "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
                 "  return;\n" +
                 "}\n" +
                 "Tags(vTag+\"_Configured\").Write(false);";
