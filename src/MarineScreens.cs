@@ -1443,7 +1443,7 @@ namespace ValveDemoHmiBuilder
                 "Tags(\"EditNameBuffer\").Write(r(Tags(vTag+\"_Name\").Read())||\"\");\n" +
                 "Tags(\"EditLocBuffer\").Write(r(Tags(vTag+\"_Location\").Read())||\"\");\n" +
                 PopupMarkOpenJs() +
-                "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", false, \" \", " + SX(760) + ", " + SY(400) + ", false);";
+                "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", true, \" \", " + SX(760) + ", " + SY(400) + ", false);";
         }
 
         // Resolves the absolute valve number from the row's live NO. tag at click time (same
@@ -1469,7 +1469,7 @@ namespace ValveDemoHmiBuilder
                 "  if(r(Tags(\"AnyPopupOpen\").Read())) return;\n" +
                 "  Tags(\"ConfirmValveIdx\").Write(no);\n" +
                 "  Tags(\"AnyPopupOpen\").Write(true);\n" +
-                "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
+                "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", true, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
                 "  return;\n" +
                 "}\n" +
                 "Tags(vTag+\"_Configured\").Write(false);";
