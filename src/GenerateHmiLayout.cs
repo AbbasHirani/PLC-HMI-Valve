@@ -902,15 +902,22 @@ namespace ValveDemoHmiBuilder
         // reads as "the dialog doesn't close" even though each one's own Close call works fine.
         // Wrapped in try/catch per call since closing an already-closed popup is expected to be a
         // harmless no-op, not something that should ever block the popup actually being opened.
-        static readonly string[] ALL_POPUP_NAMES = { "Popup_Valve", "Popup_ValveEdit", "Popup_ConfirmDisable" };
-        static string PopupCloseOthersJs(string exceptName)
+        // Guard, not cleanup: prevents a second popup from ever opening while one is already open,
+        // rather than trying to close a sibling popup reactively (confirmed live that didn't reliably
+        // work from a different popup's own script context). Prepend to every "open a popup" script;
+        // it returns early (opening nothing) if AnyPopupOpen is already true.
+        static string PopupOpenGuardJs()
         {
-            var sb = new System.Text.StringBuilder();
-            foreach (var name in ALL_POPUP_NAMES) {
-                if (name == exceptName) continue;
-                sb.Append("try { HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"" + name + "\"); } catch(e) {}\n");
-            }
-            return sb.ToString();
+            return "if (r(Tags(\"AnyPopupOpen\").Read())) return;\n";
+        }
+        static string PopupMarkOpenJs()
+        {
+            return "Tags(\"AnyPopupOpen\").Write(true);\n";
+        }
+        // Append to every close/cancel/save action on any of the 3 popups.
+        static string PopupMarkClosedJs()
+        {
+            return "Tags(\"AnyPopupOpen\").Write(false);\n";
         }
 
         static void AddPopupCloseXScript(HmiButton btn)
@@ -936,7 +943,7 @@ namespace ValveDemoHmiBuilder
                 if (scp == null || !scp.CanWrite) return;
 
                 // Bracket notation bypasses compiler's static member check while working identically at runtime
-                scp.SetValue(script, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_Valve\");", null);
+                scp.SetValue(script, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_Valve\");", null);
             } catch {}
         }
 
@@ -1045,14 +1052,11 @@ namespace ValveDemoHmiBuilder
                 // for a 1920x1080 parent ((1920-460)/2=730, (1080-360)/2=360). Both the parent canvas
                 // and the popup's own size now scale by SX()/SY() (1366x768 target), so the position
                 // must scale the same way to stay centered instead of drifting toward one corner.
-                // Plain concatenation, not string.Format: PopupCloseOthersJs()'s JS contains literal
-                // { } from its try/catch blocks, which string.Format would misparse as (invalid)
-                // placeholders - confirmed live, threw FormatException on every single valve tile's
-                // popup script, silently breaking "tap to open popup" everywhere via the outer
-                // try/catch here.
                 string jsCode =
+                    JS_READ +
+                    PopupOpenGuardJs() +
                     "Tags(\"SelectedValve\").Write(" + vIndex + ");\n" +
-                    PopupCloseOthersJs("Popup_Valve") +
+                    PopupMarkOpenJs() +
                     "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", " + SX(730) + ", " + SY(360) + ", false);";
 
                 scp.SetValue(script, jsCode, null);
@@ -1439,6 +1443,12 @@ namespace ValveDemoHmiBuilder
             CreateInternalTag(hmi, "EditNameBuffer", "String");
             CreateInternalTag(hmi, "EditLocBuffer", "String");
             CreateInternalTag(hmi, "ConfirmValveIdx", "Int");
+            // Guards against popup stacking (two popups visibly open at once) at the source,
+            // rather than trying to reactively close others when opening a new one - that reactive
+            // approach didn't reliably close a DIFFERENT popup from another popup's own script
+            // context, confirmed live. Every "open a popup" script checks this is false first;
+            // every popup's own close action(s) reset it to false.
+            CreateInternalTag(hmi, "AnyPopupOpen", "Bool");
         }
 
         // Creates an HMI tag that IS connected to a PLC tag

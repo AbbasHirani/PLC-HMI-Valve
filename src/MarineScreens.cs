@@ -1435,13 +1435,14 @@ namespace ValveDemoHmiBuilder
         static string ConfigRowTapScript(int slot)
         {
             return JS_READ +
+                PopupOpenGuardJs() +
                 "let no=r(Tags(\"Cfg_TblNo_" + slot + "\").Read());\n" +
                 "if(!no) return;\n" +
                 "Tags(\"SelectedValve\").Write(no);\n" +
                 "let vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
                 "Tags(\"EditNameBuffer\").Write(r(Tags(vTag+\"_Name\").Read())||\"\");\n" +
                 "Tags(\"EditLocBuffer\").Write(r(Tags(vTag+\"_Location\").Read())||\"\");\n" +
-                PopupCloseOthersJs("Popup_ValveEdit") +
+                PopupMarkOpenJs() +
                 "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", false, \" \", " + SX(760) + ", " + SY(400) + ", false);";
         }
 
@@ -1465,9 +1466,10 @@ namespace ValveDemoHmiBuilder
                 "}\n" +
                 "let st=r(Tags(\"Cfg_TblState_" + slot + "\").Read());\n" +
                 "if(st===3||st===5) {\n" +
+                "  if(r(Tags(\"AnyPopupOpen\").Read())) return;\n" +
                 "  Tags(\"ConfirmValveIdx\").Write(no);\n" +
-                PopupCloseOthersJs("Popup_ConfirmDisable") +
-                "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(750) + ", " + SY(430) + ", false);\n" +
+                "  Tags(\"AnyPopupOpen\").Write(true);\n" +
+                "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
                 "  return;\n" +
                 "}\n" +
                 "Tags(vTag+\"_Configured\").Write(false);";
@@ -1498,7 +1500,7 @@ namespace ValveDemoHmiBuilder
             tDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
 
             var closeBtn = MakeBtn(sc, "Edit_CloseX", 368, 4, 28, 28, "&#x2715;", BG_HEADER, Color.White, BG_HEADER, 0, 15, true);
-            AddScriptEvent(closeBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
+            AddScriptEvent(closeBtn, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
 
             MakeTb(sc, "Edit_NameLbl", 20, 54, 360, 22, "NAME", M_TRANS, M_MUTED, 0, "Left", 13, false);
             var nameField = sc.ScreenItems.Create<HmiIOField>("Edit_NameField");
@@ -1522,39 +1524,44 @@ namespace ValveDemoHmiBuilder
                 "let vTag=\"V\"+(\"000\"+(idx||1)).slice(-3);\n" +
                 "Tags(vTag+\"_Name\").Write(r(Tags(\"EditNameBuffer\").Read())||\"\");\n" +
                 "Tags(vTag+\"_Location\").Write(r(Tags(\"EditLocBuffer\").Read())||\"\");\n" +
+                PopupMarkClosedJs() +
                 "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
 
             var cancelBtn = MakeBtn(sc, "Edit_Cancel", 210, 200, 170, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 15, true);
-            AddScriptEvent(cancelBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
+            AddScriptEvent(cancelBtn, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
         }
 
         // ── CONFIRM DISABLE popup — shown when un-configuring an OPEN/MOVING valve ──────────────
         static void BuildConfirmDisableScreen(HmiScreen sc)
         {
             Console.WriteLine("  Drawing Screen_ConfirmDisable...");
-            SetPropUInt(sc, "Width", (uint)SX(420));
+            SetPropUInt(sc, "Width", (uint)SX(460));
             SetPropUInt(sc, "Height", (uint)SY(220));
             sc.BackColor = BG_DARK;
 
-            MakeRect(sc, "Confirm_Header", 0, 0, 420, 38, Color.FromArgb(255, 194, 65, 12), BORDER, 1);
-            MakeTb(sc, "Confirm_Title", 0, 8, 420, 24, "&#x26A0; CONFIRM", Color.FromArgb(255, 194, 65, 12), Color.White, 0, "Center", 15, true);
+            MakeRect(sc, "Confirm_Header", 0, 0, 460, 38, Color.FromArgb(255, 194, 65, 12), BORDER, 1);
+            MakeTb(sc, "Confirm_Title", 0, 8, 460, 24, "&#x26A0; CONFIRM", Color.FromArgb(255, 194, 65, 12), Color.White, 0, "Center", 15, true);
 
+            // No SetFont before -> unshrunk default font overflowed the field, cutting text off on
+            // both edges. Explicit SFont() + a shorter message (no embedded \n - IOField single-line
+            // text doesn't reliably wrap) fixes it.
             var msgIO = sc.ScreenItems.Create<HmiIOField>("Confirm_Message");
-            msgIO.Left = SX(20); msgIO.Top = SY(54); msgIO.Width = (uint)SX(380); msgIO.Height = (uint)SY(80);
+            msgIO.Left = SX(20); msgIO.Top = SY(60); msgIO.Width = (uint)SX(420); msgIO.Height = (uint)SY(60);
             msgIO.BackColor = BG_DARK; msgIO.ForeColor = Color.White;
             msgIO.BorderColor = BG_DARK; msgIO.BorderWidth = 0;
             SetPropEnum(msgIO, "IOFieldType", "Output");
             SetPropEnum(msgIO, "TextHorizontalAlignment", "Center");
-            SetMLText(msgIO, "Text", "This valve is currently active. Disable anyway?");
+            SetFont(msgIO, SFont(14), false);
+            SetMLText(msgIO, "Text", "This valve is OPEN/MOVING. Disable anyway?");
             var mDyn = msgIO.Dynamizations.Create<ScriptDynamization>("ProcessValue");
             mDyn.ScriptCode =
                 JS_READ +
                 "let idx=r(Tags(\"ConfirmValveIdx\").Read());\n" +
                 "let num=(\"000\"+(idx||1)).slice(-3);\n" +
-                "return \"V-\" + num + \" is currently OPEN or MOVING.\\nDisable its Configured flag anyway?\";";
+                "return \"V-\" + num + \" is OPEN/MOVING. Disable anyway?\";";
             mDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
 
-            var yesBtn = MakeBtn(sc, "Confirm_Yes", 40, 150, 160, 46, "YES, DISABLE", Color.FromArgb(255, 205, 32, 38), Color.White, Color.FromArgb(255, 255, 100, 100), 2, 14, true);
+            var yesBtn = MakeBtn(sc, "Confirm_Yes", 60, 150, 160, 46, "YES, DISABLE", Color.FromArgb(255, 205, 32, 38), Color.White, Color.FromArgb(255, 255, 100, 100), 2, 14, true);
             SetStr(yesBtn, "Authorization", "Operate");
             AddScriptEvent(yesBtn,
                 JS_READ +
@@ -1562,10 +1569,11 @@ namespace ValveDemoHmiBuilder
                 "if(!idx) return;\n" +
                 "let vTag=\"V\"+(\"000\"+idx).slice(-3);\n" +
                 "Tags(vTag+\"_Configured\").Write(false);\n" +
+                PopupMarkClosedJs() +
                 "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
 
-            var noBtn = MakeBtn(sc, "Confirm_No", 220, 150, 160, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 14, true);
-            AddScriptEvent(noBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
+            var noBtn = MakeBtn(sc, "Confirm_No", 240, 150, 160, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 14, true);
+            AddScriptEvent(noBtn, PopupMarkClosedJs() + "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
         }
     }
 }
