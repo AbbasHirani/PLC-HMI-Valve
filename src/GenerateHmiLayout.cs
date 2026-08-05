@@ -273,8 +273,16 @@ namespace ValveDemoHmiBuilder
             if (Want(only, "Diag")) {
                 HmiScreen scDiag = RecreateScreen(hmi, "Screen_Diagnostics");
                 if (scDiag != null) BuildConfigScreen(scDiag);
-                HmiScreen scEdit = RecreateScreen(hmi, "Screen_ValveEdit");
-                if (scEdit != null) BuildValveEditScreen(scEdit);
+                // Screen_ValveEdit is retired (Name/Location editing removed - see
+                // editable-hmi-text-fields.md memory file) - delete it outright rather than
+                // recreating, so no orphaned popup screen is left behind in the live project.
+                HmiScreen scEditOld = FindScreen(hmi, "Screen_ValveEdit");
+                if (scEditOld != null) {
+                    Console.WriteLine("  Deleting retired Screen_ValveEdit...");
+                    try { CleanScreen(scEditOld); scEditOld.Delete(); } catch (Exception ex) {
+                        Console.WriteLine("  [WARN] Could not delete Screen_ValveEdit: " + ex.Message);
+                    }
+                }
                 HmiScreen scConfirm = RecreateScreen(hmi, "Screen_ConfirmDisable");
                 if (scConfirm != null) BuildConfirmDisableScreen(scConfirm);
             } else Console.WriteLine("  Skipping Screen_Diagnostics (not in --only)...");
@@ -1432,11 +1440,9 @@ namespace ValveDemoHmiBuilder
                 CreateSummaryTag(hmi, "Cfg_TblLoc_" + slot,  "Valve_Meta_DB.CfgTblLoc[" + slot + "]",  "String", forceRefreshNewTags);
             }
 
-            // Internal (no PLC binding) tags for the Configuration screen's new features - jump
-            // target, and the Edit Valve popup's buffers/coordination values.
+            // Internal (no PLC binding) tags for the Configuration screen's features - jump
+            // target, and the confirm-disable popup's coordination value.
             CreateInternalTag(hmi, "CfgJumpTarget", "Int");
-            CreateInternalTag(hmi, "EditNameBuffer", "String");
-            CreateInternalTag(hmi, "EditLocBuffer", "String");
             CreateInternalTag(hmi, "ConfirmValveIdx", "Int");
         }
 

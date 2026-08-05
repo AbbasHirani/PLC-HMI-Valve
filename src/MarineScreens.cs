@@ -1250,16 +1250,16 @@ namespace ValveDemoHmiBuilder
         }
 
         // ── CONFIGURATION SCREEN — all 88 valves, one global paged table ───────────────────
-        // Replaces the old Screen_Diagnostics placeholder. Shows every valve's Zone/Name/Location/
-        // live Status plus a Configured on/off toggle - the same flag that gates whether
+        // Replaces the old Screen_Diagnostics placeholder. Shows every valve's Name/Location/live
+        // Status plus an Enable/Disable toggle - the same Configured flag that gates whether
         // FB_ValveLoop runs a slot's control logic at all (the pre-allocated-UDT-pool "enable"
-        // mechanism from the original spec). Single-column, full-width rows (v2 rework) - the
-        // original 2-column layout wasted vertical space (~103px design-space rows for content
-        // that needs ~44) and made NAME/LOCATION cramped; this fits 16 rows/page (6 pages total,
-        // down from 7) with more room per field. Name/Location edit happens in a separate popup
-        // (Screen_ValveEdit), not inline - the table's cells are PLC-mirrored display tags that
-        // FB_ValveLoop overwrites every scan, so binding an editable field directly to them would
-        // race against the PLC's own re-mirroring and could lose the edit before it's ever read.
+        // mechanism from the original spec). v3: Name/Location editing was removed entirely - real
+        // ships set valve names/locations once at commissioning and never change them, so the
+        // editable popup (Screen_ValveEdit) was solving a problem that doesn't occur in practice.
+        // See memory file editable-hmi-text-fields.md for the full method if this is ever needed
+        // again elsewhere. Table is now narrower with a dedicated commissioning-status summary
+        // panel to its right (BuildConfigSummaryPanel) instead of a single inline count - v2's
+        // table alone still fits 16 rows/page (6 pages total).
         const int CFG_ROWS_PER_PAGE = 16;
         const int CFG_MAX_PAGE = 5; // 88 valves / 16 per page - 1, 0-based
 
@@ -1272,9 +1272,13 @@ namespace ValveDemoHmiBuilder
             BuildNav(sc, "Screen_Diagnostics");
 
             const int px = 16, py = 198, pw = 1888, ph = 760;
-            BuildConfigTable(sc, px, py, pw, ph);
+            const int summaryW = 300, gap = 16;
+            int tableW = pw - summaryW - gap;
+            int summaryX = px + tableW + gap;
+            BuildConfigTable(sc, px, py, tableW, ph);
+            BuildConfigSummaryPanel(sc, summaryX, py, summaryW, ph);
 
-            // ── Control bar row 1: page nav, live PAGE label, GO TO VALVE# jump, summary count ──
+            // ── Control bar row 1: page nav, live PAGE label, GO TO VALVE# jump ──
             const int pbW = 95, pbY = py + ph + 12;
             var upBtn   = MakeBtn(sc, "Cfg_PageUp",   px,            pbY, pbW, 42, "&#x25B2; UP",   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
             var downBtn = MakeBtn(sc, "Cfg_PageDown", px + pbW + 8,  pbY, pbW, 42, "&#x25BC; DN",   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
@@ -1308,11 +1312,6 @@ namespace ValveDemoHmiBuilder
                 "let pg=Math.floor((t-1)/" + CFG_ROWS_PER_PAGE + ");\n" +
                 "if(pg<0)pg=0; if(pg>" + CFG_MAX_PAGE + ")pg=" + CFG_MAX_PAGE + ";\n" +
                 "Tags(\"Valves_DB_CfgPage\").Write(pg);");
-
-            int xSummary = xJump + 104 + 66 + 60 + 30;
-            var sumVal = MakeLiveText(sc, "Cfg_SummaryVal", xSummary, pbY + 10, 40, 22, M_GREEN, "Right", 15, true);
-            DynTag(sumVal, "Text", "Valves_DB_TotalConfigured");
-            MakeTb(sc, "Cfg_SummaryLbl", xSummary + 44, pbY + 10, 160, 22, "/ 88 CONFIGURED", M_TRANS, M_MUTED, 0, "Left", 13, false);
 
             // ── Control bar row 2: bulk configure per zone ──
             int pbY2 = pbY + 50;
@@ -1350,35 +1349,37 @@ namespace ValveDemoHmiBuilder
         {
             MakePanel(sc, "CfgTbl_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             MakeRect(sc, "CfgTbl_Hdr", px, py, pw, 38, M_HDR, M_HDR, 0);
-            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 88 VALVES  (tap a row to edit name/location)", M_TRANS, M_HDRTXT, 0, "Left", 16, true);
+            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 88 VALVES", M_TRANS, M_HDRTXT, 0, "Left", 16, true);
 
             const int colHdrH = 28;
             int rowH = (ph - 38 - colHdrH - 8) / CFG_ROWS_PER_PAGE;
 
-            // Full-width single column - field widths chosen against the ~1856px usable content
-            // width (pw - 32 side margins), with room to spare rather than the old 2-column split
-            // which forced everything narrow.
-            const int tagW = 90, zoneW = 160, nameW = 340, locW = 320, statusW = 160, cfgW = 180, pad = 16;
+            // v3 columns: TAG folded into the NAME cell (e.g. "CM-29 — Bilge Suction Valve")
+            // instead of its own column. ZONE re-added (v3.1) after live testing showed rows with
+            // no Name set read as context-less without it - re-uses the Cfg_TblZone_slot tag, which
+            // was never removed from CreateSummaryHmiTags, only unbound from the table. Frees width
+            // still went to a much larger ENABLE/DISABLE touch target vs. the pre-redesign version,
+            // since it's the row's only interactive element now (no more invisible row-tap area).
+            const int zoneW = 130, nameW = 460, locW = 380, statusW = 160, cfgW = 260, pad = 16;
+            const int tagSubW = 76, dashSubW = 18;
 
             int bodyTop = py + 38 + 2 + colHdrH + 4;
             MakeRect(sc, "CfgTbl_HdrBand", px + 1, py + 38, pw - 2, colHdrH + 6, M_HDRBAND, M_HDRBAND, 0);
 
             int cx0 = px + 16;
             int hy = py + 38 + 2;
-            int hxZone = cx0 + tagW + pad;
-            int hxName = hxZone + zoneW + pad;
+            int hxName = cx0 + zoneW + pad;
             int hxLoc = hxName + nameW + pad;
             int hxStatus = hxLoc + locW + pad;
             int hxCfg = hxStatus + statusW + pad;
 
-            MakeTb(sc, "CfgTbl_H_Tag",    cx0,      hy, tagW,    colHdrH, "TAG",         M_TRANS, M_MUTED, 0, "Center", 13, true);
-            MakeTb(sc, "CfgTbl_H_Zone",   hxZone,   hy, zoneW,   colHdrH, "ZONE",        M_TRANS, M_MUTED, 0, "Center", 13, true);
-            MakeTb(sc, "CfgTbl_H_Name",   hxName,   hy, nameW,   colHdrH, "NAME",        M_TRANS, M_MUTED, 0, "Center", 13, true);
-            MakeTb(sc, "CfgTbl_H_Loc",    hxLoc,    hy, locW,    colHdrH, "LOCATION",    M_TRANS, M_MUTED, 0, "Center", 13, true);
-            MakeTb(sc, "CfgTbl_H_Status", hxStatus, hy, statusW, colHdrH, "STATUS",      M_TRANS, M_MUTED, 0, "Center", 13, true);
-            MakeTb(sc, "CfgTbl_H_Cfg",    hxCfg,    hy, cfgW,    colHdrH, "CONFIGURED",  M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Zone",   cx0,      hy, zoneW,   colHdrH, "ZONE",              M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Name",   hxName,   hy, nameW,   colHdrH, "NAME",              M_TRANS, M_MUTED, 0, "Left",   13, true);
+            MakeTb(sc, "CfgTbl_H_Loc",    hxLoc,    hy, locW,    colHdrH, "LOCATION",          M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Status", hxStatus, hy, statusW, colHdrH, "STATUS",            M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_Cfg",    hxCfg,    hy, cfgW,    colHdrH, "ENABLE / DISABLE",  M_TRANS, M_MUTED, 0, "Center", 13, true);
 
-            int rowW = (hxCfg - 6) - (cx0 - 6); // hit-area + zebra span TAG..STATUS, stopping short of the toggle column
+            int rowW = pw - 26; // zebra/row background spans the full table width now
 
             for (int r = 0; r < CFG_ROWS_PER_PAGE; r++) {
                 int slot = r + 1;
@@ -1388,29 +1389,61 @@ namespace ValveDemoHmiBuilder
                 if (r % 2 == 1)
                     MakeRect(sc, "CfgTr_Zeb" + sfx, cx0 - 6, rY, rowW, rowH, M_ZEBRA, M_ZEBRA, 0);
 
-                var tagTb = MakeTb(sc, "CfgTr_Tag" + sfx, cx0, rY, tagW, rowH, "", M_TRANS, M_TEXT, 0, "Center", 14, true);
+                var zoneVal = MakeLiveText(sc, "CfgTr_Zone" + sfx, cx0, rY, zoneW, rowH, M_MUTED, "Center", 12, false);
+                DynTag(zoneVal, "Text", "Cfg_TblZone_" + slot);
+
+                var tagTb = MakeTb(sc, "CfgTr_Tag" + sfx, hxName, rY, tagSubW, rowH, "", M_TRANS, M_ACCENT, 0, "Left", 14, true);
                 DynTag(tagTb, "Text", "Cfg_TblTag_" + slot);
-                var zoneTb = MakeLiveText(sc, "CfgTr_Zone" + sfx, hxZone, rY, zoneW, rowH, M_MUTED, "Center", 12, false);
-                DynTag(zoneTb, "Text", "Cfg_TblZone_" + slot);
-                var nameVal = MakeLiveText(sc, "CfgTr_Name" + sfx, hxName, rY, nameW, rowH, M_TEXT, "Center", 13, false);
+                MakeTb(sc, "CfgTr_Dash" + sfx, hxName + tagSubW, rY, dashSubW, rowH, "&#x2014;", M_TRANS, M_MUTED, 0, "Left", 14, false);
+                int nameSubX = hxName + tagSubW + dashSubW + 8;
+                var nameVal = MakeLiveText(sc, "CfgTr_Name" + sfx, nameSubX, rY, nameW - (nameSubX - hxName), rowH, M_TEXT, "Left", 14, false);
                 DynTag(nameVal, "Text", "Cfg_TblName_" + slot);
+
                 var locVal = MakeLiveText(sc, "CfgTr_Loc" + sfx, hxLoc, rY, locW, rowH, M_MUTED, "Center", 13, false);
                 DynTag(locVal, "Text", "Cfg_TblLoc_" + slot);
                 var statusVal = MakeLiveText(sc, "CfgTr_Status" + sfx, hxStatus, rY, statusW, rowH, M_MUTED, "Center", 13, true);
                 DynTag(statusVal, "Text", "Cfg_TblStateTxt_" + slot);
                 AddValueMap(DynTag(statusVal, "ForeColor", "Cfg_TblState_" + slot), TBL_CODES, TBL_COLORS);
 
-                // Row-tap hit area, created LAST so it sits on top of the (non-interactive) text
-                // above it and reliably captures the tap - same pattern DrawValveSym's own "hit"
-                // button uses over its badge/glyph. Stops short of the CONFIGURED column so it
-                // never competes with that button's own tap.
-                var hit = MakeBtn(sc, "CfgTr_Hit" + sfx, cx0 - 6, rY, rowW, rowH, "", M_TRANS, M_TRANS, M_TRANS, 0, 10, false);
-                AddScriptEvent(hit, ConfigRowTapScript(slot));
-
                 var cfgBtn = MakeBtn(sc, "CfgTr_Toggle" + sfx, hxCfg, rY + 2, cfgW, rowH - 4, "", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
                 SetStr(cfgBtn, "Authorization", "Operate");
                 AddConfigToggleTextAndColor(cfgBtn, slot);
                 AddScriptEvent(cfgBtn, ConfigToggleScript(slot));
+            }
+        }
+
+        // ── COMMISSIONING STATUS panel — sits to the right of the Configuration table ───────────
+        // Replaces the old single inline "X / 88 CONFIGURED" count in the control bar. Reuses the
+        // per-zone summary tags FB_ValveLoop already maintains (Valves_DB_AftConfigured etc. -
+        // built for Screen_Home's zone captions) so this costs zero new PLC data.
+        static void BuildConfigSummaryPanel(HmiScreen sc, int px, int py, int pw, int ph)
+        {
+            MakePanel(sc, "CfgSum_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
+            MakeRect(sc, "CfgSum_Hdr", px, py, pw, 38, M_HDR, M_HDR, 0);
+            MakeTb(sc, "CfgSum_Ttl", px + 14, py + 6, pw - 28, 26, "COMMISSIONING STATUS", M_TRANS, M_HDRTXT, 0, "Center", 15, true);
+
+            int totY = py + 38 + 34;
+            var totVal = MakeLiveText(sc, "CfgSum_TotalVal", px, totY, pw, 70, M_GREEN, "Center", 56, true);
+            DynTag(totVal, "Text", "Valves_DB_TotalConfigured");
+            MakeTb(sc, "CfgSum_TotalOf", px, totY + 66, pw, 26, "/ 88 CONFIGURED", M_TRANS, M_MUTED, 0, "Center", 14, false);
+
+            int divY = totY + 66 + 34;
+            MakeRect(sc, "CfgSum_Div1", px + 20, divY, pw - 40, 2, M_LINE, M_LINE, 0);
+
+            string[] zoneLabel = { "AFT BALLAST", "BILGE / ER", "FWD BALLAST" };
+            string[] zoneTag   = { "Valves_DB_AftConfigured", "Valves_DB_ErConfigured", "Valves_DB_FwdConfigured" };
+            int[] zoneMax      = { 28, 28, 31 };
+
+            int zoneY0 = divY + 26;
+            const int zoneRowH = 74;
+            for (int i = 0; i < 3; i++) {
+                int zy = zoneY0 + i * zoneRowH;
+                MakeTb(sc, "CfgSum_ZLbl" + i, px + 20, zy, pw - 40, 22, zoneLabel[i], M_TRANS, M_MUTED, 0, "Left", 13, false);
+                var zVal = MakeLiveText(sc, "CfgSum_ZVal" + i, px + 20, zy + 24, 60, 32, M_TEXT, "Left", 24, true);
+                DynTag(zVal, "Text", zoneTag[i]);
+                MakeTb(sc, "CfgSum_ZOf" + i, px + 84, zy + 24, 100, 32, "/ " + zoneMax[i], M_TRANS, M_MUTED, 0, "Left", 16, false);
+                if (i < 2)
+                    MakeRect(sc, "CfgSum_ZDiv" + i, px + 20, zy + zoneRowH - 12, pw - 40, 1, M_LINE, M_LINE, 0);
             }
         }
 
@@ -1425,29 +1458,6 @@ namespace ValveDemoHmiBuilder
             Dyn(btn, "BackColor",
                 JS_READ + "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? 0xFF00C7BE : 0xFF3A3A3C;",
                 "AutomaticTags");
-        }
-
-        // Tapping a row opens the Edit Valve popup - reads the tapped row's live NO. tag (so it's
-        // always correct regardless of which page is showing) rather than anything baked in at
-        // build time, sets SelectedValve, pre-fills the edit buffers from that valve's OWN Name/
-        // Location tags (not the table's PLC-mirrored display tags, which FB_ValveLoop overwrites
-        // every scan), then opens the popup.
-        static string ConfigRowTapScript(int slot)
-        {
-            // Non-modal, no guard - tried modal+guard earlier and it made closing unreliable
-            // (Confirm/Edit's own Yes/Cancel/Save stopped visibly closing themselves once modal was
-            // on, while the always-reliable Popup_Valve close button has stayed non-modal the whole
-            // session). Visual stacking isn't actually a problem in practice - confirmed live, the
-            // Confirm popup renders cleanly on top of Popup_Valve with no corruption - so there's
-            // nothing modal was actually fixing that's worth the closing reliability it cost.
-            return JS_READ +
-                "let no=r(Tags(\"Cfg_TblNo_" + slot + "\").Read());\n" +
-                "if(!no) return;\n" +
-                "Tags(\"SelectedValve\").Write(no);\n" +
-                "let vTag=\"V\"+(\"000\"+no).slice(-3);\n" +
-                "Tags(\"EditNameBuffer\").Write(r(Tags(vTag+\"_Name\").Read())||\"\");\n" +
-                "Tags(\"EditLocBuffer\").Write(r(Tags(vTag+\"_Location\").Read())||\"\");\n" +
-                "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ValveEdit\", \"Screen_ValveEdit\", false, \" \", " + SX(760) + ", " + SY(400) + ", false);";
         }
 
         // Resolves the absolute valve number from the row's live NO. tag at click time (same
@@ -1475,65 +1485,6 @@ namespace ValveDemoHmiBuilder
                 "  return;\n" +
                 "}\n" +
                 "Tags(vTag+\"_Configured\").Write(false);";
-        }
-
-        // ── EDIT VALVE popup — Name/Location, opened by tapping a Configuration screen row ──────
-        // Fields bind to plain internal buffer tags (EditNameBuffer/EditLocBuffer), pre-filled by
-        // the row's tap script and written through to the real per-valve tags only on SAVE - this
-        // sidesteps the paged-mirror race condition entirely (see BuildConfigScreen comment above).
-        static void BuildValveEditScreen(HmiScreen sc)
-        {
-            Console.WriteLine("  Drawing Screen_ValveEdit...");
-            SetPropUInt(sc, "Width", (uint)SX(400));
-            SetPropUInt(sc, "Height", (uint)SY(280));
-            sc.BackColor = BG_DARK;
-
-            MakeRect(sc, "Edit_Header", 0, 0, 400, 38, BG_HEADER, BORDER, 1);
-            var titleIO = sc.ScreenItems.Create<HmiIOField>("Edit_Title");
-            titleIO.Left = SX(0); titleIO.Top = SY(6); titleIO.Width = (uint)SX(370); titleIO.Height = (uint)SY(26);
-            titleIO.BackColor = BG_HEADER; titleIO.ForeColor = Color.White;
-            titleIO.BorderColor = BG_HEADER; titleIO.BorderWidth = 0;
-            SetPropEnum(titleIO, "IOFieldType", "Output");
-            SetPropEnum(titleIO, "TextHorizontalAlignment", "Center");
-            SetMLText(titleIO, "Text", "EDIT VALVE DETAILS");
-            var tDyn = titleIO.Dynamizations.Create<ScriptDynamization>("ProcessValue");
-            tDyn.ScriptCode =
-                JS_READ + "let idx=r(Tags(\"SelectedValve\").Read());\nlet num=(\"000\"+(idx||1)).slice(-3);\nreturn \"EDIT V-\" + num;";
-            tDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
-
-            var closeBtn = MakeBtn(sc, "Edit_CloseX", 368, 4, 28, 28, "&#x2715;", BG_HEADER, Color.White, BG_HEADER, 0, 15, true);
-            AddScriptEvent(closeBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
-
-            MakeTb(sc, "Edit_NameLbl", 20, 54, 360, 22, "NAME", M_TRANS, M_MUTED, 0, "Left", 13, false);
-            var nameField = sc.ScreenItems.Create<HmiIOField>("Edit_NameField");
-            nameField.Left = SX(20); nameField.Top = SY(78); nameField.Width = (uint)SX(360); nameField.Height = (uint)SY(36);
-            nameField.BackColor = Color.White; nameField.ForeColor = M_TEXT; nameField.BorderColor = BORDER; nameField.BorderWidth = 1;
-            SetPropEnum(nameField, "IOFieldType", "InputOutput");
-            DynTag(nameField, "ProcessValue", "EditNameBuffer");
-
-            MakeTb(sc, "Edit_LocLbl", 20, 122, 360, 22, "LOCATION", M_TRANS, M_MUTED, 0, "Left", 13, false);
-            var locField = sc.ScreenItems.Create<HmiIOField>("Edit_LocField");
-            locField.Left = SX(20); locField.Top = SY(146); locField.Width = (uint)SX(360); locField.Height = (uint)SY(36);
-            locField.BackColor = Color.White; locField.ForeColor = M_TEXT; locField.BorderColor = BORDER; locField.BorderWidth = 1;
-            SetPropEnum(locField, "IOFieldType", "InputOutput");
-            DynTag(locField, "ProcessValue", "EditLocBuffer");
-
-            var saveBtn = MakeBtn(sc, "Edit_Save", 20, 200, 170, 46, "&#x2713; SAVE", Color.FromArgb(255, 16, 185, 129), Color.White, Color.FromArgb(255, 52, 211, 153), 2, 15, true);
-            SetStr(saveBtn, "Authorization", "Operate");
-            // Write FIRST, close LAST: confirmed live that closing before the writes silently
-            // dropped them - CloseScreenInPopup appears to interrupt/tear down script execution,
-            // so anything scheduled after it doesn't reliably run. Back to the original, simpler
-            // order.
-            AddScriptEvent(saveBtn,
-                JS_READ +
-                "let idx=r(Tags(\"SelectedValve\").Read());\n" +
-                "let vTag=\"V\"+(\"000\"+(idx||1)).slice(-3);\n" +
-                "Tags(vTag+\"_Name\").Write(r(Tags(\"EditNameBuffer\").Read())||\"\");\n" +
-                "Tags(vTag+\"_Location\").Write(r(Tags(\"EditLocBuffer\").Read())||\"\");\n" +
-                "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
-
-            var cancelBtn = MakeBtn(sc, "Edit_Cancel", 210, 200, 170, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 15, true);
-            AddScriptEvent(cancelBtn, "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ValveEdit\");");
         }
 
         // ── CONFIRM DISABLE popup — shown when un-configuring an OPEN/MOVING valve ──────────────
