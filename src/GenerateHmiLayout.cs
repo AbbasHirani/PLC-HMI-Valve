@@ -1213,6 +1213,36 @@ namespace ValveDemoHmiBuilder
         static string GetStr(object obj, string name)
         { try { var p = obj.GetType().GetProperty(name); return p != null ? (p.GetValue(obj, null) ?? "").ToString() : ""; } catch { return ""; } }
 
+        // Confirmed against the client's actual BOM: 6AG1214-1AG40-4XB0 (SIPLUS S7-1200 CPU 1214C
+        // DC/DC/DC), based on the standard 6ES7 214-1AG40-0XB0 - not the 1215C the project was
+        // originally built around. The 1214C has only 1 onboard PROFINET port (vs the 1215C's 2),
+        // so the PLC->ET200SP->HMI topology needs an external PROFINET switch - a physical/BOM
+        // concern, nothing this script can express. Idempotent: does nothing if already correct,
+        // so safe to call on every run rather than being a one-off manual Openness call whose
+        // effect would otherwise only live in the saved project, with no record in source.
+        static void EnsurePlcCpuType(Device plcDevice, string requiredTypeIdentifier)
+        {
+            try {
+                DeviceItem plc1 = null;
+                foreach (DeviceItem item in plcDevice.DeviceItems)
+                    if (item.Name == "PLC_1") { plc1 = item; break; }
+                if (plc1 == null) { Console.WriteLine("  [PLC] PLC_1 device item not found - skipping CPU type check."); return; }
+
+                if (string.Equals(plc1.TypeIdentifier, requiredTypeIdentifier, StringComparison.OrdinalIgnoreCase)) {
+                    Console.WriteLine("  [PLC] CPU type already correct (" + plc1.TypeIdentifier + ")");
+                    return;
+                }
+
+                Console.WriteLine("  [PLC] CPU type is " + plc1.TypeIdentifier + ", changing to " + requiredTypeIdentifier + "...");
+                var m = plc1.GetType().GetMethod("ChangeType", new Type[] { typeof(string) });
+                if (m == null) { Console.WriteLine("  [PLC] [ERROR] ChangeType method not found."); return; }
+                m.Invoke(plc1, new object[] { requiredTypeIdentifier });
+                Console.WriteLine("  [PLC] CPU type changed successfully to " + plc1.TypeIdentifier);
+            } catch (Exception ex) {
+                Console.WriteLine("  [PLC] [ERROR] Could not verify/change CPU type: " + ex.Message);
+            }
+        }
+
         static void ImportPlcBlocks(Project project)
         {
             try {
@@ -1237,7 +1267,8 @@ namespace ValveDemoHmiBuilder
                     return;
                 }
                 Console.WriteLine("  [PLC] Found PLC device: " + plcDevice.Name);
-                
+                EnsurePlcCpuType(plcDevice, "OrderNumber:6ES7 214-1AG40-0XB0/V4.0");
+
                 // Import Valves_DB
                 try {
                     string dbPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_valves_db.xml";
