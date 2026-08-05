@@ -393,7 +393,7 @@
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND NOT &quot;Valves_DB&quot;.Valve[#bitIdx].Healthy THEN
-                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
         END_FOR;
@@ -406,7 +406,7 @@
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.Valve[#bitIdx].OpenFB AND &quot;Valves_DB&quot;.Valve[#bitIdx].ClosedFB THEN
-                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
         END_FOR;
@@ -419,7 +419,7 @@
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.TimeoutOpenAlarm[#bitIdx] THEN
-                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
         END_FOR;
@@ -432,7 +432,7 @@
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.TimeoutCloseAlarm[#bitIdx] THEN
-                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
         END_FOR;
@@ -445,7 +445,7 @@
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.PosLostTmr[#bitIdx].Q THEN
-                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
         END_FOR;
@@ -458,7 +458,7 @@
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.UnexpMove[#bitIdx] THEN
-                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
         END_FOR;
@@ -471,7 +471,7 @@
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 88 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.Valve[#bitIdx].LocalMode THEN
-                    #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+                    #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
         END_FOR;
@@ -482,7 +482,7 @@
     #packWord := 0;
     FOR #b := 0 TO 8 DO
         IF NOT &quot;Valves_DB&quot;.HwHealthy[#b + 1] THEN
-            #packWord := #packWord OR SHL(IN := W#16#1, N := #b);
+            #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
         END_IF;
     END_FOR;
     &quot;Valves_DB&quot;.HwWord := #packWord;
