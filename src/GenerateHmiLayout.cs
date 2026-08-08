@@ -1301,6 +1301,48 @@ namespace ValveDemoHmiBuilder
                 } catch (Exception ex) {
                     Console.WriteLine("  [PLC] (Skipping Valve_Meta_DB re-import - PLC is online or block exists)");
                 }
+
+                // Dynamic I/O Mapper scaffolding (UDT_Valve_Config, Valve_Channels_DB, IO_Buffer_DB,
+                // FC_IoMapper) - not yet wired into Main[OB1], see FC_IoMapper's own header comment
+                // for what's still needed before it does anything. Safe to keep re-importing: all
+                // channel indices default to 0 (unassigned), which every consumer treats as
+                // "still on symbolic simulation".
+                try {
+                    string udtPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_udt_valve_config.xml";
+                    Console.WriteLine("  [PLC] Importing UDT_Valve_Config from " + udtPath + "...");
+                    var udtResult = plc.TypeGroup.Types.Import(new FileInfo(udtPath), ImportOptions.Override);
+                    if (udtResult != null && udtResult.Count > 0)
+                        Console.WriteLine("  [PLC] Import successful: " + udtResult[0].Name);
+                } catch (Exception ex) {
+                    Console.WriteLine("  [PLC] (Skipping UDT_Valve_Config re-import - PLC is online or type exists)");
+                }
+                try {
+                    string chPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_valve_channels_db.xml";
+                    Console.WriteLine("  [PLC] Importing Valve_Channels_DB from " + chPath + "...");
+                    var chBlock = plc.BlockGroup.Blocks.Import(new FileInfo(chPath), ImportOptions.Override);
+                    if (chBlock != null && chBlock.Count > 0)
+                        Console.WriteLine("  [PLC] Import successful: " + chBlock[0].Name);
+                } catch (Exception ex) {
+                    Console.WriteLine("  [PLC] (Skipping Valve_Channels_DB re-import - PLC is online or block exists)");
+                }
+                try {
+                    string ioPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_io_buffer_db.xml";
+                    Console.WriteLine("  [PLC] Importing IO_Buffer_DB from " + ioPath + "...");
+                    var ioBlock = plc.BlockGroup.Blocks.Import(new FileInfo(ioPath), ImportOptions.Override);
+                    if (ioBlock != null && ioBlock.Count > 0)
+                        Console.WriteLine("  [PLC] Import successful: " + ioBlock[0].Name);
+                } catch (Exception ex) {
+                    Console.WriteLine("  [PLC] (Skipping IO_Buffer_DB re-import - PLC is online or block exists)");
+                }
+                try {
+                    string fcPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_fc_iomapper.xml";
+                    Console.WriteLine("  [PLC] Importing FC_IoMapper from " + fcPath + "...");
+                    var fcBlock = plc.BlockGroup.Blocks.Import(new FileInfo(fcPath), ImportOptions.Override);
+                    if (fcBlock != null && fcBlock.Count > 0)
+                        Console.WriteLine("  [PLC] Import successful: " + fcBlock[0].Name);
+                } catch (Exception ex) {
+                    Console.WriteLine("  [PLC] (Skipping FC_IoMapper re-import - PLC is online or block exists)");
+                }
             } catch (Exception ex) {
                 Console.WriteLine("  [PLC] Skipping PLC block import: " + ex.Message);
             }
