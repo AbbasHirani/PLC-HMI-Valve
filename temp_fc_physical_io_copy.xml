@@ -1,0 +1,695 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V20" />
+  <DocumentInfo>
+    <Created>2026-08-08T00:00:00.0000000Z</Created>
+    <ExportSetting>WithDefaults</ExportSetting>
+    <InstalledProducts>
+      <Product>
+        <DisplayName>Totally Integrated Automation Portal</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>TIA Portal Openness</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Version Control Interface</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>STEP 7 Professional</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>STEP 7 Safety</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>WinCC Basic/Comfort/Advanced</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>WinCC Professional</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>WinCC Unified</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+    </InstalledProducts>
+  </DocumentInfo>
+  <SW.Blocks.FC ID="0">
+    <AttributeList>
+      <AutoNumber>true</AutoNumber>
+      <HeaderAuthor />
+      <HeaderFamily />
+      <HeaderName />
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input" />
+  <Section Name="Output" />
+  <Section Name="InOut" />
+  <Section Name="Temp" />
+  <Section Name="Constant" />
+</Sections></Interface>
+      <IsIECCheckEnabled>false</IsIECCheckEnabled>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>FC_PhysicalIoCopy</Name>
+      <Namespace />
+      <ProgrammingLanguage>SCL</ProgrammingLanguage>
+      <SetENOAutomatically>false</SetENOAutomatically>
+      <UDABlockProperties />
+      <UDAEnableTagReadback>false</UDAEnableTagReadback>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>NOT YET WIRED INTO Main[OB1]. Generated 2026-08-08 from the real addresses confirmed live in TIA's Device overview after assigning all 3 ET200SP stations (AFT/MID/FWD) to PLC_1's PROFINET IO system - before that, every module showed no address at all. This is the only block in the whole project that references real physical %I/%Q addresses; everything downstream (FC_IoMapper, Valve_Channels_DB) only ever deals with the abstract 1..368 / 1..208 channel numbers in IO_Buffer_DB. Still needs: (1) FB_ValveLoop simulation guard for real-mapped valves, (2) both this and FC_IoMapper actually called from Main[OB1] - see FC_IoMapper's own header comment. Safe to have present unwired: it only touches IO_Buffer_DB, which nothing else reads yet.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v4">
+  <Text UId="1">
+    // === DIGITAL INPUTS: real %I bits -&gt; IO_Buffer_DB.DI[1..368] ===
+    // -- AFT DI modules --
+    &quot;IO_Buffer_DB&quot;.DI[1] := %I2.0;
+    &quot;IO_Buffer_DB&quot;.DI[2] := %I2.1;
+    &quot;IO_Buffer_DB&quot;.DI[3] := %I2.2;
+    &quot;IO_Buffer_DB&quot;.DI[4] := %I2.3;
+    &quot;IO_Buffer_DB&quot;.DI[5] := %I2.4;
+    &quot;IO_Buffer_DB&quot;.DI[6] := %I2.5;
+    &quot;IO_Buffer_DB&quot;.DI[7] := %I2.6;
+    &quot;IO_Buffer_DB&quot;.DI[8] := %I2.7;
+    &quot;IO_Buffer_DB&quot;.DI[9] := %I3.0;
+    &quot;IO_Buffer_DB&quot;.DI[10] := %I3.1;
+    &quot;IO_Buffer_DB&quot;.DI[11] := %I3.2;
+    &quot;IO_Buffer_DB&quot;.DI[12] := %I3.3;
+    &quot;IO_Buffer_DB&quot;.DI[13] := %I3.4;
+    &quot;IO_Buffer_DB&quot;.DI[14] := %I3.5;
+    &quot;IO_Buffer_DB&quot;.DI[15] := %I3.6;
+    &quot;IO_Buffer_DB&quot;.DI[16] := %I3.7;
+    &quot;IO_Buffer_DB&quot;.DI[17] := %I4.0;
+    &quot;IO_Buffer_DB&quot;.DI[18] := %I4.1;
+    &quot;IO_Buffer_DB&quot;.DI[19] := %I4.2;
+    &quot;IO_Buffer_DB&quot;.DI[20] := %I4.3;
+    &quot;IO_Buffer_DB&quot;.DI[21] := %I4.4;
+    &quot;IO_Buffer_DB&quot;.DI[22] := %I4.5;
+    &quot;IO_Buffer_DB&quot;.DI[23] := %I4.6;
+    &quot;IO_Buffer_DB&quot;.DI[24] := %I4.7;
+    &quot;IO_Buffer_DB&quot;.DI[25] := %I5.0;
+    &quot;IO_Buffer_DB&quot;.DI[26] := %I5.1;
+    &quot;IO_Buffer_DB&quot;.DI[27] := %I5.2;
+    &quot;IO_Buffer_DB&quot;.DI[28] := %I5.3;
+    &quot;IO_Buffer_DB&quot;.DI[29] := %I5.4;
+    &quot;IO_Buffer_DB&quot;.DI[30] := %I5.5;
+    &quot;IO_Buffer_DB&quot;.DI[31] := %I5.6;
+    &quot;IO_Buffer_DB&quot;.DI[32] := %I5.7;
+    &quot;IO_Buffer_DB&quot;.DI[33] := %I6.0;
+    &quot;IO_Buffer_DB&quot;.DI[34] := %I6.1;
+    &quot;IO_Buffer_DB&quot;.DI[35] := %I6.2;
+    &quot;IO_Buffer_DB&quot;.DI[36] := %I6.3;
+    &quot;IO_Buffer_DB&quot;.DI[37] := %I6.4;
+    &quot;IO_Buffer_DB&quot;.DI[38] := %I6.5;
+    &quot;IO_Buffer_DB&quot;.DI[39] := %I6.6;
+    &quot;IO_Buffer_DB&quot;.DI[40] := %I6.7;
+    &quot;IO_Buffer_DB&quot;.DI[41] := %I7.0;
+    &quot;IO_Buffer_DB&quot;.DI[42] := %I7.1;
+    &quot;IO_Buffer_DB&quot;.DI[43] := %I7.2;
+    &quot;IO_Buffer_DB&quot;.DI[44] := %I7.3;
+    &quot;IO_Buffer_DB&quot;.DI[45] := %I7.4;
+    &quot;IO_Buffer_DB&quot;.DI[46] := %I7.5;
+    &quot;IO_Buffer_DB&quot;.DI[47] := %I7.6;
+    &quot;IO_Buffer_DB&quot;.DI[48] := %I7.7;
+    &quot;IO_Buffer_DB&quot;.DI[49] := %I8.0;
+    &quot;IO_Buffer_DB&quot;.DI[50] := %I8.1;
+    &quot;IO_Buffer_DB&quot;.DI[51] := %I8.2;
+    &quot;IO_Buffer_DB&quot;.DI[52] := %I8.3;
+    &quot;IO_Buffer_DB&quot;.DI[53] := %I8.4;
+    &quot;IO_Buffer_DB&quot;.DI[54] := %I8.5;
+    &quot;IO_Buffer_DB&quot;.DI[55] := %I8.6;
+    &quot;IO_Buffer_DB&quot;.DI[56] := %I8.7;
+    &quot;IO_Buffer_DB&quot;.DI[57] := %I9.0;
+    &quot;IO_Buffer_DB&quot;.DI[58] := %I9.1;
+    &quot;IO_Buffer_DB&quot;.DI[59] := %I9.2;
+    &quot;IO_Buffer_DB&quot;.DI[60] := %I9.3;
+    &quot;IO_Buffer_DB&quot;.DI[61] := %I9.4;
+    &quot;IO_Buffer_DB&quot;.DI[62] := %I9.5;
+    &quot;IO_Buffer_DB&quot;.DI[63] := %I9.6;
+    &quot;IO_Buffer_DB&quot;.DI[64] := %I9.7;
+    &quot;IO_Buffer_DB&quot;.DI[65] := %I10.0;
+    &quot;IO_Buffer_DB&quot;.DI[66] := %I10.1;
+    &quot;IO_Buffer_DB&quot;.DI[67] := %I10.2;
+    &quot;IO_Buffer_DB&quot;.DI[68] := %I10.3;
+    &quot;IO_Buffer_DB&quot;.DI[69] := %I10.4;
+    &quot;IO_Buffer_DB&quot;.DI[70] := %I10.5;
+    &quot;IO_Buffer_DB&quot;.DI[71] := %I10.6;
+    &quot;IO_Buffer_DB&quot;.DI[72] := %I10.7;
+    &quot;IO_Buffer_DB&quot;.DI[73] := %I11.0;
+    &quot;IO_Buffer_DB&quot;.DI[74] := %I11.1;
+    &quot;IO_Buffer_DB&quot;.DI[75] := %I11.2;
+    &quot;IO_Buffer_DB&quot;.DI[76] := %I11.3;
+    &quot;IO_Buffer_DB&quot;.DI[77] := %I11.4;
+    &quot;IO_Buffer_DB&quot;.DI[78] := %I11.5;
+    &quot;IO_Buffer_DB&quot;.DI[79] := %I11.6;
+    &quot;IO_Buffer_DB&quot;.DI[80] := %I11.7;
+    &quot;IO_Buffer_DB&quot;.DI[81] := %I12.0;
+    &quot;IO_Buffer_DB&quot;.DI[82] := %I12.1;
+    &quot;IO_Buffer_DB&quot;.DI[83] := %I12.2;
+    &quot;IO_Buffer_DB&quot;.DI[84] := %I12.3;
+    &quot;IO_Buffer_DB&quot;.DI[85] := %I12.4;
+    &quot;IO_Buffer_DB&quot;.DI[86] := %I12.5;
+    &quot;IO_Buffer_DB&quot;.DI[87] := %I12.6;
+    &quot;IO_Buffer_DB&quot;.DI[88] := %I12.7;
+    &quot;IO_Buffer_DB&quot;.DI[89] := %I13.0;
+    &quot;IO_Buffer_DB&quot;.DI[90] := %I13.1;
+    &quot;IO_Buffer_DB&quot;.DI[91] := %I13.2;
+    &quot;IO_Buffer_DB&quot;.DI[92] := %I13.3;
+    &quot;IO_Buffer_DB&quot;.DI[93] := %I13.4;
+    &quot;IO_Buffer_DB&quot;.DI[94] := %I13.5;
+    &quot;IO_Buffer_DB&quot;.DI[95] := %I13.6;
+    &quot;IO_Buffer_DB&quot;.DI[96] := %I13.7;
+    &quot;IO_Buffer_DB&quot;.DI[97] := %I14.0;
+    &quot;IO_Buffer_DB&quot;.DI[98] := %I14.1;
+    &quot;IO_Buffer_DB&quot;.DI[99] := %I14.2;
+    &quot;IO_Buffer_DB&quot;.DI[100] := %I14.3;
+    &quot;IO_Buffer_DB&quot;.DI[101] := %I14.4;
+    &quot;IO_Buffer_DB&quot;.DI[102] := %I14.5;
+    &quot;IO_Buffer_DB&quot;.DI[103] := %I14.6;
+    &quot;IO_Buffer_DB&quot;.DI[104] := %I14.7;
+    &quot;IO_Buffer_DB&quot;.DI[105] := %I15.0;
+    &quot;IO_Buffer_DB&quot;.DI[106] := %I15.1;
+    &quot;IO_Buffer_DB&quot;.DI[107] := %I15.2;
+    &quot;IO_Buffer_DB&quot;.DI[108] := %I15.3;
+    &quot;IO_Buffer_DB&quot;.DI[109] := %I15.4;
+    &quot;IO_Buffer_DB&quot;.DI[110] := %I15.5;
+    &quot;IO_Buffer_DB&quot;.DI[111] := %I15.6;
+    &quot;IO_Buffer_DB&quot;.DI[112] := %I15.7;
+    // -- MID DI modules --
+    &quot;IO_Buffer_DB&quot;.DI[113] := %I16.0;
+    &quot;IO_Buffer_DB&quot;.DI[114] := %I16.1;
+    &quot;IO_Buffer_DB&quot;.DI[115] := %I16.2;
+    &quot;IO_Buffer_DB&quot;.DI[116] := %I16.3;
+    &quot;IO_Buffer_DB&quot;.DI[117] := %I16.4;
+    &quot;IO_Buffer_DB&quot;.DI[118] := %I16.5;
+    &quot;IO_Buffer_DB&quot;.DI[119] := %I16.6;
+    &quot;IO_Buffer_DB&quot;.DI[120] := %I16.7;
+    &quot;IO_Buffer_DB&quot;.DI[121] := %I17.0;
+    &quot;IO_Buffer_DB&quot;.DI[122] := %I17.1;
+    &quot;IO_Buffer_DB&quot;.DI[123] := %I17.2;
+    &quot;IO_Buffer_DB&quot;.DI[124] := %I17.3;
+    &quot;IO_Buffer_DB&quot;.DI[125] := %I17.4;
+    &quot;IO_Buffer_DB&quot;.DI[126] := %I17.5;
+    &quot;IO_Buffer_DB&quot;.DI[127] := %I17.6;
+    &quot;IO_Buffer_DB&quot;.DI[128] := %I17.7;
+    &quot;IO_Buffer_DB&quot;.DI[129] := %I18.0;
+    &quot;IO_Buffer_DB&quot;.DI[130] := %I18.1;
+    &quot;IO_Buffer_DB&quot;.DI[131] := %I18.2;
+    &quot;IO_Buffer_DB&quot;.DI[132] := %I18.3;
+    &quot;IO_Buffer_DB&quot;.DI[133] := %I18.4;
+    &quot;IO_Buffer_DB&quot;.DI[134] := %I18.5;
+    &quot;IO_Buffer_DB&quot;.DI[135] := %I18.6;
+    &quot;IO_Buffer_DB&quot;.DI[136] := %I18.7;
+    &quot;IO_Buffer_DB&quot;.DI[137] := %I19.0;
+    &quot;IO_Buffer_DB&quot;.DI[138] := %I19.1;
+    &quot;IO_Buffer_DB&quot;.DI[139] := %I19.2;
+    &quot;IO_Buffer_DB&quot;.DI[140] := %I19.3;
+    &quot;IO_Buffer_DB&quot;.DI[141] := %I19.4;
+    &quot;IO_Buffer_DB&quot;.DI[142] := %I19.5;
+    &quot;IO_Buffer_DB&quot;.DI[143] := %I19.6;
+    &quot;IO_Buffer_DB&quot;.DI[144] := %I19.7;
+    &quot;IO_Buffer_DB&quot;.DI[145] := %I20.0;
+    &quot;IO_Buffer_DB&quot;.DI[146] := %I20.1;
+    &quot;IO_Buffer_DB&quot;.DI[147] := %I20.2;
+    &quot;IO_Buffer_DB&quot;.DI[148] := %I20.3;
+    &quot;IO_Buffer_DB&quot;.DI[149] := %I20.4;
+    &quot;IO_Buffer_DB&quot;.DI[150] := %I20.5;
+    &quot;IO_Buffer_DB&quot;.DI[151] := %I20.6;
+    &quot;IO_Buffer_DB&quot;.DI[152] := %I20.7;
+    &quot;IO_Buffer_DB&quot;.DI[153] := %I21.0;
+    &quot;IO_Buffer_DB&quot;.DI[154] := %I21.1;
+    &quot;IO_Buffer_DB&quot;.DI[155] := %I21.2;
+    &quot;IO_Buffer_DB&quot;.DI[156] := %I21.3;
+    &quot;IO_Buffer_DB&quot;.DI[157] := %I21.4;
+    &quot;IO_Buffer_DB&quot;.DI[158] := %I21.5;
+    &quot;IO_Buffer_DB&quot;.DI[159] := %I21.6;
+    &quot;IO_Buffer_DB&quot;.DI[160] := %I21.7;
+    &quot;IO_Buffer_DB&quot;.DI[161] := %I22.0;
+    &quot;IO_Buffer_DB&quot;.DI[162] := %I22.1;
+    &quot;IO_Buffer_DB&quot;.DI[163] := %I22.2;
+    &quot;IO_Buffer_DB&quot;.DI[164] := %I22.3;
+    &quot;IO_Buffer_DB&quot;.DI[165] := %I22.4;
+    &quot;IO_Buffer_DB&quot;.DI[166] := %I22.5;
+    &quot;IO_Buffer_DB&quot;.DI[167] := %I22.6;
+    &quot;IO_Buffer_DB&quot;.DI[168] := %I22.7;
+    &quot;IO_Buffer_DB&quot;.DI[169] := %I23.0;
+    &quot;IO_Buffer_DB&quot;.DI[170] := %I23.1;
+    &quot;IO_Buffer_DB&quot;.DI[171] := %I23.2;
+    &quot;IO_Buffer_DB&quot;.DI[172] := %I23.3;
+    &quot;IO_Buffer_DB&quot;.DI[173] := %I23.4;
+    &quot;IO_Buffer_DB&quot;.DI[174] := %I23.5;
+    &quot;IO_Buffer_DB&quot;.DI[175] := %I23.6;
+    &quot;IO_Buffer_DB&quot;.DI[176] := %I23.7;
+    &quot;IO_Buffer_DB&quot;.DI[177] := %I24.0;
+    &quot;IO_Buffer_DB&quot;.DI[178] := %I24.1;
+    &quot;IO_Buffer_DB&quot;.DI[179] := %I24.2;
+    &quot;IO_Buffer_DB&quot;.DI[180] := %I24.3;
+    &quot;IO_Buffer_DB&quot;.DI[181] := %I24.4;
+    &quot;IO_Buffer_DB&quot;.DI[182] := %I24.5;
+    &quot;IO_Buffer_DB&quot;.DI[183] := %I24.6;
+    &quot;IO_Buffer_DB&quot;.DI[184] := %I24.7;
+    &quot;IO_Buffer_DB&quot;.DI[185] := %I25.0;
+    &quot;IO_Buffer_DB&quot;.DI[186] := %I25.1;
+    &quot;IO_Buffer_DB&quot;.DI[187] := %I25.2;
+    &quot;IO_Buffer_DB&quot;.DI[188] := %I25.3;
+    &quot;IO_Buffer_DB&quot;.DI[189] := %I25.4;
+    &quot;IO_Buffer_DB&quot;.DI[190] := %I25.5;
+    &quot;IO_Buffer_DB&quot;.DI[191] := %I25.6;
+    &quot;IO_Buffer_DB&quot;.DI[192] := %I25.7;
+    &quot;IO_Buffer_DB&quot;.DI[193] := %I26.0;
+    &quot;IO_Buffer_DB&quot;.DI[194] := %I26.1;
+    &quot;IO_Buffer_DB&quot;.DI[195] := %I26.2;
+    &quot;IO_Buffer_DB&quot;.DI[196] := %I26.3;
+    &quot;IO_Buffer_DB&quot;.DI[197] := %I26.4;
+    &quot;IO_Buffer_DB&quot;.DI[198] := %I26.5;
+    &quot;IO_Buffer_DB&quot;.DI[199] := %I26.6;
+    &quot;IO_Buffer_DB&quot;.DI[200] := %I26.7;
+    &quot;IO_Buffer_DB&quot;.DI[201] := %I27.0;
+    &quot;IO_Buffer_DB&quot;.DI[202] := %I27.1;
+    &quot;IO_Buffer_DB&quot;.DI[203] := %I27.2;
+    &quot;IO_Buffer_DB&quot;.DI[204] := %I27.3;
+    &quot;IO_Buffer_DB&quot;.DI[205] := %I27.4;
+    &quot;IO_Buffer_DB&quot;.DI[206] := %I27.5;
+    &quot;IO_Buffer_DB&quot;.DI[207] := %I27.6;
+    &quot;IO_Buffer_DB&quot;.DI[208] := %I27.7;
+    &quot;IO_Buffer_DB&quot;.DI[209] := %I28.0;
+    &quot;IO_Buffer_DB&quot;.DI[210] := %I28.1;
+    &quot;IO_Buffer_DB&quot;.DI[211] := %I28.2;
+    &quot;IO_Buffer_DB&quot;.DI[212] := %I28.3;
+    &quot;IO_Buffer_DB&quot;.DI[213] := %I28.4;
+    &quot;IO_Buffer_DB&quot;.DI[214] := %I28.5;
+    &quot;IO_Buffer_DB&quot;.DI[215] := %I28.6;
+    &quot;IO_Buffer_DB&quot;.DI[216] := %I28.7;
+    &quot;IO_Buffer_DB&quot;.DI[217] := %I29.0;
+    &quot;IO_Buffer_DB&quot;.DI[218] := %I29.1;
+    &quot;IO_Buffer_DB&quot;.DI[219] := %I29.2;
+    &quot;IO_Buffer_DB&quot;.DI[220] := %I29.3;
+    &quot;IO_Buffer_DB&quot;.DI[221] := %I29.4;
+    &quot;IO_Buffer_DB&quot;.DI[222] := %I29.5;
+    &quot;IO_Buffer_DB&quot;.DI[223] := %I29.6;
+    &quot;IO_Buffer_DB&quot;.DI[224] := %I29.7;
+    // -- FWD DI modules --
+    &quot;IO_Buffer_DB&quot;.DI[225] := %I30.0;
+    &quot;IO_Buffer_DB&quot;.DI[226] := %I30.1;
+    &quot;IO_Buffer_DB&quot;.DI[227] := %I30.2;
+    &quot;IO_Buffer_DB&quot;.DI[228] := %I30.3;
+    &quot;IO_Buffer_DB&quot;.DI[229] := %I30.4;
+    &quot;IO_Buffer_DB&quot;.DI[230] := %I30.5;
+    &quot;IO_Buffer_DB&quot;.DI[231] := %I30.6;
+    &quot;IO_Buffer_DB&quot;.DI[232] := %I30.7;
+    &quot;IO_Buffer_DB&quot;.DI[233] := %I31.0;
+    &quot;IO_Buffer_DB&quot;.DI[234] := %I31.1;
+    &quot;IO_Buffer_DB&quot;.DI[235] := %I31.2;
+    &quot;IO_Buffer_DB&quot;.DI[236] := %I31.3;
+    &quot;IO_Buffer_DB&quot;.DI[237] := %I31.4;
+    &quot;IO_Buffer_DB&quot;.DI[238] := %I31.5;
+    &quot;IO_Buffer_DB&quot;.DI[239] := %I31.6;
+    &quot;IO_Buffer_DB&quot;.DI[240] := %I31.7;
+    &quot;IO_Buffer_DB&quot;.DI[241] := %I32.0;
+    &quot;IO_Buffer_DB&quot;.DI[242] := %I32.1;
+    &quot;IO_Buffer_DB&quot;.DI[243] := %I32.2;
+    &quot;IO_Buffer_DB&quot;.DI[244] := %I32.3;
+    &quot;IO_Buffer_DB&quot;.DI[245] := %I32.4;
+    &quot;IO_Buffer_DB&quot;.DI[246] := %I32.5;
+    &quot;IO_Buffer_DB&quot;.DI[247] := %I32.6;
+    &quot;IO_Buffer_DB&quot;.DI[248] := %I32.7;
+    &quot;IO_Buffer_DB&quot;.DI[249] := %I33.0;
+    &quot;IO_Buffer_DB&quot;.DI[250] := %I33.1;
+    &quot;IO_Buffer_DB&quot;.DI[251] := %I33.2;
+    &quot;IO_Buffer_DB&quot;.DI[252] := %I33.3;
+    &quot;IO_Buffer_DB&quot;.DI[253] := %I33.4;
+    &quot;IO_Buffer_DB&quot;.DI[254] := %I33.5;
+    &quot;IO_Buffer_DB&quot;.DI[255] := %I33.6;
+    &quot;IO_Buffer_DB&quot;.DI[256] := %I33.7;
+    &quot;IO_Buffer_DB&quot;.DI[257] := %I34.0;
+    &quot;IO_Buffer_DB&quot;.DI[258] := %I34.1;
+    &quot;IO_Buffer_DB&quot;.DI[259] := %I34.2;
+    &quot;IO_Buffer_DB&quot;.DI[260] := %I34.3;
+    &quot;IO_Buffer_DB&quot;.DI[261] := %I34.4;
+    &quot;IO_Buffer_DB&quot;.DI[262] := %I34.5;
+    &quot;IO_Buffer_DB&quot;.DI[263] := %I34.6;
+    &quot;IO_Buffer_DB&quot;.DI[264] := %I34.7;
+    &quot;IO_Buffer_DB&quot;.DI[265] := %I35.0;
+    &quot;IO_Buffer_DB&quot;.DI[266] := %I35.1;
+    &quot;IO_Buffer_DB&quot;.DI[267] := %I35.2;
+    &quot;IO_Buffer_DB&quot;.DI[268] := %I35.3;
+    &quot;IO_Buffer_DB&quot;.DI[269] := %I35.4;
+    &quot;IO_Buffer_DB&quot;.DI[270] := %I35.5;
+    &quot;IO_Buffer_DB&quot;.DI[271] := %I35.6;
+    &quot;IO_Buffer_DB&quot;.DI[272] := %I35.7;
+    &quot;IO_Buffer_DB&quot;.DI[273] := %I36.0;
+    &quot;IO_Buffer_DB&quot;.DI[274] := %I36.1;
+    &quot;IO_Buffer_DB&quot;.DI[275] := %I36.2;
+    &quot;IO_Buffer_DB&quot;.DI[276] := %I36.3;
+    &quot;IO_Buffer_DB&quot;.DI[277] := %I36.4;
+    &quot;IO_Buffer_DB&quot;.DI[278] := %I36.5;
+    &quot;IO_Buffer_DB&quot;.DI[279] := %I36.6;
+    &quot;IO_Buffer_DB&quot;.DI[280] := %I36.7;
+    &quot;IO_Buffer_DB&quot;.DI[281] := %I37.0;
+    &quot;IO_Buffer_DB&quot;.DI[282] := %I37.1;
+    &quot;IO_Buffer_DB&quot;.DI[283] := %I37.2;
+    &quot;IO_Buffer_DB&quot;.DI[284] := %I37.3;
+    &quot;IO_Buffer_DB&quot;.DI[285] := %I37.4;
+    &quot;IO_Buffer_DB&quot;.DI[286] := %I37.5;
+    &quot;IO_Buffer_DB&quot;.DI[287] := %I37.6;
+    &quot;IO_Buffer_DB&quot;.DI[288] := %I37.7;
+    &quot;IO_Buffer_DB&quot;.DI[289] := %I38.0;
+    &quot;IO_Buffer_DB&quot;.DI[290] := %I38.1;
+    &quot;IO_Buffer_DB&quot;.DI[291] := %I38.2;
+    &quot;IO_Buffer_DB&quot;.DI[292] := %I38.3;
+    &quot;IO_Buffer_DB&quot;.DI[293] := %I38.4;
+    &quot;IO_Buffer_DB&quot;.DI[294] := %I38.5;
+    &quot;IO_Buffer_DB&quot;.DI[295] := %I38.6;
+    &quot;IO_Buffer_DB&quot;.DI[296] := %I38.7;
+    &quot;IO_Buffer_DB&quot;.DI[297] := %I39.0;
+    &quot;IO_Buffer_DB&quot;.DI[298] := %I39.1;
+    &quot;IO_Buffer_DB&quot;.DI[299] := %I39.2;
+    &quot;IO_Buffer_DB&quot;.DI[300] := %I39.3;
+    &quot;IO_Buffer_DB&quot;.DI[301] := %I39.4;
+    &quot;IO_Buffer_DB&quot;.DI[302] := %I39.5;
+    &quot;IO_Buffer_DB&quot;.DI[303] := %I39.6;
+    &quot;IO_Buffer_DB&quot;.DI[304] := %I39.7;
+    &quot;IO_Buffer_DB&quot;.DI[305] := %I40.0;
+    &quot;IO_Buffer_DB&quot;.DI[306] := %I40.1;
+    &quot;IO_Buffer_DB&quot;.DI[307] := %I40.2;
+    &quot;IO_Buffer_DB&quot;.DI[308] := %I40.3;
+    &quot;IO_Buffer_DB&quot;.DI[309] := %I40.4;
+    &quot;IO_Buffer_DB&quot;.DI[310] := %I40.5;
+    &quot;IO_Buffer_DB&quot;.DI[311] := %I40.6;
+    &quot;IO_Buffer_DB&quot;.DI[312] := %I40.7;
+    &quot;IO_Buffer_DB&quot;.DI[313] := %I41.0;
+    &quot;IO_Buffer_DB&quot;.DI[314] := %I41.1;
+    &quot;IO_Buffer_DB&quot;.DI[315] := %I41.2;
+    &quot;IO_Buffer_DB&quot;.DI[316] := %I41.3;
+    &quot;IO_Buffer_DB&quot;.DI[317] := %I41.4;
+    &quot;IO_Buffer_DB&quot;.DI[318] := %I41.5;
+    &quot;IO_Buffer_DB&quot;.DI[319] := %I41.6;
+    &quot;IO_Buffer_DB&quot;.DI[320] := %I41.7;
+    &quot;IO_Buffer_DB&quot;.DI[321] := %I42.0;
+    &quot;IO_Buffer_DB&quot;.DI[322] := %I42.1;
+    &quot;IO_Buffer_DB&quot;.DI[323] := %I42.2;
+    &quot;IO_Buffer_DB&quot;.DI[324] := %I42.3;
+    &quot;IO_Buffer_DB&quot;.DI[325] := %I42.4;
+    &quot;IO_Buffer_DB&quot;.DI[326] := %I42.5;
+    &quot;IO_Buffer_DB&quot;.DI[327] := %I42.6;
+    &quot;IO_Buffer_DB&quot;.DI[328] := %I42.7;
+    &quot;IO_Buffer_DB&quot;.DI[329] := %I43.0;
+    &quot;IO_Buffer_DB&quot;.DI[330] := %I43.1;
+    &quot;IO_Buffer_DB&quot;.DI[331] := %I43.2;
+    &quot;IO_Buffer_DB&quot;.DI[332] := %I43.3;
+    &quot;IO_Buffer_DB&quot;.DI[333] := %I43.4;
+    &quot;IO_Buffer_DB&quot;.DI[334] := %I43.5;
+    &quot;IO_Buffer_DB&quot;.DI[335] := %I43.6;
+    &quot;IO_Buffer_DB&quot;.DI[336] := %I43.7;
+    &quot;IO_Buffer_DB&quot;.DI[337] := %I44.0;
+    &quot;IO_Buffer_DB&quot;.DI[338] := %I44.1;
+    &quot;IO_Buffer_DB&quot;.DI[339] := %I44.2;
+    &quot;IO_Buffer_DB&quot;.DI[340] := %I44.3;
+    &quot;IO_Buffer_DB&quot;.DI[341] := %I44.4;
+    &quot;IO_Buffer_DB&quot;.DI[342] := %I44.5;
+    &quot;IO_Buffer_DB&quot;.DI[343] := %I44.6;
+    &quot;IO_Buffer_DB&quot;.DI[344] := %I44.7;
+    &quot;IO_Buffer_DB&quot;.DI[345] := %I45.0;
+    &quot;IO_Buffer_DB&quot;.DI[346] := %I45.1;
+    &quot;IO_Buffer_DB&quot;.DI[347] := %I45.2;
+    &quot;IO_Buffer_DB&quot;.DI[348] := %I45.3;
+    &quot;IO_Buffer_DB&quot;.DI[349] := %I45.4;
+    &quot;IO_Buffer_DB&quot;.DI[350] := %I45.5;
+    &quot;IO_Buffer_DB&quot;.DI[351] := %I45.6;
+    &quot;IO_Buffer_DB&quot;.DI[352] := %I45.7;
+    &quot;IO_Buffer_DB&quot;.DI[353] := %I46.0;
+    &quot;IO_Buffer_DB&quot;.DI[354] := %I46.1;
+    &quot;IO_Buffer_DB&quot;.DI[355] := %I46.2;
+    &quot;IO_Buffer_DB&quot;.DI[356] := %I46.3;
+    &quot;IO_Buffer_DB&quot;.DI[357] := %I46.4;
+    &quot;IO_Buffer_DB&quot;.DI[358] := %I46.5;
+    &quot;IO_Buffer_DB&quot;.DI[359] := %I46.6;
+    &quot;IO_Buffer_DB&quot;.DI[360] := %I46.7;
+    &quot;IO_Buffer_DB&quot;.DI[361] := %I47.0;
+    &quot;IO_Buffer_DB&quot;.DI[362] := %I47.1;
+    &quot;IO_Buffer_DB&quot;.DI[363] := %I47.2;
+    &quot;IO_Buffer_DB&quot;.DI[364] := %I47.3;
+    &quot;IO_Buffer_DB&quot;.DI[365] := %I47.4;
+    &quot;IO_Buffer_DB&quot;.DI[366] := %I47.5;
+    &quot;IO_Buffer_DB&quot;.DI[367] := %I47.6;
+    &quot;IO_Buffer_DB&quot;.DI[368] := %I47.7;
+
+    // === DIGITAL OUTPUTS: IO_Buffer_DB.DQ[1..208] -&gt; real %Q bits ===
+    // -- AFT DQ modules --
+    %Q2.0 := &quot;IO_Buffer_DB&quot;.DQ[1];
+    %Q2.1 := &quot;IO_Buffer_DB&quot;.DQ[2];
+    %Q2.2 := &quot;IO_Buffer_DB&quot;.DQ[3];
+    %Q2.3 := &quot;IO_Buffer_DB&quot;.DQ[4];
+    %Q2.4 := &quot;IO_Buffer_DB&quot;.DQ[5];
+    %Q2.5 := &quot;IO_Buffer_DB&quot;.DQ[6];
+    %Q2.6 := &quot;IO_Buffer_DB&quot;.DQ[7];
+    %Q2.7 := &quot;IO_Buffer_DB&quot;.DQ[8];
+    %Q3.0 := &quot;IO_Buffer_DB&quot;.DQ[9];
+    %Q3.1 := &quot;IO_Buffer_DB&quot;.DQ[10];
+    %Q3.2 := &quot;IO_Buffer_DB&quot;.DQ[11];
+    %Q3.3 := &quot;IO_Buffer_DB&quot;.DQ[12];
+    %Q3.4 := &quot;IO_Buffer_DB&quot;.DQ[13];
+    %Q3.5 := &quot;IO_Buffer_DB&quot;.DQ[14];
+    %Q3.6 := &quot;IO_Buffer_DB&quot;.DQ[15];
+    %Q3.7 := &quot;IO_Buffer_DB&quot;.DQ[16];
+    %Q4.0 := &quot;IO_Buffer_DB&quot;.DQ[17];
+    %Q4.1 := &quot;IO_Buffer_DB&quot;.DQ[18];
+    %Q4.2 := &quot;IO_Buffer_DB&quot;.DQ[19];
+    %Q4.3 := &quot;IO_Buffer_DB&quot;.DQ[20];
+    %Q4.4 := &quot;IO_Buffer_DB&quot;.DQ[21];
+    %Q4.5 := &quot;IO_Buffer_DB&quot;.DQ[22];
+    %Q4.6 := &quot;IO_Buffer_DB&quot;.DQ[23];
+    %Q4.7 := &quot;IO_Buffer_DB&quot;.DQ[24];
+    %Q5.0 := &quot;IO_Buffer_DB&quot;.DQ[25];
+    %Q5.1 := &quot;IO_Buffer_DB&quot;.DQ[26];
+    %Q5.2 := &quot;IO_Buffer_DB&quot;.DQ[27];
+    %Q5.3 := &quot;IO_Buffer_DB&quot;.DQ[28];
+    %Q5.4 := &quot;IO_Buffer_DB&quot;.DQ[29];
+    %Q5.5 := &quot;IO_Buffer_DB&quot;.DQ[30];
+    %Q5.6 := &quot;IO_Buffer_DB&quot;.DQ[31];
+    %Q5.7 := &quot;IO_Buffer_DB&quot;.DQ[32];
+    %Q6.0 := &quot;IO_Buffer_DB&quot;.DQ[33];
+    %Q6.1 := &quot;IO_Buffer_DB&quot;.DQ[34];
+    %Q6.2 := &quot;IO_Buffer_DB&quot;.DQ[35];
+    %Q6.3 := &quot;IO_Buffer_DB&quot;.DQ[36];
+    %Q6.4 := &quot;IO_Buffer_DB&quot;.DQ[37];
+    %Q6.5 := &quot;IO_Buffer_DB&quot;.DQ[38];
+    %Q6.6 := &quot;IO_Buffer_DB&quot;.DQ[39];
+    %Q6.7 := &quot;IO_Buffer_DB&quot;.DQ[40];
+    %Q7.0 := &quot;IO_Buffer_DB&quot;.DQ[41];
+    %Q7.1 := &quot;IO_Buffer_DB&quot;.DQ[42];
+    %Q7.2 := &quot;IO_Buffer_DB&quot;.DQ[43];
+    %Q7.3 := &quot;IO_Buffer_DB&quot;.DQ[44];
+    %Q7.4 := &quot;IO_Buffer_DB&quot;.DQ[45];
+    %Q7.5 := &quot;IO_Buffer_DB&quot;.DQ[46];
+    %Q7.6 := &quot;IO_Buffer_DB&quot;.DQ[47];
+    %Q7.7 := &quot;IO_Buffer_DB&quot;.DQ[48];
+    %Q8.0 := &quot;IO_Buffer_DB&quot;.DQ[49];
+    %Q8.1 := &quot;IO_Buffer_DB&quot;.DQ[50];
+    %Q8.2 := &quot;IO_Buffer_DB&quot;.DQ[51];
+    %Q8.3 := &quot;IO_Buffer_DB&quot;.DQ[52];
+    %Q8.4 := &quot;IO_Buffer_DB&quot;.DQ[53];
+    %Q8.5 := &quot;IO_Buffer_DB&quot;.DQ[54];
+    %Q8.6 := &quot;IO_Buffer_DB&quot;.DQ[55];
+    %Q8.7 := &quot;IO_Buffer_DB&quot;.DQ[56];
+    %Q9.0 := &quot;IO_Buffer_DB&quot;.DQ[57];
+    %Q9.1 := &quot;IO_Buffer_DB&quot;.DQ[58];
+    %Q9.2 := &quot;IO_Buffer_DB&quot;.DQ[59];
+    %Q9.3 := &quot;IO_Buffer_DB&quot;.DQ[60];
+    %Q9.4 := &quot;IO_Buffer_DB&quot;.DQ[61];
+    %Q9.5 := &quot;IO_Buffer_DB&quot;.DQ[62];
+    %Q9.6 := &quot;IO_Buffer_DB&quot;.DQ[63];
+    %Q9.7 := &quot;IO_Buffer_DB&quot;.DQ[64];
+    // -- MID DQ modules --
+    %Q10.0 := &quot;IO_Buffer_DB&quot;.DQ[65];
+    %Q10.1 := &quot;IO_Buffer_DB&quot;.DQ[66];
+    %Q10.2 := &quot;IO_Buffer_DB&quot;.DQ[67];
+    %Q10.3 := &quot;IO_Buffer_DB&quot;.DQ[68];
+    %Q10.4 := &quot;IO_Buffer_DB&quot;.DQ[69];
+    %Q10.5 := &quot;IO_Buffer_DB&quot;.DQ[70];
+    %Q10.6 := &quot;IO_Buffer_DB&quot;.DQ[71];
+    %Q10.7 := &quot;IO_Buffer_DB&quot;.DQ[72];
+    %Q11.0 := &quot;IO_Buffer_DB&quot;.DQ[73];
+    %Q11.1 := &quot;IO_Buffer_DB&quot;.DQ[74];
+    %Q11.2 := &quot;IO_Buffer_DB&quot;.DQ[75];
+    %Q11.3 := &quot;IO_Buffer_DB&quot;.DQ[76];
+    %Q11.4 := &quot;IO_Buffer_DB&quot;.DQ[77];
+    %Q11.5 := &quot;IO_Buffer_DB&quot;.DQ[78];
+    %Q11.6 := &quot;IO_Buffer_DB&quot;.DQ[79];
+    %Q11.7 := &quot;IO_Buffer_DB&quot;.DQ[80];
+    %Q12.0 := &quot;IO_Buffer_DB&quot;.DQ[81];
+    %Q12.1 := &quot;IO_Buffer_DB&quot;.DQ[82];
+    %Q12.2 := &quot;IO_Buffer_DB&quot;.DQ[83];
+    %Q12.3 := &quot;IO_Buffer_DB&quot;.DQ[84];
+    %Q12.4 := &quot;IO_Buffer_DB&quot;.DQ[85];
+    %Q12.5 := &quot;IO_Buffer_DB&quot;.DQ[86];
+    %Q12.6 := &quot;IO_Buffer_DB&quot;.DQ[87];
+    %Q12.7 := &quot;IO_Buffer_DB&quot;.DQ[88];
+    %Q13.0 := &quot;IO_Buffer_DB&quot;.DQ[89];
+    %Q13.1 := &quot;IO_Buffer_DB&quot;.DQ[90];
+    %Q13.2 := &quot;IO_Buffer_DB&quot;.DQ[91];
+    %Q13.3 := &quot;IO_Buffer_DB&quot;.DQ[92];
+    %Q13.4 := &quot;IO_Buffer_DB&quot;.DQ[93];
+    %Q13.5 := &quot;IO_Buffer_DB&quot;.DQ[94];
+    %Q13.6 := &quot;IO_Buffer_DB&quot;.DQ[95];
+    %Q13.7 := &quot;IO_Buffer_DB&quot;.DQ[96];
+    %Q14.0 := &quot;IO_Buffer_DB&quot;.DQ[97];
+    %Q14.1 := &quot;IO_Buffer_DB&quot;.DQ[98];
+    %Q14.2 := &quot;IO_Buffer_DB&quot;.DQ[99];
+    %Q14.3 := &quot;IO_Buffer_DB&quot;.DQ[100];
+    %Q14.4 := &quot;IO_Buffer_DB&quot;.DQ[101];
+    %Q14.5 := &quot;IO_Buffer_DB&quot;.DQ[102];
+    %Q14.6 := &quot;IO_Buffer_DB&quot;.DQ[103];
+    %Q14.7 := &quot;IO_Buffer_DB&quot;.DQ[104];
+    %Q15.0 := &quot;IO_Buffer_DB&quot;.DQ[105];
+    %Q15.1 := &quot;IO_Buffer_DB&quot;.DQ[106];
+    %Q15.2 := &quot;IO_Buffer_DB&quot;.DQ[107];
+    %Q15.3 := &quot;IO_Buffer_DB&quot;.DQ[108];
+    %Q15.4 := &quot;IO_Buffer_DB&quot;.DQ[109];
+    %Q15.5 := &quot;IO_Buffer_DB&quot;.DQ[110];
+    %Q15.6 := &quot;IO_Buffer_DB&quot;.DQ[111];
+    %Q15.7 := &quot;IO_Buffer_DB&quot;.DQ[112];
+    %Q16.0 := &quot;IO_Buffer_DB&quot;.DQ[113];
+    %Q16.1 := &quot;IO_Buffer_DB&quot;.DQ[114];
+    %Q16.2 := &quot;IO_Buffer_DB&quot;.DQ[115];
+    %Q16.3 := &quot;IO_Buffer_DB&quot;.DQ[116];
+    %Q16.4 := &quot;IO_Buffer_DB&quot;.DQ[117];
+    %Q16.5 := &quot;IO_Buffer_DB&quot;.DQ[118];
+    %Q16.6 := &quot;IO_Buffer_DB&quot;.DQ[119];
+    %Q16.7 := &quot;IO_Buffer_DB&quot;.DQ[120];
+    %Q17.0 := &quot;IO_Buffer_DB&quot;.DQ[121];
+    %Q17.1 := &quot;IO_Buffer_DB&quot;.DQ[122];
+    %Q17.2 := &quot;IO_Buffer_DB&quot;.DQ[123];
+    %Q17.3 := &quot;IO_Buffer_DB&quot;.DQ[124];
+    %Q17.4 := &quot;IO_Buffer_DB&quot;.DQ[125];
+    %Q17.5 := &quot;IO_Buffer_DB&quot;.DQ[126];
+    %Q17.6 := &quot;IO_Buffer_DB&quot;.DQ[127];
+    %Q17.7 := &quot;IO_Buffer_DB&quot;.DQ[128];
+    // -- FWD DQ modules --
+    %Q18.0 := &quot;IO_Buffer_DB&quot;.DQ[129];
+    %Q18.1 := &quot;IO_Buffer_DB&quot;.DQ[130];
+    %Q18.2 := &quot;IO_Buffer_DB&quot;.DQ[131];
+    %Q18.3 := &quot;IO_Buffer_DB&quot;.DQ[132];
+    %Q18.4 := &quot;IO_Buffer_DB&quot;.DQ[133];
+    %Q18.5 := &quot;IO_Buffer_DB&quot;.DQ[134];
+    %Q18.6 := &quot;IO_Buffer_DB&quot;.DQ[135];
+    %Q18.7 := &quot;IO_Buffer_DB&quot;.DQ[136];
+    %Q19.0 := &quot;IO_Buffer_DB&quot;.DQ[137];
+    %Q19.1 := &quot;IO_Buffer_DB&quot;.DQ[138];
+    %Q19.2 := &quot;IO_Buffer_DB&quot;.DQ[139];
+    %Q19.3 := &quot;IO_Buffer_DB&quot;.DQ[140];
+    %Q19.4 := &quot;IO_Buffer_DB&quot;.DQ[141];
+    %Q19.5 := &quot;IO_Buffer_DB&quot;.DQ[142];
+    %Q19.6 := &quot;IO_Buffer_DB&quot;.DQ[143];
+    %Q19.7 := &quot;IO_Buffer_DB&quot;.DQ[144];
+    %Q20.0 := &quot;IO_Buffer_DB&quot;.DQ[145];
+    %Q20.1 := &quot;IO_Buffer_DB&quot;.DQ[146];
+    %Q20.2 := &quot;IO_Buffer_DB&quot;.DQ[147];
+    %Q20.3 := &quot;IO_Buffer_DB&quot;.DQ[148];
+    %Q20.4 := &quot;IO_Buffer_DB&quot;.DQ[149];
+    %Q20.5 := &quot;IO_Buffer_DB&quot;.DQ[150];
+    %Q20.6 := &quot;IO_Buffer_DB&quot;.DQ[151];
+    %Q20.7 := &quot;IO_Buffer_DB&quot;.DQ[152];
+    %Q21.0 := &quot;IO_Buffer_DB&quot;.DQ[153];
+    %Q21.1 := &quot;IO_Buffer_DB&quot;.DQ[154];
+    %Q21.2 := &quot;IO_Buffer_DB&quot;.DQ[155];
+    %Q21.3 := &quot;IO_Buffer_DB&quot;.DQ[156];
+    %Q21.4 := &quot;IO_Buffer_DB&quot;.DQ[157];
+    %Q21.5 := &quot;IO_Buffer_DB&quot;.DQ[158];
+    %Q21.6 := &quot;IO_Buffer_DB&quot;.DQ[159];
+    %Q21.7 := &quot;IO_Buffer_DB&quot;.DQ[160];
+    %Q22.0 := &quot;IO_Buffer_DB&quot;.DQ[161];
+    %Q22.1 := &quot;IO_Buffer_DB&quot;.DQ[162];
+    %Q22.2 := &quot;IO_Buffer_DB&quot;.DQ[163];
+    %Q22.3 := &quot;IO_Buffer_DB&quot;.DQ[164];
+    %Q22.4 := &quot;IO_Buffer_DB&quot;.DQ[165];
+    %Q22.5 := &quot;IO_Buffer_DB&quot;.DQ[166];
+    %Q22.6 := &quot;IO_Buffer_DB&quot;.DQ[167];
+    %Q22.7 := &quot;IO_Buffer_DB&quot;.DQ[168];
+    %Q23.0 := &quot;IO_Buffer_DB&quot;.DQ[169];
+    %Q23.1 := &quot;IO_Buffer_DB&quot;.DQ[170];
+    %Q23.2 := &quot;IO_Buffer_DB&quot;.DQ[171];
+    %Q23.3 := &quot;IO_Buffer_DB&quot;.DQ[172];
+    %Q23.4 := &quot;IO_Buffer_DB&quot;.DQ[173];
+    %Q23.5 := &quot;IO_Buffer_DB&quot;.DQ[174];
+    %Q23.6 := &quot;IO_Buffer_DB&quot;.DQ[175];
+    %Q23.7 := &quot;IO_Buffer_DB&quot;.DQ[176];
+    %Q24.0 := &quot;IO_Buffer_DB&quot;.DQ[177];
+    %Q24.1 := &quot;IO_Buffer_DB&quot;.DQ[178];
+    %Q24.2 := &quot;IO_Buffer_DB&quot;.DQ[179];
+    %Q24.3 := &quot;IO_Buffer_DB&quot;.DQ[180];
+    %Q24.4 := &quot;IO_Buffer_DB&quot;.DQ[181];
+    %Q24.5 := &quot;IO_Buffer_DB&quot;.DQ[182];
+    %Q24.6 := &quot;IO_Buffer_DB&quot;.DQ[183];
+    %Q24.7 := &quot;IO_Buffer_DB&quot;.DQ[184];
+    %Q25.0 := &quot;IO_Buffer_DB&quot;.DQ[185];
+    %Q25.1 := &quot;IO_Buffer_DB&quot;.DQ[186];
+    %Q25.2 := &quot;IO_Buffer_DB&quot;.DQ[187];
+    %Q25.3 := &quot;IO_Buffer_DB&quot;.DQ[188];
+    %Q25.4 := &quot;IO_Buffer_DB&quot;.DQ[189];
+    %Q25.5 := &quot;IO_Buffer_DB&quot;.DQ[190];
+    %Q25.6 := &quot;IO_Buffer_DB&quot;.DQ[191];
+    %Q25.7 := &quot;IO_Buffer_DB&quot;.DQ[192];
+    %Q26.0 := &quot;IO_Buffer_DB&quot;.DQ[193];
+    %Q26.1 := &quot;IO_Buffer_DB&quot;.DQ[194];
+    %Q26.2 := &quot;IO_Buffer_DB&quot;.DQ[195];
+    %Q26.3 := &quot;IO_Buffer_DB&quot;.DQ[196];
+    %Q26.4 := &quot;IO_Buffer_DB&quot;.DQ[197];
+    %Q26.5 := &quot;IO_Buffer_DB&quot;.DQ[198];
+    %Q26.6 := &quot;IO_Buffer_DB&quot;.DQ[199];
+    %Q26.7 := &quot;IO_Buffer_DB&quot;.DQ[200];
+    %Q27.0 := &quot;IO_Buffer_DB&quot;.DQ[201];
+    %Q27.1 := &quot;IO_Buffer_DB&quot;.DQ[202];
+    %Q27.2 := &quot;IO_Buffer_DB&quot;.DQ[203];
+    %Q27.3 := &quot;IO_Buffer_DB&quot;.DQ[204];
+    %Q27.4 := &quot;IO_Buffer_DB&quot;.DQ[205];
+    %Q27.5 := &quot;IO_Buffer_DB&quot;.DQ[206];
+    %Q27.6 := &quot;IO_Buffer_DB&quot;.DQ[207];
+    %Q27.7 := &quot;IO_Buffer_DB&quot;.DQ[208];
+
+  </Text>
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Network 1</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+    </ObjectList>
+  </SW.Blocks.FC>
+</Document>

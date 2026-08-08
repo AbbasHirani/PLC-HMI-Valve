@@ -1343,6 +1343,18 @@ namespace ValveDemoHmiBuilder
                 } catch (Exception ex) {
                     Console.WriteLine("  [PLC] (Skipping FC_IoMapper re-import - PLC is online or block exists)");
                 }
+                // Reads real %I/%Q bits (AFT/MID/FWD ET200SP stations, addresses confirmed live in
+                // TIA 2026-08-08 after assigning all 3 to PLC_1's PROFINET IO system) into/out of
+                // IO_Buffer_DB. Also not yet called from Main[OB1] - see its own header comment.
+                try {
+                    string physIoPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_fc_physical_io_copy.xml";
+                    Console.WriteLine("  [PLC] Importing FC_PhysicalIoCopy from " + physIoPath + "...");
+                    var physIoBlock = plc.BlockGroup.Blocks.Import(new FileInfo(physIoPath), ImportOptions.Override);
+                    if (physIoBlock != null && physIoBlock.Count > 0)
+                        Console.WriteLine("  [PLC] Import successful: " + physIoBlock[0].Name);
+                } catch (Exception ex) {
+                    Console.WriteLine("  [PLC] (Skipping FC_PhysicalIoCopy re-import - PLC is online or block exists)");
+                }
             } catch (Exception ex) {
                 Console.WriteLine("  [PLC] Skipping PLC block import: " + ex.Message);
             }
