@@ -1432,7 +1432,7 @@ namespace ValveDemoHmiBuilder
 
             string[] zoneLabel = { "AFT BALLAST", "BILGE / ER", "FWD BALLAST" };
             string[] zoneTag   = { "Valves_DB_AftConfigured", "Valves_DB_ErConfigured", "Valves_DB_FwdConfigured" };
-            int[] zoneMax      = { 28, 28, 31 };
+            int[] zoneMax      = { 28, 28, 32 };
 
             int zoneY0 = divY + 26;
             const int zoneRowH = 74;
