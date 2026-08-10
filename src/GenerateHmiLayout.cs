@@ -22,7 +22,7 @@ using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 
 // ============================================================
-// valveDemo2 — Full 88-Valve HMI Layout Generator v8
+// valveDemo2 — Full 96-Slot HMI Layout Generator v8
 // Functional Fixes:
 //   1. Corrected UI.OpenFaceplateInPopup parameters order to match Siemens standard:
 //      UI.OpenFaceplateInPopup(faceplateType, title, interface, parentScreen, invisible, popupWindowName)
@@ -34,7 +34,7 @@ namespace ValveDemoHmiBuilder
 {
     partial class Program
     {
-        private const int    VALVE_COUNT    = 88;
+        private const int    VALVE_COUNT    = 96;
         private const string FACEPLATE_TYPE = "Valve_Faceplate_V_0_0_4";
         private const string HMI_CONNECTION = "HMI_Connection_1";
 
@@ -265,7 +265,7 @@ namespace ValveDemoHmiBuilder
 
             if (Want(only, "Fwd")) {
                 HmiScreen scFwd = RecreateScreen(hmi, "Screen_FwdBallast");
-                if (scFwd != null) BuildZoneScreen(scFwd, "Screen_FwdBallast", "FORWARD BALLAST", 57, 88, "Fwd", 16);
+                if (scFwd != null) BuildZoneScreen(scFwd, "Screen_FwdBallast", "FORWARD BALLAST", 57, 96, "Fwd", 20);
             } else Console.WriteLine("  Skipping Screen_FwdBallast (not in --only)...");
 
             if (Want(only, "Aft")) {
@@ -742,13 +742,13 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "OV_BG", 0, 0, SCREEN_W, SCREEN_H, BG_DARK, BG_DARK, 0);
 
             // Header and Summary bars
-            BuildHeaderBar(sc, "Valve Control System — 88 Valves Overview", true);
+            BuildHeaderBar(sc, "Valve Control System — 96 Slots Overview", true);
             BuildSummaryBar(sc);
 
-            // Place 88 cards
-            Console.WriteLine("  Placing 88 interactive valve buttons...");
+            // Place VALVE_COUNT cards
+            Console.WriteLine("  Placing " + VALVE_COUNT + " interactive valve buttons...");
             for (int v = 1; v <= VALVE_COUNT; v++) {
-                if (v == 1 || v % 10 == 0) Console.WriteLine("    -> Valve " + v + " of 88...");
+                if (v == 1 || v % 10 == 0) Console.WriteLine("    -> Valve " + v + " of " + VALVE_COUNT + "...");
                 int col  = (v - 1) % GRID_COLS;
                 int row  = (v - 1) / GRID_COLS;
                 int left = GRID_LEFT + col * (CARD_W + CARD_GAP_X);
@@ -896,7 +896,7 @@ namespace ValveDemoHmiBuilder
                             "let t = readTag(Tags(\"Valves_DB_TotalTransit\").Read()) || 0;\n" +
                             "let f = readTag(Tags(\"Valves_DB_TotalFault\").Read()) || 0;\n" +
                             "let l = readTag(Tags(\"Valves_DB_TotalLocal\").Read()) || 0;\n" +
-                            "return 88 - (o + c + t + f + l);";
+                            "return 96 - (o + c + t + f + l);";
                         sd.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
                     } catch (Exception ex) {
                         Console.WriteLine("  [DEBUG] Error scripting Summary Cnt: " + ex);
@@ -1092,7 +1092,7 @@ namespace ValveDemoHmiBuilder
                 if (scp == null || !scp.CanWrite) return;
 
                 string jsCode =
-                    "for (let i = 1; i <= 88; i++) {\n" +
+                    "for (let i = 1; i <= " + VALVE_COUNT + "; i++) {\n" +
                     "  let tag = \"V\" + (\"000\" + i).slice(-3) + \"_Healthy\";\n" +
                     "  Tags(tag).Write(true);\n" +
                     "}\n";
@@ -1467,9 +1467,9 @@ namespace ValveDemoHmiBuilder
             CreateDiscreteAlarm(hmi, "System_Heartbeat_Fault", "System", "HMI Heartbeat loss detected.", dbName + "_HwWord", 7, "HMI", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_General_Fault", "System", "System fault detected.", dbName + "_HwWord", 8, "SYSTEM", "SYSTEM");
 
-            for (int i = 1; i <= 88; i++) {
+            for (int i = 1; i <= VALVE_COUNT; i++) {
                 string vId = string.Format("V{0:D3}", i);
-                // Position-based zone boundaries: AFT 1-28, BILGE/ER 29-56, FWD 57-88.
+                // Position-based zone boundaries: AFT 1-28, BILGE/ER 29-56, FWD 57-96.
                 string zoneArea = (i <= 28) ? "BALLAST AFT" : (i <= 56) ? "BILGE-ER" : "BALLAST FWD";
 
                 // Pass 1: High priority alarms
@@ -1485,7 +1485,7 @@ namespace ValveDemoHmiBuilder
                 CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", vId + " Unexpected Movement detected (uncommanded limit switch change).", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
                 CreateDiscreteAlarm(hmi, vId + "_Local", "ValveEvent", vId + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
             }
-            Console.WriteLine("  Created " + (88 * 7 + 9) + " discrete alarms.");
+            Console.WriteLine("  Created " + (VALVE_COUNT * 7 + 9) + " discrete alarms.");
         }
 
         static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit, string origin, string area)
@@ -1515,7 +1515,7 @@ namespace ValveDemoHmiBuilder
 
         static void CreateSummaryHmiTags(HmiSoftware hmi, bool forceRefreshNewTags = false)
         {
-            Console.WriteLine("\n[STEP 2] Checking and creating HMI tags for all 88 valves...");
+            Console.WriteLine("\n[STEP 2] Checking and creating HMI tags for all 96 slots...");
             // SelectedValve is an INTERNAL HMI tag - no PLC address, just holds the selected index
             CreateInternalTag(hmi, "SelectedValve", "Int");
             // BilgePage tracks which page (0 or 1) of the Bilge valve table is currently shown —
@@ -1554,17 +1554,23 @@ namespace ValveDemoHmiBuilder
                 }
             }
 
-            Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 88 valves...");
+            Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 96 slots...");
             for (int i = 1; i <= VALVE_COUNT; i++) {
                 string vTag = string.Format("V{0:D3}", i);
                 string plcPrefix = string.Format("Valves_DB.Valve[{0}]", i);
-                CreateSummaryTag(hmi, vTag + "_Configured", plcPrefix + ".Configured", "Bool");
-                CreateSummaryTag(hmi, vTag + "_OpenCmd",    plcPrefix + ".OpenCmd",    "Bool");
-                CreateSummaryTag(hmi, vTag + "_CloseCmd",   plcPrefix + ".CloseCmd",   "Bool");
-                CreateSummaryTag(hmi, vTag + "_OpenFB",     plcPrefix + ".OpenFB",     "Bool");
-                CreateSummaryTag(hmi, vTag + "_ClosedFB",   plcPrefix + ".ClosedFB",   "Bool");
-                CreateSummaryTag(hmi, vTag + "_Healthy",    plcPrefix + ".Healthy",    "Bool");
-                CreateSummaryTag(hmi, vTag + "_LocalMode",  plcPrefix + ".LocalMode",  "Bool");
+                // These seven must pass forceRefreshNewTags like every other call below. Omitting
+                // it defaulted forceRefresh to false, which made --fix-tags skip them entirely:
+                // the tags were created but their PLC address was never applied, so they stayed
+                // permanently unbound and failed the HMI compile with "The property PLC tag is
+                // invalid". Latent since the refresh mechanism was added - it only surfaced when
+                // slots 89-96 became the first new valves created after that point.
+                CreateSummaryTag(hmi, vTag + "_Configured", plcPrefix + ".Configured", "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_OpenCmd",    plcPrefix + ".OpenCmd",    "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_CloseCmd",   plcPrefix + ".CloseCmd",   "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_OpenFB",     plcPrefix + ".OpenFB",     "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_ClosedFB",   plcPrefix + ".ClosedFB",   "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_Healthy",    plcPrefix + ".Healthy",    "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_LocalMode",  plcPrefix + ".LocalMode",  "Bool", forceRefreshNewTags);
                 CreateSummaryTag(hmi, vTag + "_Stuck",             "Valves_DB.Stuck[" + i + "]",             "Bool", forceRefreshNewTags);
                 CreateSummaryTag(hmi, vTag + "_TimeoutOpenAlarm",  "Valves_DB.TimeoutOpenAlarm[" + i + "]",  "Bool", forceRefreshNewTags);
                 CreateSummaryTag(hmi, vTag + "_TimeoutCloseAlarm", "Valves_DB.TimeoutCloseAlarm[" + i + "]", "Bool", forceRefreshNewTags);

@@ -59,7 +59,7 @@
         <BooleanAttribute Name="SetPoint" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="SimStep" Datatype="Array[1..88] of Int" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="SimStep" Datatype="Array[1..96] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -159,7 +159,7 @@
         END_FOR;
     END_IF;
 
-    FOR #i := 1 TO 88 DO
+    FOR #i := 1 TO 96 DO
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
             // Snapshot BEFORE this scan's command/timer processing runs — needed by the
             // Unexpected Movement (F) guard below to tell a genuine idle-and-unexplained drop
@@ -281,11 +281,12 @@
             &quot;Valves_DB&quot;.PrevClosedFB[#i] := &quot;Valves_DB&quot;.Valve[#i].ClosedFB;
 
             // 4. Priority Summary Counting — plant-wide AND per-zone in the same pass
-            // (this loop already runs 1..88 every scan regardless, so the zone-scoped
+            // (this loop already runs 1..96 every scan regardless, so the zone-scoped
             // increments below are free — they're what let every HMI KPI/caption cell
             // read one tag instead of re-looping its zone's 28-32 valves itself).
             // Zone valve-number ranges follow physical position from stern to bow, so the HMI
-            // mimic reads CM-01..CM-88 straight across: AFT=1-28, ER=29-56, FWD=57-88.
+            // mimic reads slots straight across: AFT=1-28, ER=29-56, FWD=57-96. Real occupancy from
+            // the client schedule is AFT 27 / ER 27 / FWD 35 = 89, so each zone keeps some spare slots.
             #tempConfigured := #tempConfigured + 1;
             IF #i &lt;= 28 THEN
                 #tempAftConfigured := #tempAftConfigured + 1;
@@ -384,14 +385,14 @@
     // ---- Alarm condition bit-packing -----------------------------------------
     // WinCC discrete alarms trigger off a bit within a Word tag (RaisedStateTag +
     // RaisedStateTagBitNumber), not a bare Bool array element, so each of the 7 per-valve
-    // conditions gets packed into 6 words (96 bits, 88 used) here. Valve V's bit for any
+    // conditions gets packed into 6 words (96 bits, all 96 used) here. Valve V's bit for any
     // condition is word (V-1)/16, bit (V-1) MOD 16 — matches how the HMI-side alarm creation
     // computes the same trigger address, so the two have to stay in lockstep.
     FOR #w := 0 TO 5 DO
         #packWord := 0;
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
-            IF #bitIdx &lt;= 88 THEN
+            IF #bitIdx &lt;= 96 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND NOT &quot;Valves_DB&quot;.Valve[#bitIdx].Healthy THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
@@ -404,7 +405,7 @@
         #packWord := 0;
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
-            IF #bitIdx &lt;= 88 THEN
+            IF #bitIdx &lt;= 96 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.Valve[#bitIdx].OpenFB AND &quot;Valves_DB&quot;.Valve[#bitIdx].ClosedFB THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
@@ -417,7 +418,7 @@
         #packWord := 0;
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
-            IF #bitIdx &lt;= 88 THEN
+            IF #bitIdx &lt;= 96 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.TimeoutOpenAlarm[#bitIdx] THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
@@ -430,7 +431,7 @@
         #packWord := 0;
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
-            IF #bitIdx &lt;= 88 THEN
+            IF #bitIdx &lt;= 96 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.TimeoutCloseAlarm[#bitIdx] THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
@@ -443,7 +444,7 @@
         #packWord := 0;
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
-            IF #bitIdx &lt;= 88 THEN
+            IF #bitIdx &lt;= 96 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.PosLostTmr[#bitIdx].Q THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
@@ -456,7 +457,7 @@
         #packWord := 0;
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
-            IF #bitIdx &lt;= 88 THEN
+            IF #bitIdx &lt;= 96 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.UnexpMove[#bitIdx] THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
@@ -469,7 +470,7 @@
         #packWord := 0;
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
-            IF #bitIdx &lt;= 88 THEN
+            IF #bitIdx &lt;= 96 THEN
                 IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.Valve[#bitIdx].LocalMode THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
@@ -493,7 +494,7 @@
     // rather than building the name in JavaScript from a page tag — that indirection is what
     // forced the table onto ~126 polled scripts and made the screen slow to load.
     // TblState = -1 marks a slot with no valve on this page (0 already means UNCONFIGURED).
-    // 14 iterations x 3 zones per scan is negligible next to the 88-valve loop above.
+    // 14 iterations x 3 zones per scan is negligible next to the 96-valve loop above.
 
     // AFT BALLAST: valves 1..28 (2 pages)
     #base := 1 + &quot;Valves_DB&quot;.AftPage * 14;
@@ -565,11 +566,12 @@
         END_IF;
     END_FOR;
 
-    // FORWARD BALLAST: valves 57..88 (3 pages: 14/14/4)
+    // FORWARD BALLAST: valves 57..96 (3 pages of 14, 40 slots - the widest zone, holding the
+    // schedule's 35 FWD valves)
     #base := 57 + &quot;Valves_DB&quot;.FwdPage * 14;
     FOR #j := 1 TO 14 DO
         #idx := #base + #j - 1;
-        IF #idx &lt;= 88 THEN
+        IF #idx &lt;= 96 THEN
             &quot;Valves_DB&quot;.FwdTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
             &quot;Valves_DB&quot;.FwdTblNo[#j] := #idx - 56;
             &quot;Valves_DB&quot;.FwdTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
@@ -597,13 +599,13 @@
         END_IF;
     END_FOR;
 
-    // CONFIGURATION SCREEN: all 88 valves in one global sequence (6 pages of 16), not zone-scoped
+    // CONFIGURATION SCREEN: all 96 slots in one global sequence (exactly 6 pages of 16), not zone-scoped
     // like the three windows above - this screen shows the whole fleet, so #idx IS the absolute
     // valve number directly, no zone-start offset needed.
     #base := 1 + &quot;Valves_DB&quot;.CfgPage * 16;
     FOR #j := 1 TO 16 DO
         #idx := #base + #j - 1;
-        IF #idx &lt;= 88 THEN
+        IF #idx &lt;= 96 THEN
             &quot;Valves_DB&quot;.CfgTblNo[#j] := #idx;
             IF #idx &lt; 10 THEN
                 &quot;Valves_DB&quot;.CfgTblTag[#j] := CONCAT(IN1 := 'CM-0', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 1));

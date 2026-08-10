@@ -48,7 +48,7 @@
       <HeaderVersion>0.1</HeaderVersion>
       <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
   <Section Name="Static">
-    <Member Name="Valve" Datatype="Array[1..88] of &quot;Valve_IO&quot;" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Valve" Datatype="Array[1..96] of &quot;Valve_IO&quot;" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -95,7 +95,7 @@
     <Member Name="TotalFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="TotalLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="TotalConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <!-- Per-zone sub-totals: FB_ValveLoop already iterates 1..88 every scan to build the
+    <!-- Per-zone sub-totals: FB_ValveLoop already iterates 1..96 every scan to build the
          plant-wide totals above, so computing these zone-scoped versions in the same pass
          costs nothing extra. Each HMI KPI/caption cell reads one of these directly instead
          of looping 28-32 valves itself, which is what was making Screen_Home's tables slow
@@ -122,8 +122,8 @@
          it already uses for counting: 0=UNCONFIGURED 1=FAULT 2=LOCAL 3=OPEN 4=CLOSED 5=MOVING.
          Lets every HMI badge/status cell read ONE tag instead of the five raw bits
          (Configured/OpenFB/ClosedFB/Healthy/LocalMode) it used to combine itself — on Screen_Home
-         that is 88 reads/cycle instead of 440. -->
-    <Member Name="StateCode" Datatype="Array[1..88] of Int" Remanence="NonRetain" Accessibility="Public">
+         that is 96 reads/cycle instead of 480. -->
+    <Member Name="StateCode" Datatype="Array[1..96] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -137,7 +137,7 @@
          only by Reset Fault).
          Loss of Position (E) is NOT latched — its own 2s TON (PosLostTmr) IS the alarm condition,
          so it clears the moment the valve stops being idle-with-no-position. -->
-    <Member Name="Stuck" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Stuck" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -149,7 +149,7 @@
          switch inputs once the real Dynamic I/O Mapper replaces this simulation, at which point
          this member (and the auto-init logic that reads it) should be removed entirely - real
          hardware never needs to guess a starting position. -->
-    <Member Name="Initialized" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Initialized" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -158,21 +158,21 @@
     </Member>
     <!-- Split by direction (not one shared bit) since Fail to Open (C) and Fail to Close (D)
          are two separate alarms with separate messages/columns in the catalogue. -->
-    <Member Name="TimeoutOpenAlarm" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="TimeoutOpenAlarm" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="TimeoutCloseAlarm" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="TimeoutCloseAlarm" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="UnexpMove" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="UnexpMove" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -181,14 +181,14 @@
     </Member>
     <!-- Previous-scan snapshot of the limit switches — comparing this scan to last scan is the
          only way to catch a position change that nobody commanded (Unexpected Movement, F). -->
-    <Member Name="PrevOpenFB" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="PrevOpenFB" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="PrevClosedFB" Datatype="Array[1..88] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="PrevClosedFB" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -200,7 +200,7 @@
          here in the DB (an array of the same TON_TIME type as Valve_IO's TimerOpen/TimerClose)
          rather than inside the Valve_IO UDT, so adding it doesn't touch every existing block that
          already uses that UDT. -->
-    <Member Name="PosLostTmr" Datatype="Array[1..88] of TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="PosLostTmr" Datatype="Array[1..96] of TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -226,7 +226,7 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- One Word array per alarm condition, 6 words (96 bits) covering all 88 valves — packed
+    <!-- One Word array per alarm condition, 6 words (96 bits) covering all 96 slots — packed
          because WinCC discrete alarms trigger off a bit-within-a-word tag (HmiDiscreteAlarm's
          RaisedStateTag + RaisedStateTagBitNumber), not a bare Bool array element directly.
          Valve V's bit for any condition: word (V-1)/16, bit (V-1) MOD 16. -->
@@ -386,7 +386,7 @@
       </AttributeList>
     </Member>
     <!-- Configuration screen: same paged-window pattern as the zone tables above, but spanning
-         all 88 valves directly (no zone offset) since this screen shows the whole fleet across one
+         all 96 slots directly (no zone offset) since this screen shows the whole fleet across one
          global 6-page sequence (16/page) rather than one zone at a time. -->
     <Member Name="CfgPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="CfgTblNo" Datatype="Array[1..16] of Int" Remanence="NonRetain" Accessibility="Public">

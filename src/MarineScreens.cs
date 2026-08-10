@@ -412,7 +412,7 @@ namespace ValveDemoHmiBuilder
                 "return \"" + prefix + "\"+n;";
         }
 
-        // Display-only relabelling: operator sees CM-01..CM-88, but every PLC member, all 616
+        // Display-only relabelling: operator sees the client CM number, but every PLC member, all
         // HMI tags, and every script keep V001..V088 — nothing underneath changes.
         static string Disp(int n) { return "CM-" + n.ToString("D2"); }
 
@@ -636,7 +636,7 @@ namespace ValveDemoHmiBuilder
         // ── HOME SCREEN ─────────────────────────────────────────────────
         static void BuildScreenHome(HmiScreen sc)
         {
-            Console.WriteLine("  Drawing Home Screen (v4 - 88-valve mimic, tables in one row below)...");
+            Console.WriteLine("  Drawing Home Screen (v4 - 96-slot mimic, tables in one row below)...");
 
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
@@ -657,7 +657,7 @@ namespace ValveDemoHmiBuilder
             // Left-to-right order matches the mimic's corrected zone order above it (AFT-ER-FWD).
             BuildKpiBox(sc, "AFT BALLAST",      1, 28, "Aft", tX0 + 0 * tStep, tY, tW, tH);
             BuildKpiBox(sc, "BILGE / ER",      29, 56, "Er",  tX0 + 1 * tStep, tY, tW, tH);
-            BuildKpiBox(sc, "FORWARD BALLAST", 57, 88, "Fwd", tX0 + 2 * tStep, tY, tW, tH);
+            BuildKpiBox(sc, "FORWARD BALLAST", 57, 96, "Fwd", tX0 + 2 * tStep, tY, tW, tH);
             BuildSysStatus(sc,                       tX0 + 3 * tStep, tY, tW, tH);
             BuildPlantSummary(sc,                    tX0 + 4 * tStep, tY, tW, tH);
             BuildAlarmPanel(sc,                      tX0 + 5 * tStep, tY, tW, tH);
@@ -698,7 +698,7 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Title_Rule", 0, 46, 1920, 4, M_ACCENT, M_ACCENT, 0);
             MakeTb(sc, "Title_Main", 0, 50, 1920, 54, "MV WESTERLY  &#xB7;  VALVE REMOTE CONTROL SYSTEM",
                    M_TRANS, M_TEXT, 0, "Center", 32, true);
-            MakeTb(sc, "Title_Sub", 0, 104, 1920, 24, "Bilge &amp; Ballast Distribution  &#x2014;  88 Motorised Valves",
+            MakeTb(sc, "Title_Sub", 0, 104, 1920, 24, "Bilge &amp; Ballast Distribution  &#x2014;  89 Motorised Valves",
                    M_TRANS, M_MUTED, 0, "Center", 19, false);
         }
 
@@ -753,7 +753,7 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Nav_BG", 0, 128, 1920, 58, M_BOX, M_LINE, 1);
 
             // Zone buttons run in valve-number order (AFT CM-01-28, BILGE/ER CM-29-56,
-            // FWD CM-57-88), which is also stern->bow, matching the mimic's zone order.
+            // FWD slots 57-96), which is also stern->bow, matching the mimic's zone order.
             string[] labels  = { "&#x2302;  HOME", "&#x2693;  BALLAST AFT", "&#x1F4A7;  BILGE / ER",
                                  "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x1F4C8;  CONFIG", "&#x1F464;  LOGIN" };
             string[] targets = { "Screen_Home", "Screen_AftBallast", "Screen_Bilge", "Screen_FwdBallast",
@@ -770,12 +770,12 @@ namespace ValveDemoHmiBuilder
             }
         }
 
-        // ── VESSEL MIMIC — all 88 valves, full width/height ─────────────
+        // ── VESSEL MIMIC — all 96 slots, full width/height ─────────────
         static void BuildVesselMimic(HmiScreen sc, int px, int py, int pw, int ph)
         {
             MakePanel(sc, "Mim_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             MakeRect(sc, "Mim_Hdr", px, py, pw, 42, M_HDR, M_HDR, 0);
-            MakeTb(sc, "Mim_Ttl", px + 16, py + 8, pw - 32, 30, "VESSEL MIMIC  &#x2014;  ALL 88 VALVES",
+            MakeTb(sc, "Mim_Ttl", px + 16, py + 8, pw - 32, 30, "VESSEL MIMIC  &#x2014;  ALL 96 SLOTS",
                    M_TRANS, M_HDRTXT, 0, "Left", 20, true);
 
             // Hull geometry — derived from (px,py,pw,ph) so this stays correct if the panel
@@ -798,13 +798,16 @@ namespace ValveDemoHmiBuilder
             int[] div = { zoneX[1], zoneX[2] };
 
             string[] zoneNames  = { "AFT BALLAST", "BILGE / ER", "FORWARD BALLAST" };
-            // Valve numbers follow physical position stern->bow, so the mimic reads CM-01..CM-88
-            // straight across instead of jumping 61-88, 1-28, 29-60. FB_ValveLoop uses the exact
-            // same boundaries (i<=28 Aft, i<=56 Er, else Fwd) for its per-zone counters.
+            // Slots follow physical position stern->bow, so the mimic reads straight across
+            // instead of jumping between zones. FB_ValveLoop uses the exact same boundaries
+            // (i<=28 Aft, i<=56 Er, else Fwd) for its per-zone counters.
+            // FWD is the widest zone (40 slots): the client schedule puts 35 of its 89 valves
+            // forward, against 27 each aft and midships, so the even split the mimic used to
+            // assume never matched the real vessel.
             int[] zoneVStart    = { 1, 29, 57 };
-            int[] zoneVEnd      = { 28, 56, 88 };
-            // Exact fit: 7+7+8 columns x 4 rows = 28+28+32 = 88, no leftover.
-            int[] zoneCols      = { 7, 7, 8 };
+            int[] zoneVEnd      = { 28, 56, 96 };
+            // Exact fit: 7+7+10 columns x 4 rows = 28+28+40 = 96, no leftover.
+            int[] zoneCols      = { 7, 7, 10 };
             string[] zonePfx    = { "Aft", "Er", "Fwd" }; // matches Valves_DB_<prefix>Configured etc.
 
             // Alternating zone tint for visual separation.
@@ -966,7 +969,7 @@ namespace ValveDemoHmiBuilder
 
             // TOTAL CHANNELS is a fixed constant — never worth a dynamization.
             MakeTb(sc, "Pls_Lbl0", x + 14, rY0, w - 116, rowH, "TOTAL CHANNELS", M_TRANS, M_MUTED, 0, "Left", 15, false);
-            MakeTb(sc, "Pls_Val0", x + w - 78, rY0, 68, rowH, "88", M_TRANS, M_TEXT, 0, "Right", 22, true);
+            MakeTb(sc, "Pls_Val0", x + w - 78, rY0, 68, rowH, "96", M_TRANS, M_TEXT, 0, "Right", 22, true);
             MakeRect(sc, "Pls_Sep0", x + 10, rY0 + rowH - 1, w - 20, 1, M_LINE, M_LINE, 0);
 
             // CONFIGURED now reads Valves_DB_TotalConfigured directly — FB_ValveLoop computes
@@ -1255,7 +1258,7 @@ namespace ValveDemoHmiBuilder
             }
         }
 
-        // ── CONFIGURATION SCREEN — all 88 valves, one global paged table ───────────────────
+        // ── CONFIGURATION SCREEN — all 96 slots, one global paged table ───────────────────
         // Replaces the old Screen_Diagnostics placeholder. Shows every valve's Name/Location/live
         // Status plus an Enable/Disable toggle - the same Configured flag that gates whether
         // FB_ValveLoop runs a slot's control logic at all (the pre-allocated-UDT-pool "enable"
@@ -1267,11 +1270,11 @@ namespace ValveDemoHmiBuilder
         // panel to its right (BuildConfigSummaryPanel) instead of a single inline count - v2's
         // table alone still fits 16 rows/page (6 pages total).
         const int CFG_ROWS_PER_PAGE = 16;
-        const int CFG_MAX_PAGE = 5; // 88 valves / 16 per page - 1, 0-based
+        const int CFG_MAX_PAGE = 5; // 96 slots / 16 per page - 1, 0-based (exactly 6 full pages)
 
         static void BuildConfigScreen(HmiScreen sc)
         {
-            Console.WriteLine("  Drawing Screen_Diagnostics as VALVE CONFIGURATION (88 valves, 6 pages)...");
+            Console.WriteLine("  Drawing Screen_Diagnostics as VALVE CONFIGURATION (96 slots, 6 pages)...");
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
             BuildHomeHeader(sc);
@@ -1314,7 +1317,7 @@ namespace ValveDemoHmiBuilder
             AddScriptEvent(goBtn,
                 JS_READ +
                 "let t=r(Tags(\"CfgJumpTarget\").Read())||1;\n" +
-                "if(t<1)t=1; if(t>88)t=88;\n" +
+                "if(t<1)t=1; if(t>96)t=96;\n" +
                 "let pg=Math.floor((t-1)/" + CFG_ROWS_PER_PAGE + ");\n" +
                 "if(pg<0)pg=0; if(pg>" + CFG_MAX_PAGE + ")pg=" + CFG_MAX_PAGE + ";\n" +
                 "Tags(\"Valves_DB_CfgPage\").Write(pg);");
@@ -1333,7 +1336,7 @@ namespace ValveDemoHmiBuilder
 
             var fwdBtn = MakeBtn(sc, "Cfg_BulkFwd", bulkX + 320, pbY2, 150, 34, "BALLAST FWD", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
             SetStr(fwdBtn, "Authorization", "Operate");
-            AddScriptEvent(fwdBtn, ZoneConfigureAllScript(57, 88));
+            AddScriptEvent(fwdBtn, ZoneConfigureAllScript(57, 96));
         }
 
         // One-time cost on tap only (not recurring per-scan work) - loops the zone's fixed valve
@@ -1355,7 +1358,7 @@ namespace ValveDemoHmiBuilder
         {
             MakePanel(sc, "CfgTbl_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             MakeRect(sc, "CfgTbl_Hdr", px, py, pw, 38, M_HDR, M_HDR, 0);
-            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 88 VALVES", M_TRANS, M_HDRTXT, 0, "Left", 16, true);
+            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 96 SLOTS", M_TRANS, M_HDRTXT, 0, "Left", 16, true);
 
             const int colHdrH = 28;
             int rowH = (ph - 38 - colHdrH - 8) / CFG_ROWS_PER_PAGE;
@@ -1439,13 +1442,13 @@ namespace ValveDemoHmiBuilder
             MakeTb(sc, "CfgSum_TotalLbl", px + 18, py + 10, 190, 18, "TOTAL CONFIGURED", M_TRANS, M_MUTED, 0, "Left", 11, true);
             var totVal = MakeLiveText(sc, "CfgSum_TotalVal", px + 18, py + 28, 84, 46, M_GREEN, "Left", 32, true);
             DynTag(totVal, "Text", "Valves_DB_TotalConfigured");
-            MakeTb(sc, "CfgSum_TotalOf", px + 104, py + 40, 90, 30, "/ 88", M_TRANS, M_MUTED, 0, "Left", 17, false);
+            MakeTb(sc, "CfgSum_TotalOf", px + 104, py + 40, 90, 30, "/ 96", M_TRANS, M_MUTED, 0, "Left", 17, false);
 
             MakeRect(sc, "CfgSum_DivMain", px + 215, py + 14, 1, ph - 28, M_LINE, M_LINE, 0);
 
             string[] zoneLabel = { "AFT BALLAST", "BILGE / ER", "FWD BALLAST" };
             string[] zoneTag   = { "Valves_DB_AftConfigured", "Valves_DB_ErConfigured", "Valves_DB_FwdConfigured" };
-            int[] zoneMax      = { 28, 28, 32 };
+            int[] zoneMax      = { 28, 28, 40 };
 
             const int zx0 = 238, zw = 184;
             for (int i = 0; i < 3; i++) {

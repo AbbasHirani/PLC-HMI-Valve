@@ -48,17 +48,17 @@
       <HeaderVersion>0.1</HeaderVersion>
       <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
   <Section Name="Static">
-    <!-- Manually-maintained reference data, one entry per valve (V001..V088). Not written by
+    <!-- Manually-maintained reference data, one entry per slot (V001..V096). Not written by
          any script or simulation — an engineer fills these in once via TIA's DB view (or online
          monitoring) after commissioning. Defaults to empty strings until populated. -->
-    <Member Name="Name" Datatype="Array[1..88] of String[20]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Name" Datatype="Array[1..96] of String[20]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="Location" Datatype="Array[1..88] of String[20]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Location" Datatype="Array[1..96] of String[20]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -72,28 +72,28 @@
          things. SysName likewise replaces the old index-range-derived zone string - a valve's
          system is schedule data, not something to infer from where it happens to sit in the array.
          Member names avoid SCL reserved words (FuncName not Function, SysName not System). -->
-    <Member Name="CmNo" Datatype="Array[1..88] of String[6]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CmNo" Datatype="Array[1..96] of String[6]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="VTag" Datatype="Array[1..88] of String[12]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="VTag" Datatype="Array[1..96] of String[12]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="SysName" Datatype="Array[1..88] of String[12]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="SysName" Datatype="Array[1..96] of String[12]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="FuncName" Datatype="Array[1..88] of String[22]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="FuncName" Datatype="Array[1..96] of String[22]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -194,7 +194,7 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Configuration screen's global (all-88) paged window - same mirroring pattern as the
+    <!-- Configuration screen's global (all-96) paged window - same mirroring pattern as the
          per-zone Aft/Er/FwdTblName/Loc above. -->
     <Member Name="CfgTblName" Datatype="Array[1..16] of String[20]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
