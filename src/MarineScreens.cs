@@ -125,7 +125,10 @@ namespace ValveDemoHmiBuilder
             tb.Left = SX(x); tb.Top = SY(y); tb.Width = (uint)SX(w); tb.Height = (uint)SY(h);
             tb.BackColor = bg; tb.ForeColor = fg; tb.BorderWidth = (byte)bw;
             SetProp(tb, "HorizontalTextAlignment", align);
-            SetProp(tb, "VerticalTextAlignment", "Middle");
+            // "Center", not "Middle": HmiVerticalAlignment is {Top, Center, Bottom, Stretch}, so
+            // "Middle" threw inside SetProp's Enum.Parse and was swallowed by its empty catch -
+            // every textbox in the project silently kept the default top alignment instead.
+            SetProp(tb, "VerticalTextAlignment", "Center");
             SetFont(tb, SFont(fontSize), bold);
             SetText(tb, "Text", label);
             return tb;
@@ -1162,16 +1165,23 @@ namespace ValveDemoHmiBuilder
             // Field widths within one ~colW-wide column, with `pad` breathing room between each so
             // STATUS doesn't run into the command buttons. The status dot was removed (the status
             // word is already colour-coded by the same state, so the dot only repeated it).
-            // Budget at pw=1674: colW=809; fields 34+72+182+156+112+200 = 756, plus 5 pads = 806,
-            // leaving 3px slack. Widths are set against worst-case content so nothing clips:
-            //   NO.      34  "28"                    ~20px
-            //   TAG      72  "CM-29" @15 bold        ~48px   (was 64 and clipped the last digit)
-            //   NAME    182  20 chars @13            ~143px  (Valve_Meta_DB is String[20])
-            //   LOCATION156  20 chars @13            ~143px
-            //   STATUS  112  "UNCONFIGURED" @14 bold ~101px  (longest state word)
-            //   COMMAND 200  two 96px buttons + 8 gap
-            const int noW = 34, tagW = 72, nameW = 182, locW = 156, statusW = 112,
-                      btnW = 96, btnGap = 8, pad = 10;
+            // v2 columns follow the client's own valve schedule. Two were dropped:
+            //   NO.   - a zone-relative counter (1..28) that existed only because the paging
+            //           window needed one; it means nothing to anyone operating the valve.
+            //   NAME  - the client's schedule has no "name" field, so it could never be filled.
+            // TAG became CM NO, reading the real stored CmNo instead of the PLC-CONCAT'd
+            // 'CM-' + index string, which mislabelled most valves once the real schedule showed
+            // CM numbers skip values and run past 88. FUNCTION was considered and deliberately
+            // left out - this table is already dense and Function is on the valve popup.
+            // Budget at pw=1674: colW=809; fields 70+120+230+120+200 = 740, plus 4 pads = 788,
+            // leaving 21px slack. Widths are set against worst-case content so nothing clips:
+            //   CM NO     70  "CM97" @15 bold         ~44px
+            //   VALVE TAG120  String[12] @14          ~92px worst case
+            //   LOCATION 230  20 chars @13            ~143px  (Valve_Meta_DB is String[20])
+            //   STATUS   120  "UNCONFIGURED" @14 bold ~101px  (longest state word)
+            //   COMMAND  200  two 96px buttons + 8 gap
+            const int cmW = 70, vtagW = 120, locW = 230, statusW = 120,
+                      btnW = 96, btnGap = 8, pad = 12;
 
             int bodyTop = py + 38 + 2 + colHdrH + 4;
 
@@ -1186,18 +1196,16 @@ namespace ValveDemoHmiBuilder
             for (int col = 0; col < cols; col++) {
                 int cx0 = px + 16 + col * (colW + colGutter);
                 int hy = py + 38 + 2;
-                int hxTag  = cx0 + noW + pad;
-                int hxName = hxTag + tagW + pad;
-                int hxLoc  = hxName + nameW + pad;
+                int hxVTag = cx0 + cmW + pad;
+                int hxLoc  = hxVTag + vtagW + pad;
                 int hxSt   = hxLoc + locW + pad;
                 int hxCmd  = hxSt + statusW + pad;
 
-                MakeTb(sc, "Tbl_H_No"   + col, cx0,    hy, noW,               colHdrH, "NO.",      M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "Tbl_H_Tag"  + col, hxTag,  hy, tagW,              colHdrH, "TAG",      M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "Tbl_H_Name" + col, hxName, hy, nameW,             colHdrH, "NAME",     M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "Tbl_H_Loc"  + col, hxLoc,  hy, locW,              colHdrH, "LOCATION", M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "Tbl_H_St"   + col, hxSt,   hy, statusW,           colHdrH, "STATUS",   M_TRANS, M_MUTED, 0, "Center", 14, true);
-                MakeTb(sc, "Tbl_H_Cmd"  + col, hxCmd,  hy, btnW * 2 + btnGap, colHdrH, "COMMAND",  M_TRANS, M_MUTED, 0, "Center", 14, true);
+                MakeTb(sc, "Tbl_H_CmNo" + col, cx0,    hy, cmW,               colHdrH, "CM NO",     M_TRANS, M_MUTED, 0, "Left",   14, true);
+                MakeTb(sc, "Tbl_H_VTag" + col, hxVTag, hy, vtagW,             colHdrH, "VALVE TAG", M_TRANS, M_MUTED, 0, "Left",   14, true);
+                MakeTb(sc, "Tbl_H_Loc"  + col, hxLoc,  hy, locW,              colHdrH, "LOCATION",  M_TRANS, M_MUTED, 0, "Left",   14, true);
+                MakeTb(sc, "Tbl_H_St"   + col, hxSt,   hy, statusW,           colHdrH, "STATUS",    M_TRANS, M_MUTED, 0, "Center", 14, true);
+                MakeTb(sc, "Tbl_H_Cmd"  + col, hxCmd,  hy, btnW * 2 + btnGap, colHdrH, "COMMAND",   M_TRANS, M_MUTED, 0, "Center", 14, true);
 
                 for (int r = 0; r < rowsPerCol; r++) {
                     // 1-based slot index into the PLC's 14-entry window for this zone.
@@ -1213,18 +1221,16 @@ namespace ValveDemoHmiBuilder
                     if (r % 2 == 1)
                         MakeRect(sc, "Tr_Zeb" + sfx, cx0 - 6, rY, colW + 6, rowH, M_ZEBRA, M_ZEBRA, 0);
 
-                    // NO. is the row's position within the zone (1..28); TAG is the CM-nn label,
-                    // preformatted by the PLC so no string work is needed here.
-                    var noTb = MakeTb(sc, "Tr_No" + sfx, cx0, rY, noW, rowH, "", M_TRANS, M_MUTED, 0, "Center", 15, false);
-                    DynTag(noTb, "Text", zonePrefix + "_TblNo_" + slot);
-                    var tagTb = MakeTb(sc, "Tr_Tag" + sfx, cx0 + noW, rY, tagW, rowH, "", M_TRANS, M_TEXT, 0, "Center", 15, true);
-                    DynTag(tagTb, "Text", zonePrefix + "_TblTag_" + slot);
+                    // Identity straight from the client's schedule, mirrored per page by the PLC.
+                    // All three are TextBoxes so their left alignment actually applies - the
+                    // HmiButton that MakeLiveText creates has no alignment property at all, so its
+                    // text is always centred and its align argument is silently dropped.
+                    var cmTb = MakeTb(sc, "Tr_CmNo" + sfx, cx0, rY, cmW, rowH, "", M_TRANS, M_ACCENT, 0, "Left", 15, true);
+                    DynTag(cmTb, "Text", zonePrefix + "_TblCmNo_" + slot);
+                    var vtagTb = MakeTb(sc, "Tr_VTag" + sfx, hxVTag, rY, vtagW, rowH, "", M_TRANS, M_TEXT, 0, "Left", 14, false);
+                    DynTag(vtagTb, "Text", zonePrefix + "_TblVTag_" + slot);
 
-                    // NAME/LOCATION centred so the cells line up under their headers.
-                    var nameVal = MakeLiveText(sc, "Tr_Name" + sfx, hxName, rY, nameW, rowH, M_TEXT, "Center", 13, false);
-                    DynTag(nameVal, "Text", zonePrefix + "_TblName_" + slot);
-
-                    var locVal = MakeLiveText(sc, "Tr_Loc" + sfx, hxLoc, rY, locW, rowH, M_MUTED, "Center", 13, false);
+                    var locVal = MakeTb(sc, "Tr_Loc" + sfx, hxLoc, rY, locW, rowH, "", M_TRANS, M_MUTED, 0, "Left", 13, false);
                     DynTag(locVal, "Text", zonePrefix + "_TblLoc_" + slot);
 
                     // Word comes ready-made from the PLC (direct bind); only its colour needs the
@@ -1271,12 +1277,12 @@ namespace ValveDemoHmiBuilder
             BuildHomeHeader(sc);
             BuildNav(sc, "Screen_Diagnostics");
 
+            // Table now spans the screen's full width - the commissioning counts moved out of a
+            // right-hand column into the bottom strip below, next to the page/jump controls, to
+            // free that width for the client's 5 schedule columns.
             const int px = 16, py = 198, pw = 1888, ph = 760;
-            const int summaryW = 300, gap = 16;
-            int tableW = pw - summaryW - gap;
-            int summaryX = px + tableW + gap;
-            BuildConfigTable(sc, px, py, tableW, ph);
-            BuildConfigSummaryPanel(sc, summaryX, py, summaryW, ph);
+            BuildConfigTable(sc, px, py, pw, ph);
+            BuildConfigSummaryBar(sc, 1104, 966, 800, 92);
 
             // ── Control bar row 1: page nav, live PAGE label, GO TO VALVE# jump ──
             const int pbW = 95, pbY = py + ph + 12;
@@ -1354,28 +1360,30 @@ namespace ValveDemoHmiBuilder
             const int colHdrH = 28;
             int rowH = (ph - 38 - colHdrH - 8) / CFG_ROWS_PER_PAGE;
 
-            // v3 columns: TAG folded into the NAME cell (e.g. "CM-29 — Bilge Suction Valve")
-            // instead of its own column. ZONE re-added (v3.1) after live testing showed rows with
-            // no Name set read as context-less without it - re-uses the Cfg_TblZone_slot tag, which
-            // was never removed from CreateSummaryHmiTags, only unbound from the table. Frees width
-            // still went to a much larger ENABLE/DISABLE touch target vs. the pre-redesign version,
-            // since it's the row's only interactive element now (no more invisible row-tap area).
-            const int zoneW = 130, nameW = 460, locW = 380, statusW = 160, cfgW = 260, pad = 16;
-            const int tagSubW = 76, dashSubW = 18;
+            // v4 columns mirror the client's own valve-schedule format exactly - CM No / Valve Tag /
+            // System / Location / Function - so a row on screen can be checked line-for-line against
+            // the sheet they issue. Replaces v3.1's ZONE + folded TAG-NAME pair: both of those were
+            // derived from the array index, which the real schedule disproves (CM numbers have gaps
+            // and run past 88, and a valve's system is schedule data, not an index range).
+            const int cmW = 110, vtagW = 210, sysW = 190, locW = 400, funcW = 370, statusW = 170, cfgW = 270, pad = 16;
 
             int bodyTop = py + 38 + 2 + colHdrH + 4;
             MakeRect(sc, "CfgTbl_HdrBand", px + 1, py + 38, pw - 2, colHdrH + 6, M_HDRBAND, M_HDRBAND, 0);
 
             int cx0 = px + 16;
             int hy = py + 38 + 2;
-            int hxName = cx0 + zoneW + pad;
-            int hxLoc = hxName + nameW + pad;
-            int hxStatus = hxLoc + locW + pad;
-            int hxCfg = hxStatus + statusW + pad;
+            int hxVTag   = cx0 + cmW + pad;
+            int hxSys    = hxVTag + vtagW + pad;
+            int hxLoc    = hxSys + sysW + pad;
+            int hxFunc   = hxLoc + locW + pad;
+            int hxStatus = hxFunc + funcW + pad;
+            int hxCfg    = hxStatus + statusW + pad;
 
-            MakeTb(sc, "CfgTbl_H_Zone",   cx0,      hy, zoneW,   colHdrH, "ZONE",              M_TRANS, M_MUTED, 0, "Center", 13, true);
-            MakeTb(sc, "CfgTbl_H_Name",   hxName,   hy, nameW,   colHdrH, "NAME",              M_TRANS, M_MUTED, 0, "Left",   13, true);
-            MakeTb(sc, "CfgTbl_H_Loc",    hxLoc,    hy, locW,    colHdrH, "LOCATION",          M_TRANS, M_MUTED, 0, "Center", 13, true);
+            MakeTb(sc, "CfgTbl_H_CmNo",   cx0,      hy, cmW,     colHdrH, "CM NO",             M_TRANS, M_MUTED, 0, "Left",   13, true);
+            MakeTb(sc, "CfgTbl_H_VTag",   hxVTag,   hy, vtagW,   colHdrH, "VALVE TAG",         M_TRANS, M_MUTED, 0, "Left",   13, true);
+            MakeTb(sc, "CfgTbl_H_Sys",    hxSys,    hy, sysW,    colHdrH, "SYSTEM",            M_TRANS, M_MUTED, 0, "Left",   13, true);
+            MakeTb(sc, "CfgTbl_H_Loc",    hxLoc,    hy, locW,    colHdrH, "LOCATION",          M_TRANS, M_MUTED, 0, "Left",   13, true);
+            MakeTb(sc, "CfgTbl_H_Func",   hxFunc,   hy, funcW,   colHdrH, "FUNCTION",          M_TRANS, M_MUTED, 0, "Left",   13, true);
             MakeTb(sc, "CfgTbl_H_Status", hxStatus, hy, statusW, colHdrH, "STATUS",            M_TRANS, M_MUTED, 0, "Center", 13, true);
             MakeTb(sc, "CfgTbl_H_Cfg",    hxCfg,    hy, cfgW,    colHdrH, "ENABLE / DISABLE",  M_TRANS, M_MUTED, 0, "Center", 13, true);
 
@@ -1389,18 +1397,23 @@ namespace ValveDemoHmiBuilder
                 if (r % 2 == 1)
                     MakeRect(sc, "CfgTr_Zeb" + sfx, cx0 - 6, rY, rowW, rowH, M_ZEBRA, M_ZEBRA, 0);
 
-                var zoneVal = MakeLiveText(sc, "CfgTr_Zone" + sfx, cx0, rY, zoneW, rowH, M_MUTED, "Center", 12, false);
-                DynTag(zoneVal, "Text", "Cfg_TblZone_" + slot);
-
-                var tagTb = MakeTb(sc, "CfgTr_Tag" + sfx, hxName, rY, tagSubW, rowH, "", M_TRANS, M_ACCENT, 0, "Left", 14, true);
-                DynTag(tagTb, "Text", "Cfg_TblTag_" + slot);
-                MakeTb(sc, "CfgTr_Dash" + sfx, hxName + tagSubW, rY, dashSubW, rowH, "&#x2014;", M_TRANS, M_MUTED, 0, "Left", 14, false);
-                int nameSubX = hxName + tagSubW + dashSubW + 8;
-                var nameVal = MakeLiveText(sc, "CfgTr_Name" + sfx, nameSubX, rY, nameW - (nameSubX - hxName), rowH, M_TEXT, "Left", 14, false);
-                DynTag(nameVal, "Text", "Cfg_TblName_" + slot);
-
-                var locVal = MakeLiveText(sc, "CfgTr_Loc" + sfx, hxLoc, rY, locW, rowH, M_MUTED, "Center", 13, false);
+                // Text columns are HmiTextBox, not MakeLiveText's HmiButton: HmiButton exposes NO
+                // alignment property at all (confirmed by reflection - only Authorization), so its
+                // text is permanently centred and MakeLiveText's align argument is silently
+                // discarded by SetProp. That mismatched these left-aligned headers. A plain
+                // DynTag on a TextBox's Text is already proven in this project (the previous
+                // layout's TAG sub-column did exactly this); only ScriptDynamization needs a button.
+                var cmVal = MakeTb(sc, "CfgTr_CmNo" + sfx, cx0, rY, cmW, rowH, "", M_TRANS, M_ACCENT, 0, "Left", 14, true);
+                DynTag(cmVal, "Text", "Cfg_TblCmNo_" + slot);
+                var vtagVal = MakeTb(sc, "CfgTr_VTag" + sfx, hxVTag, rY, vtagW, rowH, "", M_TRANS, M_TEXT, 0, "Left", 14, false);
+                DynTag(vtagVal, "Text", "Cfg_TblVTag_" + slot);
+                var sysVal = MakeTb(sc, "CfgTr_Sys" + sfx, hxSys, rY, sysW, rowH, "", M_TRANS, M_MUTED, 0, "Left", 13, false);
+                DynTag(sysVal, "Text", "Cfg_TblSys_" + slot);
+                var locVal = MakeTb(sc, "CfgTr_Loc" + sfx, hxLoc, rY, locW, rowH, "", M_TRANS, M_MUTED, 0, "Left", 13, false);
                 DynTag(locVal, "Text", "Cfg_TblLoc_" + slot);
+                var funcVal = MakeTb(sc, "CfgTr_Func" + sfx, hxFunc, rY, funcW, rowH, "", M_TRANS, M_MUTED, 0, "Left", 13, false);
+                DynTag(funcVal, "Text", "Cfg_TblFunc_" + slot);
+
                 var statusVal = MakeLiveText(sc, "CfgTr_Status" + sfx, hxStatus, rY, statusW, rowH, M_MUTED, "Center", 13, true);
                 DynTag(statusVal, "Text", "Cfg_TblStateTxt_" + slot);
                 AddValueMap(DynTag(statusVal, "ForeColor", "Cfg_TblState_" + slot), TBL_CODES, TBL_COLORS);
@@ -1412,38 +1425,37 @@ namespace ValveDemoHmiBuilder
             }
         }
 
-        // ── COMMISSIONING STATUS panel — sits to the right of the Configuration table ───────────
-        // Replaces the old single inline "X / 88 CONFIGURED" count in the control bar. Reuses the
-        // per-zone summary tags FB_ValveLoop already maintains (Valves_DB_AftConfigured etc. -
-        // built for Screen_Home's zone captions) so this costs zero new PLC data.
-        static void BuildConfigSummaryPanel(HmiScreen sc, int px, int py, int pw, int ph)
+        // ── COMMISSIONING STATUS strip — bottom-right, alongside the page/jump controls ─────────
+        // Was a full-height panel down the right side; moved here (v4) so the valve table can use
+        // the screen's full width for the client's 5 schedule columns. Same four counts, laid out
+        // horizontally instead of stacked. Reuses the per-zone summary tags FB_ValveLoop already
+        // maintains (Valves_DB_AftConfigured etc. - built for Screen_Home's zone captions) so this
+        // costs zero new PLC data.
+        static void BuildConfigSummaryBar(HmiScreen sc, int px, int py, int pw, int ph)
         {
             MakePanel(sc, "CfgSum_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
-            MakeRect(sc, "CfgSum_Hdr", px, py, pw, 38, M_HDR, M_HDR, 0);
-            MakeTb(sc, "CfgSum_Ttl", px + 14, py + 6, pw - 28, 26, "COMMISSIONING STATUS", M_TRANS, M_HDRTXT, 0, "Center", 15, true);
 
-            int totY = py + 38 + 34;
-            var totVal = MakeLiveText(sc, "CfgSum_TotalVal", px, totY, pw, 70, M_GREEN, "Center", 56, true);
+            // Plant-wide total, sized up as the headline figure of the strip.
+            MakeTb(sc, "CfgSum_TotalLbl", px + 18, py + 10, 190, 18, "TOTAL CONFIGURED", M_TRANS, M_MUTED, 0, "Left", 11, true);
+            var totVal = MakeLiveText(sc, "CfgSum_TotalVal", px + 18, py + 28, 84, 46, M_GREEN, "Left", 32, true);
             DynTag(totVal, "Text", "Valves_DB_TotalConfigured");
-            MakeTb(sc, "CfgSum_TotalOf", px, totY + 66, pw, 26, "/ 88 CONFIGURED", M_TRANS, M_MUTED, 0, "Center", 14, false);
+            MakeTb(sc, "CfgSum_TotalOf", px + 104, py + 40, 90, 30, "/ 88", M_TRANS, M_MUTED, 0, "Left", 17, false);
 
-            int divY = totY + 66 + 34;
-            MakeRect(sc, "CfgSum_Div1", px + 20, divY, pw - 40, 2, M_LINE, M_LINE, 0);
+            MakeRect(sc, "CfgSum_DivMain", px + 215, py + 14, 1, ph - 28, M_LINE, M_LINE, 0);
 
             string[] zoneLabel = { "AFT BALLAST", "BILGE / ER", "FWD BALLAST" };
             string[] zoneTag   = { "Valves_DB_AftConfigured", "Valves_DB_ErConfigured", "Valves_DB_FwdConfigured" };
             int[] zoneMax      = { 28, 28, 32 };
 
-            int zoneY0 = divY + 26;
-            const int zoneRowH = 74;
+            const int zx0 = 238, zw = 184;
             for (int i = 0; i < 3; i++) {
-                int zy = zoneY0 + i * zoneRowH;
-                MakeTb(sc, "CfgSum_ZLbl" + i, px + 20, zy, pw - 40, 22, zoneLabel[i], M_TRANS, M_MUTED, 0, "Left", 13, false);
-                var zVal = MakeLiveText(sc, "CfgSum_ZVal" + i, px + 20, zy + 24, 60, 32, M_TEXT, "Left", 24, true);
+                int zx = px + zx0 + i * zw;
+                MakeTb(sc, "CfgSum_ZLbl" + i, zx, py + 10, zw - 12, 18, zoneLabel[i], M_TRANS, M_MUTED, 0, "Left", 11, true);
+                var zVal = MakeLiveText(sc, "CfgSum_ZVal" + i, zx, py + 30, 56, 40, M_TEXT, "Left", 24, true);
                 DynTag(zVal, "Text", zoneTag[i]);
-                MakeTb(sc, "CfgSum_ZOf" + i, px + 84, zy + 24, 100, 32, "/ " + zoneMax[i], M_TRANS, M_MUTED, 0, "Left", 16, false);
+                MakeTb(sc, "CfgSum_ZOf" + i, zx + 58, py + 40, 80, 30, "/ " + zoneMax[i], M_TRANS, M_MUTED, 0, "Left", 15, false);
                 if (i < 2)
-                    MakeRect(sc, "CfgSum_ZDiv" + i, px + 20, zy + zoneRowH - 12, pw - 40, 1, M_LINE, M_LINE, 0);
+                    MakeRect(sc, "CfgSum_ZDiv" + i, zx + zw - 10, py + 14, 1, ph - 28, M_LINE, M_LINE, 0);
             }
         }
 

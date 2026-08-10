@@ -77,6 +77,9 @@ namespace ValveDemoHmiBuilder
         private static readonly Color COLOR_FAIL = Color.FromArgb(255, 231, 76,  60);
         private static readonly Color COLOR_OK   = Color.FromArgb(255,  46, 125, 50);
         private static readonly Color BORDER     = Color.FromArgb(255, 53,  60,  78);
+        // Dimmed caption colour for the popup's identity-card field labels, so the labels read as
+        // subordinate to the values they describe rather than competing with them.
+        private static readonly Color TXT_MUTED  = Color.FromArgb(255, 142, 148, 160);
 
         private static Assembly ResolveAssembly(object sender, ResolveEventArgs args)
         {
@@ -363,12 +366,17 @@ namespace ValveDemoHmiBuilder
         {
             HmiScreen sc = RecreateScreen(hmi, "Screen_Popup");
             if (sc == null) return;
+            // 400 tall, was 360: the old single status line became a 2x2 identity card carrying
+            // the client's schedule fields (Valve Tag / System / Location / Function), which needs
+            // ~76px instead of 40. Everything below shifted down 40px to match. Growing the popup
+            // was preferred over shrinking the status circle - that circle is the main
+            // at-a-glance indicator and shouldn't lose prominence to make room for reference data.
             SetPropUInt(sc, "Width", (uint)SX(460));
-            SetPropUInt(sc, "Height", (uint)SY(360));
+            SetPropUInt(sc, "Height", (uint)SY(400));
             sc.BackColor = BG_DARK;
 
             // Outer canvas
-            MakeRect(sc, "Pop_BG", 0, 0, 460, 360, BG_DARK, BORDER, 2);
+            MakeRect(sc, "Pop_BG", 0, 0, 460, 400, BG_DARK, BORDER, 2);
 
             // ─── HEADER (Y=0..38): Dark bar + Centered Valve Name ─────────
             MakeRect(sc, "Pop_Header", 0, 0, 460, 38, BG_HEADER, BORDER, 1);
@@ -386,74 +394,62 @@ namespace ValveDemoHmiBuilder
                 var tDyn = titleIO.Dynamizations.Create<ScriptDynamization>("ProcessValue");
                 tDyn.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let num = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "return \"VALVE V-\" + num + \" — CONTROL PANEL\";";
+                    // Titles by the client's CM number, not the array slot: the two are NOT the
+                    // same. Their schedule skips numbers (no CM22, no CM73-76) and runs to CM97,
+                    // so slot and CM number only coincide for the first 21 valves and drift apart
+                    // after that. Falls back to the slot when CmNo is still blank (the whole fleet,
+                    // until the confirmed schedule is entered) so the header never renders empty,
+                    // and says so explicitly rather than showing a slot number that could be
+                    // mistaken for a CM number.
+                    "let idx = readTag(Tags(\"SelectedValve\").Read()) || 1;\n" +
+                    "let vTag = \"V\" + (\"000\" + idx).slice(-3);\n" +
+                    "let cm = readTag(Tags(vTag + \"_CmNo\").Read());\n" +
+                    "if (cm && cm !== \"\") return cm + \" — CONTROL PANEL\";\n" +
+                    "return \"VALVE \" + idx + \" (NO CM TAG) — CONTROL PANEL\";";
                 tDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
-            // ─── STATUS CARD (Y=46..86): Text only ─────────────
-            MakeRect(sc, "Pop_StatusCard", 15, 46, 430, 40, BG_CARD, BORDER, 1);
+            // ─── IDENTITY CARD (Y=46..122): the client's schedule fields ─────────────
+            // Replaces the old one-line "V-001 | STATE | HEALTH | MODE" strip. Two of those four
+            // were pure duplication (the valve number repeats the title; the state repeats the big
+            // circle and its label below), but HEALTH and MODE appeared nowhere else on the popup,
+            // so they moved down onto the state label rather than being dropped - MODE especially,
+            // since the client explicitly asked that a valve in manual mode reads on screen as not
+            // remotely operable. The freed space now carries the reference data an operator
+            // actually can't get anywhere else on this popup.
+            MakeRect(sc, "Pop_MetaCard", 15, 46, 430, 76, BG_CARD, BORDER, 1);
 
-            var statusIO = sc.ScreenItems.Create<HmiIOField>("Pop_StatusText");
-            statusIO.Left = SX(20); statusIO.Top = SY(50); statusIO.Width = (uint)SX(420); statusIO.Height = (uint)SY(32);
-            statusIO.BackColor = BG_CARD; statusIO.ForeColor = Color.White;
-            statusIO.BorderColor = BG_CARD; statusIO.BorderWidth = 0;
-            SetPropEnum(statusIO, "IOFieldType", "Output");
-            SetMLText(statusIO, "Text", "V-001  |  INITIALIZING  |  N/A  |  AUTO");
-            try {
-                var sDyn = statusIO.Dynamizations.Create<ScriptDynamization>("ProcessValue");
-                sDyn.ScriptCode =
-                    // Reads the same "_State" tag (Valves_DB.StateCode[i]) every other screen uses,
-                    // instead of independently recomputing MOVING/FAULT/etc. from raw feedbacks here.
-                    // That second copy of the logic never included the C/D timeout latches, let alone
-                    // the later UnexpMove/Loss-of-Position conditions, and had silently drifted out
-                    // of sync with StateCode's real priority chain (0=UNCONFIGURED 1=FAULT 2=LOCAL
-                    // 3=OPEN 4=CLOSED 5=MOVING) - one source of truth now, not two.
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let vTag = \"V\" + vNum;\n" +
-                    "let code = readTag(Tags(vTag + \"_State\").Read());\n" +
-                    "let healthy = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
-                    "let local   = readTag(Tags(vTag + \"_LocalMode\").Read());\n\n" +
-                    "let stNames = [\"UNCONFIGURED\", \"FAULT\", \"LOCAL MODE\", \"OPEN\", \"CLOSED\", \"MOVING\"];\n" +
-                    "let st = stNames[code] || \"MOVING\";\n" +
-                    "let hl = (code === 0) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
-                    "let md = local ? \"LOCAL\" : \"AUTO\";\n" +
-                    "return \"V-\" + vNum + \"  |  \" + st + \"  |  \" + hl + \"  |  MODE: \" + md;";
-                // T500ms, not AutomaticTags: this reads a DYNAMICALLY computed tag name
-                // (vTag + "_State", where vTag depends on SelectedValve's current value) rather
-                // than a fixed literal tag - reopening the same popup instance for a different
-                // valve didn't reliably re-trigger AutomaticTags's dependency tracking, leaving
-                // the previous valve's stale status on screen (confirmed live: V-004 shown OPEN
-                // elsewhere, popup still showed CLOSED). A light 500ms poll on 3 elements costs
-                // nothing next to the ~126-element T100ms problem this session already fixed
-                // elsewhere, and guarantees correctness on every popup open regardless of trigger
-                // edge cases.
-                sDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
-            } catch {}
+            string[] metaLabels  = { "VALVE TAG", "SYSTEM", "LOCATION", "FUNCTION" };
+            string[] metaSuffix  = { "VTag",      "Sys",    "Location", "Func"     };
+            for (int m = 0; m < 4; m++) {
+                int mx = 25 + (m % 2) * 215;
+                int my = 52 + (m / 2) * 36;
+                MakeTb(sc, "Pop_MetaLbl" + m, mx, my, 200, 14, metaLabels[m], BG_CARD, TXT_MUTED, 0, "Left", 9, true);
+                PopMetaField(sc, "Pop_MetaVal" + m, mx, my + 14, 200, 20, metaSuffix[m]);
+            }
 
-            // ─── OPEN / CLOSE Buttons (Y=96..144) ─────────────────────────────────
+            // ─── OPEN / CLOSE Buttons (Y=136..184) ─────────────────────────────────
             var btnOpen = sc.ScreenItems.Create<HmiButton>("Btn_Open");
-            btnOpen.Left = SX(20); btnOpen.Top = SY(96); btnOpen.Width = (uint)SX(200); btnOpen.Height = (uint)SY(48);
+            btnOpen.Left = SX(20); btnOpen.Top = SY(136); btnOpen.Width = (uint)SX(200); btnOpen.Height = (uint)SY(48);
             btnOpen.BackColor = Color.FromArgb(255, 16, 185, 129); btnOpen.ForeColor = Color.White;
             btnOpen.BorderColor = Color.FromArgb(255, 52, 211, 153); btnOpen.BorderWidth = 2;
             SetMLText(btnOpen, "Text", "▲ OPEN VALVE");
             SetStr(btnOpen, "Authorization", "Operate");
             AddPopupActionButton(btnOpen, "OpenCmd");
+            AddRemoteLockStyling(btnOpen, 0xFF10B981);
 
             var btnClose = sc.ScreenItems.Create<HmiButton>("Btn_Close");
-            btnClose.Left = SX(240); btnClose.Top = SY(96); btnClose.Width = (uint)SX(200); btnClose.Height = (uint)SY(48);
+            btnClose.Left = SX(240); btnClose.Top = SY(136); btnClose.Width = (uint)SX(200); btnClose.Height = (uint)SY(48);
             btnClose.BackColor = Color.FromArgb(255, 55, 65, 81); btnClose.ForeColor = Color.White;
             btnClose.BorderColor = Color.FromArgb(255, 107, 114, 128); btnClose.BorderWidth = 2;
             SetMLText(btnClose, "Text", "▼ CLOSE VALVE");
             SetStr(btnClose, "Authorization", "Operate");
             AddPopupActionButton(btnClose, "CloseCmd");
+            AddRemoteLockStyling(btnClose, 0xFF374151);
 
-            // ─── Large Status Circle (Diameter=90, Y=155..245) ──
+            // ─── Large Status Circle (Diameter=90, Y=195..285) ──
             var dot = sc.ScreenItems.Create<HmiEllipse>("Pop_Dot");
-            dot.CenterX = SX(230); dot.CenterY = SY(200); dot.RadiusX = (uint)SX(45); dot.RadiusY = (uint)SY(45);
+            dot.CenterX = SX(230); dot.CenterY = SY(240); dot.RadiusX = (uint)SX(45); dot.RadiusY = (uint)SY(45);
             dot.BackColor = TEAL; dot.BorderColor = Color.White;
             try {
                 // Same fix as Pop_StatusText: read the single precomputed _State tag instead of an
@@ -478,9 +474,9 @@ namespace ValveDemoHmiBuilder
                 dotDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
 
-            // State label below big circle (Y=255..281)
+            // State label below big circle (Y=295..321)
             var stateLabel = sc.ScreenItems.Create<HmiIOField>("Pop_StateLabel");
-            stateLabel.Left = SX(30); stateLabel.Top = SY(255); stateLabel.Width = (uint)SX(400); stateLabel.Height = (uint)SY(26);
+            stateLabel.Left = SX(30); stateLabel.Top = SY(295); stateLabel.Width = (uint)SX(400); stateLabel.Height = (uint)SY(26);
             stateLabel.BackColor = BG_DARK; stateLabel.ForeColor = Color.White;
             stateLabel.BorderColor = BG_DARK; stateLabel.BorderWidth = 0;
             SetPropEnum(stateLabel, "IOFieldType", "Output");
@@ -494,14 +490,25 @@ namespace ValveDemoHmiBuilder
                     "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
                     "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
                     "let code = readTag(Tags(vTag + \"_State\").Read());\n" +
+                    "let healthy = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
+                    "let local   = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
                     "let names = [\"⬤  UNCONFIGURED\", \"⬤  FAULT\", \"⬤  LOCAL MODE\", \"⬤  FULLY OPEN\", \"⬤  FULLY CLOSED\", \"⬤  MOVING\"];\n" +
-                    "return names[code] || \"⬤  MOVING\";\n";
+                    // Health and mode moved here from the removed status strip - they were the only
+                    // two parts of it not already shown elsewhere on the popup, and mode belongs
+                    // next to live state anyway. MODE reads REMOTE/LOCAL rather than AUTO/LOCAL:
+                    // the client's requirement is that a valve in manual mode is visibly not
+                    // remotely operable, and "REMOTE" states that directly where "AUTO" implied
+                    // something about automatic sequencing that this system doesn't do.
+                    "let st = names[code] || \"⬤  MOVING\";\n" +
+                    "let hl = (code === 0) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
+                    "let md = local ? \"LOCAL — REMOTE LOCKED\" : \"REMOTE\";\n" +
+                    "return st + \"     ·     \" + hl + \"     ·     \" + md;\n";
                 slDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
             } catch {}
 
             // ─── RESET FAULT Button (Left=15, Y=292, Width=138, Height=46) ───────────
             var btnReset = sc.ScreenItems.Create<HmiButton>("Btn_Reset");
-            btnReset.Left = SX(15); btnReset.Top = SY(292); btnReset.Width = (uint)SX(138); btnReset.Height = (uint)SY(46);
+            btnReset.Left = SX(15); btnReset.Top = SY(332); btnReset.Width = (uint)SX(138); btnReset.Height = (uint)SY(46);
             btnReset.BackColor = Color.FromArgb(255, 194, 65, 12); btnReset.ForeColor = Color.White;
             btnReset.BorderColor = Color.FromArgb(255, 249, 115, 22); btnReset.BorderWidth = 2;
             SetMLText(btnReset, "Text", "⚡ RESET FAULT");
@@ -511,7 +518,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── SERVICE ON/OFF Toggle Switch (Left=160, Y=292, Width=138, Height=46) ──
             var btnService = sc.ScreenItems.Create<HmiButton>("Btn_Service");
-            btnService.Left = SX(160); btnService.Top = SY(292); btnService.Width = (uint)SX(138); btnService.Height = (uint)SY(46);
+            btnService.Left = SX(160); btnService.Top = SY(332); btnService.Width = (uint)SX(138); btnService.Height = (uint)SY(46);
             btnService.BackColor = Color.FromArgb(255, 58, 58, 60); btnService.ForeColor = Color.White;
             btnService.BorderColor = TEAL; btnService.BorderWidth = 2;
             SetMLText(btnService, "Text", "🛠️ SERVICE:  OFF");
@@ -546,7 +553,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── SIMULATE STUCK Toggle Switch (Left=305, Y=292, Width=140, Height=46) ──
             var btnStuck = sc.ScreenItems.Create<HmiButton>("Btn_Stuck");
-            btnStuck.Left = SX(305); btnStuck.Top = SY(292); btnStuck.Width = (uint)SX(140); btnStuck.Height = (uint)SY(46);
+            btnStuck.Left = SX(305); btnStuck.Top = SY(332); btnStuck.Width = (uint)SX(140); btnStuck.Height = (uint)SY(46);
             btnStuck.BackColor = Color.FromArgb(255, 58, 58, 60); btnStuck.ForeColor = Color.White;
             btnStuck.BorderColor = Color.FromArgb(255, 234, 179, 8); btnStuck.BorderWidth = 2;
             SetMLText(btnStuck, "Text", "⚠️ STUCK: OFF");
@@ -1047,8 +1054,9 @@ namespace ValveDemoHmiBuilder
                 int vIndex = int.Parse(vTag.Substring(1));
                 string vNum = string.Format("{0:D3}", vIndex);
                 // showHeader=false: we have a custom header with Btn_CloseX inside Screen_Popup.
-                // The 730/360 position centers the popup on its parent screen — originally computed
-                // for a 1920x1080 parent ((1920-460)/2=730, (1080-360)/2=360). Both the parent canvas
+                // The 730/340 position centers the popup on its parent screen — computed for a
+                // 1920x1080 parent ((1920-460)/2=730, (1080-400)/2=340; the Y moved from 360 when
+                // the popup grew from 360 to 400 tall for the identity card). Both the parent canvas
                 // and the popup's own size now scale by SX()/SY() (1366x768 target), so the position
                 // must scale the same way to stay centered instead of drifting toward one corner.
                 // Popup_Valve is meant to be freely retargetable: tapping a different valve tile
@@ -1060,7 +1068,7 @@ namespace ValveDemoHmiBuilder
                 // makes stacking structurally impossible without extra tracking.
                 string jsCode =
                     "Tags(\"SelectedValve\").Write(" + vIndex + ");\n" +
-                    "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", " + SX(730) + ", " + SY(360) + ", false);";
+                    "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", " + SX(730) + ", " + SY(340) + ", false);";
 
                 scp.SetValue(script, jsCode, null);
             } catch (Exception ex) {
@@ -1241,6 +1249,64 @@ namespace ValveDemoHmiBuilder
             } catch (Exception ex) {
                 Console.WriteLine("  [PLC] [ERROR] Could not verify/change CPU type: " + ex.Message);
             }
+        }
+
+        // Dims OPEN/CLOSE whenever the valve can't actually be driven from here - either it's in
+        // LOCAL mode (someone has taken hand control at the valve) or it isn't configured at all.
+        // The PLC already refuses those commands, but until now nothing on screen said so, and the
+        // buttons stayed fully lit and clickable. This is the visible half of the client's
+        // requirement that a valve in manual mode reads as not remotely operable.
+        // Colour only - the button stays clickable and the PLC interlock remains the real guard;
+        // the styling must never be mistaken for the safety mechanism.
+        static void AddRemoteLockStyling(HmiButton btn, uint activeBackColor)
+        {
+            string guard =
+                "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                "let idx = readTag(Tags(\"SelectedValve\").Read()) || 1;\n" +
+                "let vTag = \"V\" + (\"000\" + idx).slice(-3);\n" +
+                "let local = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
+                "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
+                "let locked = local || !cfg;\n";
+            try {
+                var bDyn = btn.Dynamizations.Create<ScriptDynamization>("BackColor");
+                bDyn.ScriptCode = guard + "return locked ? 0xFF2A2E38 : " + string.Format("0x{0:X8}", activeBackColor) + ";";
+                bDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+            } catch {}
+            try {
+                var fDyn = btn.Dynamizations.Create<ScriptDynamization>("ForeColor");
+                fDyn.ScriptCode = guard + "return locked ? 0xFF6B7280 : 0xFFFFFFFF;";
+                fDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+            } catch {}
+        }
+
+        // One value cell of the popup's identity card. Has to be an IOField driven by a
+        // ScriptDynamization rather than a plain tag bind, because the tag name isn't known at
+        // build time - it's derived per-read from whichever valve SelectedValve currently points at.
+        // Renders an em dash for an empty field so an un-entered value reads as deliberately blank
+        // instead of looking like the popup failed to load.
+        static void PopMetaField(HmiScreen sc, string name, int x, int y, int w, int h, string tagSuffix)
+        {
+            var f = sc.ScreenItems.Create<HmiIOField>(name);
+            f.Left = SX(x); f.Top = SY(y); f.Width = (uint)SX(w); f.Height = (uint)SY(h);
+            f.BackColor = BG_CARD; f.ForeColor = Color.White;
+            f.BorderColor = BG_CARD; f.BorderWidth = 0;
+            SetPropEnum(f, "IOFieldType", "Output");
+            SetPropEnum(f, "TextHorizontalAlignment", "Left");
+            SetFont(f, SFont(13), false);
+            SetMLText(f, "Text", "—");
+            try {
+                var d = f.Dynamizations.Create<ScriptDynamization>("ProcessValue");
+                d.ScriptCode =
+                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                    "let idx = readTag(Tags(\"SelectedValve\").Read()) || 1;\n" +
+                    "let vTag = \"V\" + (\"000\" + idx).slice(-3);\n" +
+                    "let s = readTag(Tags(vTag + \"_" + tagSuffix + "\").Read());\n" +
+                    "return (s === null || s === undefined || s === \"\") ? \"—\" : s;";
+                // T500ms for the same reason as the rest of this popup: the tag name is computed
+                // from SelectedValve, so AutomaticTags can't track the dependency reliably when the
+                // popup is retargeted at a different valve while already open.
+                d.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+            } catch {}
         }
 
         static void ImportPlcBlocks(Project project)
@@ -1508,6 +1574,13 @@ namespace ValveDemoHmiBuilder
                 // future zone screen (not just Bilge/ER) can reuse them without another pass.
                 CreateSummaryTag(hmi, vTag + "_Name",     "Valve_Meta_DB.Name[" + i + "]",     "String", forceRefreshNewTags);
                 CreateSummaryTag(hmi, vTag + "_Location", "Valve_Meta_DB.Location[" + i + "]", "String", forceRefreshNewTags);
+                // Client-schedule identity, per valve. The Configuration table reads its paged
+                // Cfg_Tbl* window instead, but the popup resolves its tag names at runtime from
+                // SelectedValve, so it needs a directly-addressable tag per valve.
+                CreateSummaryTag(hmi, vTag + "_CmNo", "Valve_Meta_DB.CmNo[" + i + "]",     "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_VTag", "Valve_Meta_DB.VTag[" + i + "]",     "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_Sys",  "Valve_Meta_DB.SysName[" + i + "]",  "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_Func", "Valve_Meta_DB.FuncName[" + i + "]", "String", forceRefreshNewTags);
             }
 
             // Configuration screen's global (all-88) paged window - same naming convention as the
@@ -1523,6 +1596,26 @@ namespace ValveDemoHmiBuilder
                 CreateSummaryTag(hmi, "Cfg_TblStateTxt_" + slot, "Valves_DB.CfgTblStateTxt[" + slot + "]", "String", forceRefreshNewTags);
                 CreateSummaryTag(hmi, "Cfg_TblName_" + slot, "Valve_Meta_DB.CfgTblName[" + slot + "]", "String", forceRefreshNewTags);
                 CreateSummaryTag(hmi, "Cfg_TblLoc_" + slot,  "Valve_Meta_DB.CfgTblLoc[" + slot + "]",  "String", forceRefreshNewTags);
+                // Client-schedule identity columns (CM No / Valve Tag / System / Function) - the
+                // format the client actually issues valve lists in. Cfg_TblTag_/Cfg_TblZone_ above
+                // are the older index-derived strings; the Configuration table binds these instead.
+                CreateSummaryTag(hmi, "Cfg_TblCmNo_" + slot, "Valve_Meta_DB.CfgTblCmNo[" + slot + "]", "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblVTag_" + slot, "Valve_Meta_DB.CfgTblVTag[" + slot + "]", "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblSys_" + slot,  "Valve_Meta_DB.CfgTblSys[" + slot + "]",  "String", forceRefreshNewTags);
+                CreateSummaryTag(hmi, "Cfg_TblFunc_" + slot, "Valve_Meta_DB.CfgTblFunc[" + slot + "]", "String", forceRefreshNewTags);
+            }
+
+            // Per-zone VALVE LIST identity columns. NOTE: the zone tables' other tags
+            // (Aft_TblNo_/_TblTag_/_TblName_/_TblLoc_/_TblState_/_TblStateTxt_) are bound by
+            // BuildValveTable but created nowhere in this generator - they exist in the live
+            // project from an earlier script. Only the two new ones are created here; the older
+            // set is left alone rather than re-registered, since re-pointing live, working tags
+            // is a real risk for no benefit while they resolve correctly.
+            foreach (var zp in new[] { "Aft", "Er", "Fwd" }) {
+                for (int slot = 1; slot <= 14; slot++) {
+                    CreateSummaryTag(hmi, zp + "_TblCmNo_" + slot, "Valve_Meta_DB." + zp + "TblCmNo[" + slot + "]", "String", forceRefreshNewTags);
+                    CreateSummaryTag(hmi, zp + "_TblVTag_" + slot, "Valve_Meta_DB." + zp + "TblVTag[" + slot + "]", "String", forceRefreshNewTags);
+                }
             }
 
             // Internal (no PLC binding) tags for the Configuration screen's features - jump

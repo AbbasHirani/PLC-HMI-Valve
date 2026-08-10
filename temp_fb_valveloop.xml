@@ -511,6 +511,8 @@
             END_IF;
             &quot;Valve_Meta_DB&quot;.AftTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
             &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            &quot;Valve_Meta_DB&quot;.AftTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+            &quot;Valve_Meta_DB&quot;.AftTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
             CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
                 0: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'UNCONFIGURED';
                 1: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'FAULT';
@@ -526,6 +528,8 @@
             &quot;Valves_DB&quot;.AftTblStateTxt[#j] := '';
             &quot;Valve_Meta_DB&quot;.AftTblName[#j] := '';
             &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := '';
+            &quot;Valve_Meta_DB&quot;.AftTblCmNo[#j] := '';
+            &quot;Valve_Meta_DB&quot;.AftTblVTag[#j] := '';
         END_IF;
     END_FOR;
 
@@ -539,6 +543,8 @@
             &quot;Valves_DB&quot;.ErTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
             &quot;Valve_Meta_DB&quot;.ErTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
             &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            &quot;Valve_Meta_DB&quot;.ErTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+            &quot;Valve_Meta_DB&quot;.ErTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
             CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
                 0: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'UNCONFIGURED';
                 1: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'FAULT';
@@ -554,6 +560,8 @@
             &quot;Valves_DB&quot;.ErTblStateTxt[#j] := '';
             &quot;Valve_Meta_DB&quot;.ErTblName[#j] := '';
             &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := '';
+            &quot;Valve_Meta_DB&quot;.ErTblCmNo[#j] := '';
+            &quot;Valve_Meta_DB&quot;.ErTblVTag[#j] := '';
         END_IF;
     END_FOR;
 
@@ -567,6 +575,8 @@
             &quot;Valves_DB&quot;.FwdTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
             &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
             &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            &quot;Valve_Meta_DB&quot;.FwdTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+            &quot;Valve_Meta_DB&quot;.FwdTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
             CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
                 0: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'UNCONFIGURED';
                 1: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'FAULT';
@@ -582,6 +592,8 @@
             &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := '';
             &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := '';
             &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := '';
+            &quot;Valve_Meta_DB&quot;.FwdTblCmNo[#j] := '';
+            &quot;Valve_Meta_DB&quot;.FwdTblVTag[#j] := '';
         END_IF;
     END_FOR;
 
@@ -607,6 +619,14 @@
             END_IF;
             &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
             &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+            // Client-schedule identity columns. Displayed verbatim - no fallback to the
+            // computed CmNo/zone strings above, because a blank here is meaningful: it means
+            // that valve has not been entered from the confirmed schedule yet, and showing a
+            // derived 'CM-07' in its place would misrepresent unentered data as real.
+            &quot;Valve_Meta_DB&quot;.CfgTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+            &quot;Valve_Meta_DB&quot;.CfgTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
+            &quot;Valve_Meta_DB&quot;.CfgTblSys[#j] := &quot;Valve_Meta_DB&quot;.SysName[#idx];
+            &quot;Valve_Meta_DB&quot;.CfgTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
             &quot;Valves_DB&quot;.CfgTblConfigured[#j] := &quot;Valves_DB&quot;.Valve[#idx].Configured;
             &quot;Valves_DB&quot;.CfgTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
             CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
@@ -623,6 +643,10 @@
             &quot;Valves_DB&quot;.CfgTblZone[#j] := '';
             &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := '';
             &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := '';
+            &quot;Valve_Meta_DB&quot;.CfgTblCmNo[#j] := '';
+            &quot;Valve_Meta_DB&quot;.CfgTblVTag[#j] := '';
+            &quot;Valve_Meta_DB&quot;.CfgTblSys[#j] := '';
+            &quot;Valve_Meta_DB&quot;.CfgTblFunc[#j] := '';
             &quot;Valves_DB&quot;.CfgTblConfigured[#j] := FALSE;
             &quot;Valves_DB&quot;.CfgTblState[#j] := 6;
             &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := '';
