@@ -318,34 +318,76 @@ namespace ValveDemoHmiBuilder
         // consistently instead of producing a screen with a mix of working and broken badges.
         static bool s_nativeBadgeOk = true;
 
+        // Same idea, for the badge's CM-number label text (no precedent elsewhere in this codebase
+        // of binding HmiButton.Text via native TagDynamization, unlike BackColor/ForeColor above —
+        // untested until a real build runs, so this flips to script for every badge on first failure.
+        static bool s_nativeBadgeTextOk = true;
+
         // State-code palette/labels, shared by every native mapping (same order and meaning as
         // STATE_COLOR_LOGIC / STATE_TEXT_LOGIC, which the Bilge table's script slots still use).
-        static readonly int[] STATE_CODES = { 0, 1, 2, 3, 4, 5 };
+        // Mimic/diagram boxes: FILL shows position, BORDER shows trouble. Splitting them means a
+        // faulted valve still says where it is — the same information loss the popup had, and it
+        // mattered more here because the mimic is what an operator scans first.
+        // Deliberately NOT a flashing script: 89 boxes re-evaluating on every 1Hz clock tick is
+        // real load on the Home screen, and native value maps cost nothing at runtime. It also
+        // keeps flashing available to mean "unacknowledged" later, which is the usual convention.
+        static readonly int[] POS_CODES = { 0, 3, 4, 5, 6, 7 };
+        static readonly object[] POS_COLORS = {
+            Color.FromArgb(255, 154, 163, 176), // 0 UNCONFIGURED
+            Color.FromArgb(255,   0, 158,  74), // 3 OPEN
+            Color.FromArgb(255,  96, 106, 122), // 4 CLOSED
+            Color.FromArgb(255,   0, 162, 255), // 5 NO POSITION
+            Color.FromArgb(255,   0, 162, 255), // 6 OPENING
+            Color.FromArgb(255,   0, 162, 255)  // 7 CLOSING
+        };
+        // Border keyed off StateCode, which is the one that DOES go to 1 on any fault.
+        static readonly int[] BORDER_CODES = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        static readonly object[] BORDER_COLORS = {
+            Color.FromArgb(255,  17,  17,  17), // 0 normal
+            Color.FromArgb(255, 235,  60,  48), // 1 FAULT  — red outline
+            Color.FromArgb(255, 226, 168,   0), // 2 LOCAL  — amber outline
+            Color.FromArgb(255,  17,  17,  17), // 3
+            Color.FromArgb(255,  17,  17,  17), // 4
+            Color.FromArgb(255,  17,  17,  17), // 5
+            Color.FromArgb(255,  17,  17,  17), // 6
+            Color.FromArgb(255,  17,  17,  17)  // 7
+        };
+
+        static readonly int[] STATE_CODES = { 0, 1, 2, 3, 4, 5, 6, 7 };
         static readonly object[] STATE_COLORS = {
             Color.FromArgb(255, 154, 163, 176), // 0 UNCONFIGURED
             Color.FromArgb(255, 205,  32,  38), // 1 FAULT
             Color.FromArgb(255, 226, 168,   0), // 2 LOCAL
             Color.FromArgb(255,   0, 158,  74), // 3 OPEN
             Color.FromArgb(255,  96, 106, 122), // 4 CLOSED
-            Color.FromArgb(255,   0, 162, 255)  // 5 MOVING
+            Color.FromArgb(255,   0, 162, 255), // 5 POSITION UNKNOWN
+            Color.FromArgb(255,   0, 162, 255), // 6 OPENING — one motion colour, not three
+            Color.FromArgb(255,   0, 162, 255)  // 7 CLOSING
         };
 
-        // Table variant adds code 6 = "no valve in this slot on this page" (a zone whose valve
+        // Table variant adds code 9 = "no valve in this slot on this page" (a zone whose valve
         // count isn't a multiple of 14 leaves the last page short), drawn in transparent ink so the
-        // row reads as blank. 6 rather than -1: negative codes are avoided since the mapping table
-        // is fussy about what it accepts, and there was no reason to risk it.
+        // row reads as blank. Positive rather than -1: negative codes are avoided since the mapping
+        // table is fussy about what it accepts, and there was no reason to risk it.
+        // It was 6 until 2026-08-16, when 6/7 became real StateCodes (OPENING/CLOSING) — the two
+        // shared this one value map, so an opening valve rendered its status text transparent.
+        // Moved to 9, which sits outside the StateCode range; keep it that way if more states appear.
         // There is deliberately no TBL_WORDS — a mapping table is rejected on a Text property
         // ("Creation of Tag dynamization entries is not allowed for this property"), so the status
-        // word is supplied ready-made by the PLC in <Zone>TblStateTxt and bound directly.
-        static readonly int[] TBL_CODES = { 0, 1, 2, 3, 4, 5, 6 };
+        // word is supplied ready-made by the PLC in <Zone>TblStateTxt and bound directly. That is
+        // also why OPENING/CLOSING needed no HMI change to appear in the list: the PLC writes the
+        // word, the HMI just displays it.
+        static readonly int[] TBL_CODES = { 0, 1, 2, 3, 4, 5, 6, 7, 9 };
         static readonly object[] TBL_COLORS = {
-            Color.FromArgb(255, 154, 163, 176),
-            Color.FromArgb(255, 205,  32,  38),
-            Color.FromArgb(255, 226, 168,   0),
-            Color.FromArgb(255,   0, 158,  74),
-            Color.FromArgb(255,  96, 106, 122),
-            Color.FromArgb(255,   0, 162, 255),
-            M_TRANS
+            Color.FromArgb(255, 154, 163, 176),   // 0 UNCONFIGURED
+            Color.FromArgb(255, 205,  32,  38),   // 1 FAULT
+            Color.FromArgb(255, 226, 168,   0),   // 2 LOCAL
+            Color.FromArgb(255,   0, 158,  74),   // 3 OPEN
+            Color.FromArgb(255,  96, 106, 122),   // 4 CLOSED
+            Color.FromArgb(255,   0, 162, 255),   // 5 POSITION UNKNOWN
+            Color.FromArgb(255,   0, 162, 255),   // 6 OPENING  — motion blue, same as 5/7
+            Color.FromArgb(255,   0, 162, 255),   // 7 CLOSING  — direction is carried by the word
+            M_TRANS                               // 9 empty slot
         };
 
         // Command buttons fill only in their own state; every other state has no entry, so the
@@ -412,10 +454,6 @@ namespace ValveDemoHmiBuilder
                 "return \"" + prefix + "\"+n;";
         }
 
-        // Display-only relabelling: operator sees the client CM number, but every PLC member, all
-        // HMI tags, and every script keep V001..V088 — nothing underneath changes.
-        static string Disp(int n) { return "CM-" + n.ToString("D2"); }
-
         // Build-time throttle on illustration badges (each costs 3 Openness items + a dynamization
         // + 6 mapping entries, and every one is a cross-process round-trip). The valve tables, KPI
         // panels and summaries are never capped — they read PLC-precomputed totals, so they always
@@ -426,6 +464,278 @@ namespace ValveDemoHmiBuilder
         // the layout is signed off — that is a deliberate, costly choice (Screen_Home alone is 88
         // badges), so it should be an explicit decision, not a default.
         const int ILLUSTRATION_VALVES_PER_ZONE = 4;
+
+        // ── BALLAST SYSTEM DIAGRAM SCREENS ────────────────────────────────────────────
+        // A dedicated screen per zone showing the real plan-view P&ID artwork (hull, tanks,
+        // ballast mains, every valve at its true position) as an imported SVG background,
+        // with one live overlay per valve on top of the drawing's own valve boxes.
+        //
+        // Why a whole screen instead of the zone screen's existing mimic strip: the artwork is
+        // 1760x700 (2.5:1) and the mimic slot is 1888x460 (4.1:1). Squeezing it in would scale
+        // the drawing to ~0.66 and drop its 10px labels to ~6.6px — unreadable on the panel.
+        // Given its own screen it sits at ~1.07 scale, so every CM tag, DN size and capacity
+        // stays legible at the size it was designed for.
+        //
+        // The SVG is a STATIC background: it draws the orange valve boxes, but knows nothing
+        // about live state. Each overlay below covers its box with a state-coloured square and
+        // a transparent hit target wired to the same popup every other valve control opens.
+        // ARTWORK COORDINATES BELOW MUST STAY IN SYNC WITH hmi_graphics/ballast_*.svg.
+        struct DiagValve
+        {
+            public string Cm;    // client CM number, for the item name only
+            public int Slot;     // absolute PLC slot -> V001..V096
+            public int Ax, Ay;   // centre of this valve's box, in ARTWORK coordinates
+            public DiagValve(string cm, int slot, int ax, int ay) { Cm = cm; Slot = slot; Ax = ax; Ay = ay; }
+        }
+
+        // AFT zone, slots 1..27, in "AFT zone1.png"'s own 1888x500 coordinates (placed 1:1, no
+        // scaling). Slot order is the client's schedule order (CM25, CM26, CM50, CM51 ...), NOT
+        // sorted by CM number; see Valve_Meta_DB.
+        //
+        // Coordinates are MEASURED, not estimated: DetectBoxes.exe scans the PNG for the grey valve
+        // squares and reports each centre, and the printed CM labels were read off 2.4x crops and
+        // matched to those centres one by one. Re-run DetectBoxes.exe rather than eyeballing if the
+        // artwork is ever re-exported. All 23 printed labels resolved; every one cross-checks as
+        // System = "Ballast Aft" in Annex_B_IO_List_Full_Mapped.xlsx, and each sits at the location
+        // its schedule row claims (aft-peak group at the aft peak, pump/cross-line group in the ER,
+        // DB-tank group at TK7 DB).
+        //
+        // The four marked ASSIGNED below are drawn as untagged placeholder boxes in the artwork -
+        // the client has not confirmed them (CM80/CM85 are two of the seven outstanding). They are
+        // placed on the untagged box that best matches their schedule Location so the zone is fully
+        // operable for testing; the artwork must be re-exported with real labels once confirmed.
+        // Five untagged boxes are deliberately left with no overlay: they are almost certainly the
+        // "Cross-over manifold" group (CM86-CM90), which the schedule files under Ballast *Fwd*
+        // despite sitting physically here at ~Fr 128. See handoff item 19.
+        static readonly DiagValve[] AFT_DIAGRAM = {
+            new DiagValve("CM52",  5,  145, 114),   // Aft peak      (P)
+            new DiagValve("CM53",  6,  145, 188),   // Aft peak P    tank suction
+            new DiagValve("CM51",  4,  134, 243),   // Aft peak      (C)
+            new DiagValve("CM54",  7,  144, 304),   // Aft peak S    tank suction
+            new DiagValve("CM50",  3,  144, 375),   // Main line     isolation
+
+            new DiagValve("CM71", 18,  356,  84),   // ER  main line     distribution
+            new DiagValve("CM85", 27,  299, 126),   // ER  cross line    isolation      [ASSIGNED]
+            new DiagValve("CM67", 14,  413, 126),   // ER  cross line    isolation
+            new DiagValve("CM78", 20,  572, 126),   // ER  pump 1        discharge
+            new DiagValve("CM83", 25,  681,  83),   // ER  tank branch   isolation
+            new DiagValve("CM79", 21,  681, 132),   // ER  bilge tie     cross connect
+            new DiagValve("CM80", 22,  751, 200),   // ER  bilge tie     isolation      [ASSIGNED]
+            new DiagValve("CM68", 15,  299, 189),   // ER  cross line    isolation
+            new DiagValve("CM72", 19,  356, 341),   // ER  pump 2        suction
+            new DiagValve("CM70", 17,  299, 383),   // ER  pump 2        isolation
+            new DiagValve("CM69", 16,  413, 383),   // ER  pump 2        isolation
+            new DiagValve("CM81", 23,  569, 383),   // ER  pump 2 disch  isolation
+            new DiagValve("CM82", 24,  674, 383),   // ER  pump 2 disch  isolation
+            new DiagValve("CM84", 26,  673, 435),   // ER  main line     isolation
+
+            new DiagValve("CM25",  1, 1089, 183),   // TK7 DB   P  filling
+            new DiagValve("CM59", 12, 1341, 122),   // TK7 DB   P  suction
+            new DiagValve("CM26",  2, 1089, 300),   // TK7 DB   S  suction
+            new DiagValve("CM60", 13, 1299, 366),   // TK7 DB   S  filling
+            new DiagValve("CM55",  8, 1419, 126),   // DB tank     filling
+            new DiagValve("CM56",  9, 1420, 356),   // DB tank     suction
+            new DiagValve("CM57", 10, 1632, 176),   // DB tank     suction        [ASSIGNED]
+            new DiagValve("CM58", 11, 1603, 303),   // DB tank     filling        [ASSIGNED]
+        };
+
+        // FWD zone, slots 55..89, in "FWD Zone1.png"'s own 1888x500 coordinates.
+        // Every box in this artwork is a "CM00" placeholder - the client has confirmed no forward
+        // numbering yet - so slots are assigned in the artwork's own reading order (top-to-bottom,
+        // left-to-right, exactly as DetectBoxes.exe emits them) against the schedule's slot order.
+        // That mapping is ARBITRARY BUT STABLE: it makes every forward valve reachable and testable
+        // now, and has to be redone against real labels once the client confirms. Do not treat the
+        // pairing of a CM number to a position here as meaningful.
+        //
+        // The artwork has 32 boxes for 35 forward valves, so the last three (CM88/CM89/CM90) have
+        // nowhere to sit and are parked bottom-right, on request, rather than being dropped - an
+        // unreachable valve is worse than an oddly-placed one. See handoff item 19: the shortfall
+        // is a schedule/drawing reconciliation problem, not a drawing error.
+        static readonly DiagValve[] FWD_DIAGRAM = {
+            new DiagValve("CM27", 55,  452, 125),  new DiagValve("CM28", 56,  550, 120),
+            new DiagValve("CM29", 57,  742, 130),  new DiagValve("CM30", 58,  116, 180),
+            new DiagValve("CM31", 59,  178, 180),  new DiagValve("CM32", 60,  604, 179),
+            new DiagValve("CM33", 61,  863, 180),  new DiagValve("CM34", 62, 1147, 180),
+            new DiagValve("CM35", 63, 1355, 206),  new DiagValve("CM36", 64,  926, 249),
+            new DiagValve("CM37", 65,  977, 234),  new DiagValve("CM38", 66, 1028, 234),
+            new DiagValve("CM39", 67, 1079, 253),  new DiagValve("CM40", 68, 1210, 250),
+            new DiagValve("CM41", 69, 1261, 234),  new DiagValve("CM42", 70, 1315, 233),
+            new DiagValve("CM43", 71, 1356, 243),  new DiagValve("CM44", 72, 1730, 242),
+            new DiagValve("CM45", 73,  116, 306),  new DiagValve("CM46", 74,  178, 306),
+            new DiagValve("CM47", 75,  604, 306),  new DiagValve("CM48", 76,  863, 305),
+            new DiagValve("CM49", 77, 1147, 305),  new DiagValve("CM61", 78, 1355, 281),
+            new DiagValve("CM62", 79,  240, 358),  new DiagValve("CM63", 80,  293, 358),
+            new DiagValve("CM64", 81,  346, 358),  new DiagValve("CM65", 82,  399, 358),
+            new DiagValve("CM66", 83,  485, 358),  new DiagValve("CM77", 84,  651, 345),
+            new DiagValve("CM86", 85,  711, 370),  new DiagValve("CM87", 86,  772, 345),
+            // No box in the artwork for these three - parked bottom-right so they stay operable.
+            new DiagValve("CM88", 87, 1706, 455),  new DiagValve("CM89", 88, 1766, 455),
+            new DiagValve("CM90", 89, 1826, 455),
+        };
+
+        // HOME overview, all 89 slots, in "Full.png"'s own 1888x584 coordinates. Boxes here are
+        // 20px, not 30 - the whole vessel is compressed onto one sheet.
+        //
+        // Full.png is NOT a composite of the two zone drawings: it carries 45 boxes aft of Fr 128
+        // and 19 forward, where the zone sheets carry 32 and 32. The three drawings do not agree
+        // with each other, so no attempt is made to keep a valve at the "same" spot on Home as on
+        // its zone screen - that correspondence does not exist to preserve.
+        //
+        // What IS meaningful here is the hull split: boxes are sorted by x and the 27 sternmost go
+        // to the AFT slots, the next 35 to FWD. That lands AFT at x=100..929 (aft peak, ER, TK7)
+        // and FWD at x=958..1655, which matches the vessel. Within each group the pairing of a CM
+        // number to a box is arbitrary - every label in this artwork reads "CM00" - and must be
+        // redone once the client confirms numbering. Two boxes are left spare.
+        //
+        // The 27 Bilge valves have no artwork at all yet, so they are parked in a 6x5 grid bottom
+        // right rather than dropped: an unreachable valve is worse than an oddly-placed one, and
+        // Home is the only screen that offers a whole-vessel view.
+        static readonly DiagValve[] HOME_DIAGRAM = {
+            new DiagValve("CM25", 1,  100, 144),   new DiagValve("CM26", 2,  100, 217),
+            new DiagValve("CM50", 3,  100, 272),   new DiagValve("CM51", 4,  100, 334),
+            new DiagValve("CM52", 5,  100, 405),   new DiagValve("CM53", 6,  196, 156),
+            new DiagValve("CM54", 7,  196, 219),   new DiagValve("CM55", 8,  196, 413),
+            new DiagValve("CM56", 9,  227, 127),   new DiagValve("CM57", 10, 227, 388),
+            new DiagValve("CM58", 11, 258, 156),   new DiagValve("CM59", 12, 258, 413),
+            new DiagValve("CM60", 13, 338, 156),   new DiagValve("CM67", 14, 338, 413),
+            new DiagValve("CM68", 15, 370, 388),   new DiagValve("CM69", 16, 397, 109),
+            new DiagValve("CM70", 17, 397, 156),   new DiagValve("CM71", 18, 401, 413),
+            new DiagValve("CM72", 19, 401, 464),   new DiagValve("CM78", 20, 443, 230),
+            new DiagValve("CM79", 21, 638, 214),   new DiagValve("CM80", 22, 638, 331),
+            new DiagValve("CM81", 23, 764, 402),   new DiagValve("CM82", 24, 792, 144),
+            new DiagValve("CM83", 25, 846, 144),   new DiagValve("CM84", 26, 846, 402),
+            new DiagValve("CM85", 27, 929, 336),
+
+            new DiagValve("CM27", 55,  958, 198),  new DiagValve("CM28", 56, 1008, 198),
+            new DiagValve("CM29", 57, 1008, 346),  new DiagValve("CM30", 58, 1051, 271),
+            new DiagValve("CM31", 59, 1075, 271),  new DiagValve("CM32", 60, 1103, 209),
+            new DiagValve("CM33", 61, 1103, 332),  new DiagValve("CM34", 62, 1137, 208),
+            new DiagValve("CM35", 63, 1137, 332),  new DiagValve("CM36", 64, 1173, 392),
+            new DiagValve("CM37", 65, 1202, 391),  new DiagValve("CM38", 66, 1232, 392),
+            new DiagValve("CM39", 67, 1262, 392),  new DiagValve("CM40", 68, 1270, 147),
+            new DiagValve("CM41", 69, 1291, 392),  new DiagValve("CM42", 70, 1297, 147),
+            new DiagValve("CM43", 71, 1321, 216),  new DiagValve("CM44", 72, 1321, 332),
+            new DiagValve("CM45", 73, 1346, 378),  new DiagValve("CM46", 74, 1370, 403),
+            new DiagValve("CM47", 75, 1392, 157),  new DiagValve("CM48", 76, 1412, 378),
+            new DiagValve("CM49", 77, 1431, 214),  new DiagValve("CM61", 78, 1431, 332),
+            new DiagValve("CM62", 79, 1456, 283),  new DiagValve("CM63", 80, 1481, 263),
+            new DiagValve("CM64", 81, 1507, 263),  new DiagValve("CM65", 82, 1530, 282),
+            new DiagValve("CM66", 83, 1554, 216),  new DiagValve("CM77", 84, 1554, 332),
+            new DiagValve("CM86", 85, 1577, 282),  new DiagValve("CM87", 86, 1602, 263),
+            new DiagValve("CM88", 87, 1628, 263),  new DiagValve("CM89", 88, 1655, 244),
+            new DiagValve("CM90", 89, 1655, 275),
+
+            // Bilge — parked, no artwork yet.
+            new DiagValve("CM01", 28, 1640, 440),  new DiagValve("CM02", 29, 1678, 440),
+            new DiagValve("CM03", 30, 1716, 440),  new DiagValve("CM04", 31, 1754, 440),
+            new DiagValve("CM05", 32, 1792, 440),  new DiagValve("CM06", 33, 1830, 440),
+            new DiagValve("CM07", 34, 1640, 468),  new DiagValve("CM08", 35, 1678, 468),
+            new DiagValve("CM09", 36, 1716, 468),  new DiagValve("CM10", 37, 1754, 468),
+            new DiagValve("CM11", 38, 1792, 468),  new DiagValve("CM12", 39, 1830, 468),
+            new DiagValve("CM13", 40, 1640, 496),  new DiagValve("CM14", 41, 1678, 496),
+            new DiagValve("CM15", 42, 1716, 496),  new DiagValve("CM16", 43, 1754, 496),
+            new DiagValve("CM17", 44, 1792, 496),  new DiagValve("CM18", 45, 1830, 496),
+            new DiagValve("CM19", 46, 1640, 524),  new DiagValve("CM20", 47, 1678, 524),
+            new DiagValve("CM21", 48, 1716, 524),  new DiagValve("CM23", 49, 1754, 524),
+            new DiagValve("CM24", 50, 1792, 524),  new DiagValve("CM94", 51, 1830, 524),
+            new DiagValve("CM95", 52, 1640, 552),  new DiagValve("CM96", 53, 1678, 552),
+            new DiagValve("CM97", 54, 1716, 552),
+        };
+
+        // Draws the P&ID sheet + its live valve overlay inside an existing zone screen, replacing
+        // that zone's simple badge strip. graphicName is the name the SVG carries in TIA's Graphics
+        // collection after it is imported by hand (Openness has no API for that import — same
+        // category of manual step as designing a Faceplate Type).
+        //
+        // The artwork is authored at exactly (pw x ph) so it is placed 1:1: artwork coordinates ARE
+        // screen coordinates here. That is deliberate — scaling it down to fit is what made the
+        // DN/function labels unreadable, so the drawing is redrawn at target size instead.
+        // boxPx: the artwork's own valve-square size. 30 on the zone sheets, 20 on Home's
+        // whole-vessel sheet. Must match the drawing or the overlay leaves a grey fringe / spills
+        // onto the pipe lines — measure with DetectBoxes.exe rather than guessing.
+        static void BuildZoneDiagram(HmiScreen sc, int px, int py, int pw, int ph,
+                                      string graphicName, string zoneLabel, DiagValve[] valves,
+                                      int boxPx = 30)
+        {
+            Console.WriteLine("  Drawing P&ID mimic '" + graphicName + "' (" + zoneLabel + ", " +
+                              valves.Length + " live valve overlays)...");
+
+            MakePanel(sc, "Dg_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
+            // No title bar: same reasoning as the Home mimic and the other zone mimics — the
+            // active nav tab already says which zone this is, so a repeated "AFT BALLAST —
+            // SYSTEM DIAGRAM" band would just be more of the same wasted space. Removing it
+            // gives the drawing itself the full panel height instead.
+
+            // Exact artwork size, no margin: the overlay math below assumes drawX/drawY/drawW/drawH
+            // map 1:1 onto the SVG's own 1888x500 viewBox. The previous pw-2/ph-2 "framing" margin
+            // meant GraphicStretchMode.Uniform had to letterbox+scale the image to fit, shifting
+            // every rendered point by a few px relative to where the overlays assumed it would be —
+            // confirmed as a real bug, not a rounding artefact to live with.
+            int drawX = px, drawY = py;
+            int drawW = pw, drawH = ph;
+
+            var gv = sc.ScreenItems.Create<HmiGraphicView>("Dg_Sheet");
+            gv.Left = SX(drawX); gv.Top = SY(drawY);
+            gv.Width = (uint)SX(drawW); gv.Height = (uint)SY(drawH);
+            gv.BackColor = Color.Transparent;
+            // Uniform: the box matches the artwork's own aspect, so nothing crops or distorts.
+            SetPropEnumSafe(gv, "GraphicStretchMode", "Uniform");
+            try { gv.Graphic = graphicName; }
+            catch (Exception ex) {
+                Console.WriteLine("  [WARN] Could not set Graphic='" + graphicName + "': " + ex.Message);
+                Console.WriteLine("         Import hmi_graphics/" + graphicName + ".svg into the HMI's");
+                Console.WriteLine("         Graphics collection in TIA, then re-run this build.");
+            }
+
+            foreach (var v in valves) {
+                int cx = drawX + v.Ax;
+                int cy = drawY + v.Ay;
+                string vTag = string.Format("V{0:D3}", v.Slot);
+
+                // State square sitting exactly over the drawing's own valve box, so the static grey
+                // box becomes the live state colour. 30px because that is what the 2026-08-16
+                // artwork actually measures - DetectBoxes.exe reports every box in both zone PNGs
+                // as 29-30px. Keep this equal to the artwork's real box size or the overlay either
+                // leaves a grey fringe or spills onto the pipe lines.
+                var box = MakeRect(sc, "Dg_" + v.Cm + "_st", cx - boxPx / 2, cy - boxPx / 2, boxPx, boxPx,
+                                   M_MUTED, Color.FromArgb(255, 17, 17, 17), 2);
+                if (s_nativeBadgeOk) {
+                    if (!AddValueMap(DynTag(box, "BackColor", vTag + "_PosCode"), POS_CODES, POS_COLORS)) {
+                        RemoveDyn(box, "BackColor");
+                        s_nativeBadgeOk = false;
+                        Console.WriteLine("  [Diagram] native colour mapping unavailable — falling back to script.");
+                    }
+                }
+                if (!s_nativeBadgeOk) Dyn(box, "BackColor", ValveStateColorScript(vTag), "AutomaticTags");
+                // Fault/local outline, independent of the fill so both read at once.
+                if (s_nativeBadgeOk) AddValueMap(DynTag(box, "BorderColor", vTag + "_State"), BORDER_CODES, BORDER_COLORS);
+
+                // Transparent hit target, deliberately larger than the 30px box so it is
+                // comfortably touchable; carries the bowtie so the symbol survives on top of the
+                // live colour, and opens the same SBO popup as every other valve control.
+                int hitPx = boxPx + 10;
+                var hit = sc.ScreenItems.Create<HmiButton>("Dg_" + v.Cm + "_hit");
+                hit.Left = SX(cx - hitPx / 2); hit.Top = SY(cy - hitPx / 2);
+                hit.Width = (uint)SX(hitPx); hit.Height = (uint)SY(hitPx);
+                hit.BackColor = M_TRANS; hit.ForeColor = Color.White;
+                hit.BorderColor = M_TRANS; hit.BorderWidth = 0;
+                SetProp(hit, "HorizontalTextAlignment", "Center");
+                SetProp(hit, "VerticalTextAlignment", "Center");
+                SetFont(hit, SFont(11), true);
+                SetText(hit, "Text", "&#x22C8;");
+                try { hit.GetType().GetProperty("ShowFocusVisual").SetValue(hit, false, null); } catch {}
+                AddPopupScript(hit, vTag);
+            }
+        }
+
+        // SetPropEnum lives in GenerateHmiLayout.cs and throws on an unknown enum value; the
+        // stretch-mode name is the one thing here not confirmed by reflection, so it must not be
+        // allowed to abort a whole screen build if V20 spells it differently.
+        static void SetPropEnumSafe(object obj, string propName, string value)
+        {
+            try { SetPropEnum(obj, propName, value); }
+            catch (Exception ex) { Console.WriteLine("  [WARN] " + propName + "='" + value + "': " + ex.Message); }
+        }
 
         static HmiEllipse MakeDot(HmiScreen sc, string name, int cx, int cy, int rx, int ry,
                                    Color fill, Color border, int bw = 2)
@@ -619,8 +929,19 @@ namespace ValveDemoHmiBuilder
             SetText(sym, "Text", "&#x22C8;");
 
             // 3. Transparent button spanning badge + label area: its own Text (bottom-aligned)
-            // IS the CM-nn label, and its native click opens the SBO popup — one item doing
-            // both jobs instead of a separate label textbox plus a separate hit-target button.
+            // IS the real CM-number label, and its native click opens the SBO popup — one item
+            // doing both jobs instead of a separate label textbox plus a separate hit-target button.
+            //
+            // The label used to be a static "CM-" + slot-index string (Disp(), now removed) — that
+            // was always fake: slot index is our own internal pool position, not the client's CM
+            // number, and the two only coincide for the first ~21 valves before drifting apart (the
+            // client's CM numbering runs continuously across the whole ship, not per zone). The
+            // click/popup binding below (vTag) was always correct — it's real physical-slot data —
+            // so the label just needs to catch up to what it already opens. Bound to the same
+            // V{slot}_CmNo tag the popup title already uses successfully. No fallback text for a
+            // blank CmNo (unconfigured slots, none today at 89/89): the badge is already grey/muted for
+            // that state, so a blank label is honest, unlike a synthesized number that could be
+            // mistaken for a real one.
             var hit = sc.ScreenItems.Create<HmiButton>(name + "_hit");
             hit.Left = SX(cx - 30); hit.Top = SY(cy - R); hit.Width = (uint)SX(60); hit.Height = (uint)SY(R * 2 + 18);
             hit.BackColor = M_TRANS; hit.ForeColor = M_TEXT;
@@ -628,7 +949,19 @@ namespace ValveDemoHmiBuilder
             SetProp(hit, "HorizontalTextAlignment", "Center");
             SetProp(hit, "VerticalTextAlignment", "Bottom");
             SetFont(hit, SFont(13), true);
-            SetText(hit, "Text", Disp(tagNum));
+            bool labelBoundNative = false;
+            if (s_nativeBadgeTextOk) {
+                labelBoundNative = DynTag(hit, "Text", vTag + "_CmNo") != null;
+                if (!labelBoundNative) {
+                    s_nativeBadgeTextOk = false;
+                    Console.WriteLine("  [DrawValveSym] native text binding unavailable — falling back to script for all badge labels.");
+                }
+            }
+            if (!labelBoundNative) {
+                Dyn(hit, "Text",
+                    "function readTag(v){return (v!==null&&typeof v===\"object\"&&\"Value\" in v)?v.Value:v;}\n" +
+                    "return readTag(Tags(\"" + vTag + "_CmNo\").Read());", "AutomaticTags");
+            }
             try { hit.GetType().GetProperty("ShowFocusVisual").SetValue(hit, false, null); } catch {}
             AddPopupScript(hit, vTag);
         }
@@ -636,7 +969,7 @@ namespace ValveDemoHmiBuilder
         // ── HOME SCREEN ─────────────────────────────────────────────────
         static void BuildScreenHome(HmiScreen sc)
         {
-            Console.WriteLine("  Drawing Home Screen (v4 - 96-slot mimic, tables in one row below)...");
+            Console.WriteLine("  Drawing Home Screen (v4 - 89-slot mimic, tables in one row below)...");
 
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
@@ -651,13 +984,15 @@ namespace ValveDemoHmiBuilder
             // Mimic panel height was trimmed from 678 to make room for the taller KPI row below
             // (bigger text) and the taller shared header above — the badge grid itself is the
             // same size, only its surrounding margins got tighter.
-            BuildVesselMimic(sc, 16, 198, 1888, 560);
+            // Real vessel artwork replaces the code-drawn mimic. "Full.png" is authored at exactly
+            // 1888x584 — the same box the mimic occupied — so it drops in 1:1 with no rescaling.
+            BuildZoneDiagram(sc, 16, 174, 1888, 584, "Full", "VESSEL OVERVIEW", HOME_DIAGRAM, 20);
 
             int tY = 774, tH = 288, tW = 304, tStep = 316, tX0 = 16;
             // Left-to-right order matches the mimic's corrected zone order above it (AFT-ER-FWD).
-            BuildKpiBox(sc, "AFT BALLAST",      1, 28, "Aft", tX0 + 0 * tStep, tY, tW, tH);
-            BuildKpiBox(sc, "BILGE / ER",      29, 56, "Er",  tX0 + 1 * tStep, tY, tW, tH);
-            BuildKpiBox(sc, "FORWARD BALLAST", 57, 96, "Fwd", tX0 + 2 * tStep, tY, tW, tH);
+            BuildKpiBox(sc, "AFT BALLAST",      1, 27, "Aft", tX0 + 0 * tStep, tY, tW, tH);
+            BuildKpiBox(sc, "BILGE / ER",      28, 54, "Er",  tX0 + 1 * tStep, tY, tW, tH);
+            BuildKpiBox(sc, "FORWARD BALLAST", 55, 89, "Fwd", tX0 + 2 * tStep, tY, tW, tH);
             BuildSysStatus(sc,                       tX0 + 3 * tStep, tY, tW, tH);
             BuildPlantSummary(sc,                    tX0 + 4 * tStep, tY, tW, tH);
             BuildAlarmPanel(sc,                      tX0 + 5 * tStep, tY, tW, tH);
@@ -698,8 +1033,9 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Title_Rule", 0, 46, 1920, 4, M_ACCENT, M_ACCENT, 0);
             MakeTb(sc, "Title_Main", 0, 50, 1920, 54, "MV WESTERLY  &#xB7;  VALVE REMOTE CONTROL SYSTEM",
                    M_TRANS, M_TEXT, 0, "Center", 32, true);
-            MakeTb(sc, "Title_Sub", 0, 104, 1920, 24, "Bilge &amp; Ballast Distribution  &#x2014;  89 Motorised Valves",
-                   M_TRANS, M_MUTED, 0, "Center", 19, false);
+            // Subtitle ("Bilge & Ballast Distribution — 89 Motorised Valves") removed on request
+            // to give its 24px back to the illustration panels below on every screen - the nav
+            // bar and everything under it moved up to reclaim it (see BuildNav's y=104, was 128).
         }
 
         // Minimal screen for a nav target that has no dedicated design yet. Keeps the header
@@ -750,16 +1086,16 @@ namespace ValveDemoHmiBuilder
         // is whichever of these the calling screen IS, so its own button highlights.
         static void BuildNav(HmiScreen sc, string activeTarget)
         {
-            MakeRect(sc, "Nav_BG", 0, 128, 1920, 58, M_BOX, M_LINE, 1);
+            MakeRect(sc, "Nav_BG", 0, 104, 1920, 58, M_BOX, M_LINE, 1);
 
-            // Zone buttons run in valve-number order (AFT CM-01-28, BILGE/ER CM-29-56,
-            // FWD slots 57-96), which is also stern->bow, matching the mimic's zone order.
+            // Zone buttons run in valve-number order (AFT slots 1-27, BILGE/ER slots 28-54,
+            // FWD slots 55-89), which is also stern->bow, matching the mimic's zone order.
             string[] labels  = { "&#x2302;  HOME", "&#x2693;  BALLAST AFT", "&#x1F4A7;  BILGE / ER",
                                  "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x1F4C8;  CONFIG", "&#x1F464;  LOGIN" };
             string[] targets = { "Screen_Home", "Screen_AftBallast", "Screen_Bilge", "Screen_FwdBallast",
                                  "Screen_Alarms", "Screen_Diagnostics", "Screen_Login" };
 
-            int w = 258, h = 46, y = 134, x0 = 20, gap = 8;
+            int w = 258, h = 46, y = 110, x0 = 20, gap = 8;
             for (int i = 0; i < labels.Length; i++) {
                 bool active = (targets[i] == activeTarget);
                 Color bg = active ? M_ACCENT : M_BOX;
@@ -770,23 +1106,24 @@ namespace ValveDemoHmiBuilder
             }
         }
 
-        // ── VESSEL MIMIC — all 96 slots, full width/height ─────────────
+        // ── VESSEL MIMIC — all 89 slots, full width/height ─────────────
         static void BuildVesselMimic(HmiScreen sc, int px, int py, int pw, int ph)
         {
             MakePanel(sc, "Mim_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
-            MakeRect(sc, "Mim_Hdr", px, py, pw, 42, M_HDR, M_HDR, 0);
-            MakeTb(sc, "Mim_Ttl", px + 16, py + 8, pw - 32, 30, "VESSEL MIMIC  &#x2014;  ALL 96 SLOTS",
-                   M_TRANS, M_HDRTXT, 0, "Left", 20, true);
+            // No title bar and no colour-key legend: the title only repeated what the nav tab
+            // and page heading already say, and the legend just restated colours an operator
+            // learns once from the valve popup. Both removed to give the mimic itself more
+            // room instead of spending it on a header band and a footer strip.
 
             // Hull geometry — derived from (px,py,pw,ph) so this stays correct if the panel
             // is ever resized again. Zone order is AFT (stern, left) -> ER (mid) -> FWD (bow,
             // right) — real vessel geography; the previous ER-FWD-AFT order put "AFT BALLAST"
             // beside a "BOW" label, which was backwards.
-            // Badges/pitch below are unchanged size — topY/botY margins were tightened (from a
-            // 480px badge-row span with ~200px of top+bottom margin, to the same 312px span
-            // with less surrounding whitespace) to make room for the taller shared header and
-            // taller KPI row this panel now shares the screen with.
-            int topY = py + 56, botY = py + 368, midY = (topY + botY) / 2;
+            // topY starts right under the panel border now that the 42px header band is gone
+            // (was py+56); botY is unchanged — the space the legend used to occupy at the
+            // bottom is left as clean panel background rather than being filled with something
+            // new that wasn't asked for.
+            int topY = py + 16, botY = py + 368, midY = (topY + botY) / 2;
             int sternX = px + 54;
             const int bowMargin = 34, bowLen = 220, hullT = 4;
             int bowTipX = px + pw - bowMargin;
@@ -804,10 +1141,11 @@ namespace ValveDemoHmiBuilder
             // FWD is the widest zone (40 slots): the client schedule puts 35 of its 89 valves
             // forward, against 27 each aft and midships, so the even split the mimic used to
             // assume never matched the real vessel.
-            int[] zoneVStart    = { 1, 29, 57 };
-            int[] zoneVEnd      = { 28, 56, 96 };
-            // Exact fit: 7+7+10 columns x 4 rows = 28+28+40 = 96, no leftover.
-            int[] zoneCols      = { 7, 7, 10 };
+            int[] zoneVStart    = { 1, 28, 55 };
+            int[] zoneVEnd      = { 27, 54, 89 };
+            // 7+7+9 columns x 4 rows = 28+28+36 capacity for 27+27+35 real valves — a little
+            // slack in each row rather than an exact fit, now that there's no spare zone padding.
+            int[] zoneCols      = { 7, 7, 9 };
             string[] zonePfx    = { "Aft", "Er", "Fwd" }; // matches Valves_DB_<prefix>Configured etc.
 
             // Alternating zone tint for visual separation.
@@ -886,18 +1224,6 @@ namespace ValveDemoHmiBuilder
             // stern end, FWD zone sits at the bow end.
             MakeTb(sc, "Mim_Bow",   bowTipX - 80, midY - 14, 100, 26, "BOW", M_TRANS, M_MUTED, 0, "Center", 16, true);
             MakeTb(sc, "Mim_Stern", sternX - 54, midY - 14, 80, 26, "AFT", M_TRANS, M_MUTED, 0, "Center", 16, true);
-
-            // Legend strip.
-            int ly = py + ph - 60;
-            MakeRect(sc, "Lgd_Sep", px + 20, ly - 14, pw - 40, 1, M_LINE, M_LINE, 0);
-            string[] lgLabels = { "OPEN", "CLOSED", "MOVING", "LOCAL", "FAULT", "UNCONFIGURED" };
-            Color[]  lgColors = { M_GREEN, M_MUTED, M_BLUE, M_YELLOW, M_RED, Color.FromArgb(255, 154, 163, 176) };
-            int lx = px + 28;
-            for (int i = 0; i < lgLabels.Length; i++) {
-                MakeTb(sc, "Lgd_Sym" + i, lx, ly, 30, 30, "&#x22C8;", M_TRANS, lgColors[i], 0, "Center", 20, true);
-                MakeTb(sc, "Lgd_Txt" + i, lx + 32, ly, 148, 30, lgLabels[i], M_TRANS, M_TEXT, 0, "Left", 15, false);
-                lx += 182;
-            }
         }
 
         // ── Table row: 6 panels, single row below the mimic (304px each) ─
@@ -969,7 +1295,7 @@ namespace ValveDemoHmiBuilder
 
             // TOTAL CHANNELS is a fixed constant — never worth a dynamization.
             MakeTb(sc, "Pls_Lbl0", x + 14, rY0, w - 116, rowH, "TOTAL CHANNELS", M_TRANS, M_MUTED, 0, "Left", 15, false);
-            MakeTb(sc, "Pls_Val0", x + w - 78, rY0, 68, rowH, "96", M_TRANS, M_TEXT, 0, "Right", 22, true);
+            MakeTb(sc, "Pls_Val0", x + w - 78, rY0, 68, rowH, "89", M_TRANS, M_TEXT, 0, "Right", 22, true);
             MakeRect(sc, "Pls_Sep0", x + 10, rY0 + rowH - 1, w - 20, 1, M_LINE, M_LINE, 0);
 
             // CONFIGURED now reads Valves_DB_TotalConfigured directly — FB_ValveLoop computes
@@ -1029,13 +1355,31 @@ namespace ValveDemoHmiBuilder
             BuildHomeHeader(sc);
             BuildNav(sc, screenTarget);
 
-            // Illustration stops 24px short of the table/summary row so the two panels read as
-            // separate boxes — at 484 they shared an edge and looked fused together.
-            // 198 + 460 = 658, then a 24px gap, then the table row at 682 .. 1062 (Home's bottom).
-            BuildZoneMimic(sc, 16, 198, 1888, 460, vStart, vEnd, mimicCols, 2, zoneLabel);
+            // Panels start 24px higher than before (174, was 198) since the header's subtitle
+            // line was removed. All three zones now share the same 500px illustration height -
+            // matches AFT's diagram exactly, so FWD/Bilge's placeholder mimic sits at the same
+            // size their real artwork will eventually take. None of them grow to fill the
+            // reclaimed 24px themselves - it all goes to the table below instead.
+            // AFT's diagram MUST stay exactly 1888x500 - that's the native size of the
+            // already-designed "AFT zone" artwork, and any other size would letterbox it under
+            // GraphicStretchMode.Uniform, throwing the live overlay coordinates out of alignment
+            // again (the exact bug fixed earlier this session). Sizing FWD/Bilge to match is safe
+            // since their mimic is still plain code-drawn, no fixed artwork to stay matched to yet.
+            const int illustH = 500;
+            int tableY = 174 + illustH + 24;          // 698, same on every zone
+            int tableH = 1062 - tableY;                // all end on Home's 1062 bottom edge
+
+            // Bilge still has no artwork (yet to be designed), so it keeps the code-drawn mimic.
+            if (zonePrefix == "Aft")
+                BuildZoneDiagram(sc, 16, 174, 1888, 500, "AFT zone1", zoneLabel, AFT_DIAGRAM);
+            else if (zonePrefix == "Fwd")
+                BuildZoneDiagram(sc, 16, 174, 1888, 500, "FWD Zone1", zoneLabel, FWD_DIAGRAM);
+            else
+                BuildZoneMimic(sc, 16, 174, 1888, 500, vStart, vEnd, mimicCols, 2, zoneLabel);
+
             // Table takes width back off the summary (1650 -> 1674): the summary only has to fit
             // six short label/number rows, whereas the table has six columns fighting for room.
-            BuildValveTable(sc, 16, 682, 1674, 380, zonePrefix, vStart, maxPage);
+            BuildValveTable(sc, 16, tableY, 1674, tableH, zonePrefix, vStart, maxPage);
 
             // Summary sits beside the table, sharing its top edge, and now runs the full width left
             // over to the right margin (1680..1904) instead of stopping at 1880 and leaving a dead
@@ -1046,7 +1390,9 @@ namespace ValveDemoHmiBuilder
             // 200 wide, not narrower: BuildKpiBox gives its title only (w-108)px, and "SUMMARY" at
             // font 17 needs ~75 of the 92 that leaves — any narrower and the title starts clipping.
             const int sumX = 1704, sumW = 200;      // 1704 + 200 = 1904 = 1920 - 16px margin
-            BuildKpiBox(sc, "SUMMARY", vStart, vEnd, zonePrefix, sumX, 682, sumW, 320);
+            // Shares the table's top edge and stops just above the page buttons, so it shortens
+            // with the table when a zone carries the taller P&ID drawing.
+            BuildKpiBox(sc, "SUMMARY", vStart, vEnd, zonePrefix, sumX, tableY, sumW, 1002 - tableY);
 
             // Page UP/DOWN — below the summary, matching its width so the column lines up.
             // These write the PLC's per-zone page tag; the PLC then reloads the table window.
@@ -1102,11 +1448,11 @@ namespace ValveDemoHmiBuilder
                                     int vStart, int vEnd, int cols, int rows, string zoneLabel)
         {
             MakePanel(sc, "ZMim_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
-            MakeRect(sc, "ZMim_Hdr", px, py, pw, 40, M_HDR, M_HDR, 0);
-            MakeTb(sc, "ZMim_Ttl", px + 16, py + 7, pw - 32, 28,
-                   zoneLabel + " &#x2014; " + (vEnd - vStart + 1) + " VALVES", M_TRANS, M_HDRTXT, 0, "Left", 15, true);
+            // No title bar here either — the nav tab and the zone's own valve-list header
+            // directly below already say which zone and how many valves; repeating it in a
+            // header band on the illustration was the same wasted space as Home's mimic title.
 
-            int hullL = px + 24, hullT = py + 44, hullR = px + pw - 24, hullB = py + ph - 16;
+            int hullL = px + 24, hullT = py + 12, hullR = px + pw - 24, hullB = py + ph - 16;
             MakeRect(sc, "ZHull_Top",   hullL,     hullT,     hullR - hullL, 4,             M_BORDER, M_BORDER, 0);
             MakeRect(sc, "ZHull_Bot",   hullL,     hullB - 4, hullR - hullL, 4,             M_BORDER, M_BORDER, 0);
             MakeRect(sc, "ZHull_Left",  hullL,     hullT,     4,             hullB - hullT, M_BORDER, M_BORDER, 0);
@@ -1174,17 +1520,24 @@ namespace ValveDemoHmiBuilder
             //   NAME  - the client's schedule has no "name" field, so it could never be filled.
             // TAG became CM NO, reading the real stored CmNo instead of the PLC-CONCAT'd
             // 'CM-' + index string, which mislabelled most valves once the real schedule showed
-            // CM numbers skip values and run past 88. FUNCTION was considered and deliberately
-            // left out - this table is already dense and Function is on the valve popup.
-            // Budget at pw=1674: colW=809; fields 70+120+230+120+200 = 740, plus 4 pads = 788,
-            // leaving 21px slack. Widths are set against worst-case content so nothing clips:
-            //   CM NO     70  "CM97" @15 bold         ~44px
-            //   VALVE TAG120  String[12] @14          ~92px worst case
-            //   LOCATION 230  20 chars @13            ~143px  (Valve_Meta_DB is String[20])
-            //   STATUS   120  "UNCONFIGURED" @14 bold ~101px  (longest state word)
-            //   COMMAND  200  two 96px buttons + 8 gap
-            const int cmW = 70, vtagW = 120, locW = 230, statusW = 120,
-                      btnW = 96, btnGap = 8, pad = 12;
+            // CM numbers skip values and run past 88.
+            // FUNCTION added 2026-08-16 on request - it was previously left out as "already dense,
+            // and it's on the popup", but the popup's meta card was cut back to VALVE TAG only, so
+            // Function had nowhere left to appear. It needed a PLC change too: the zone windows
+            // mirrored Name/Loc/CmNo/VTag but never FuncName (only the Config screen did), so
+            // <Zone>TblFunc arrays were added to Valve_Meta_DB and packed in FB_ValveLoop.
+            // Budget at pw=1674: colW=809; fields 64+100+145+155+110+180 = 754, plus 5 pads at 10
+            // = 804, leaving 5px slack. LOCATION gave up the most room since its real values are
+            // short ("DB tank", "Aft peak P") even though the field allows 20 chars.
+            // Widths against worst-case content:
+            //   CM NO     64  "CM97" @15 bold           ~44px
+            //   VALVE TAG100  "11-020-A1" @14           ~70px  (String[12] worst ~92px)
+            //   LOCATION 145  "Pump 2 discharge" @13   ~114px  (String[20] worst ~143px)
+            //   FUNCTION 155  "Cross-over manifold" @13 ~136px  (String[22] worst ~157px)
+            //   STATUS   110  "UNCONFIGURED" @14 bold  ~101px  (longest state word)
+            //   COMMAND  180  two 86px buttons + 8 gap
+            const int cmW = 64, vtagW = 100, locW = 145, funcW = 155, statusW = 110,
+                      btnW = 86, btnGap = 8, pad = 10;
 
             int bodyTop = py + 38 + 2 + colHdrH + 4;
 
@@ -1201,12 +1554,14 @@ namespace ValveDemoHmiBuilder
                 int hy = py + 38 + 2;
                 int hxVTag = cx0 + cmW + pad;
                 int hxLoc  = hxVTag + vtagW + pad;
-                int hxSt   = hxLoc + locW + pad;
+                int hxFunc = hxLoc + locW + pad;
+                int hxSt   = hxFunc + funcW + pad;
                 int hxCmd  = hxSt + statusW + pad;
 
                 MakeTb(sc, "Tbl_H_CmNo" + col, cx0,    hy, cmW,               colHdrH, "CM NO",     M_TRANS, M_MUTED, 0, "Left",   14, true);
                 MakeTb(sc, "Tbl_H_VTag" + col, hxVTag, hy, vtagW,             colHdrH, "VALVE TAG", M_TRANS, M_MUTED, 0, "Left",   14, true);
                 MakeTb(sc, "Tbl_H_Loc"  + col, hxLoc,  hy, locW,              colHdrH, "LOCATION",  M_TRANS, M_MUTED, 0, "Left",   14, true);
+                MakeTb(sc, "Tbl_H_Func" + col, hxFunc, hy, funcW,             colHdrH, "FUNCTION",  M_TRANS, M_MUTED, 0, "Left",   14, true);
                 MakeTb(sc, "Tbl_H_St"   + col, hxSt,   hy, statusW,           colHdrH, "STATUS",    M_TRANS, M_MUTED, 0, "Center", 14, true);
                 MakeTb(sc, "Tbl_H_Cmd"  + col, hxCmd,  hy, btnW * 2 + btnGap, colHdrH, "COMMAND",   M_TRANS, M_MUTED, 0, "Center", 14, true);
 
@@ -1236,6 +1591,9 @@ namespace ValveDemoHmiBuilder
                     var locVal = MakeTb(sc, "Tr_Loc" + sfx, hxLoc, rY, locW, rowH, "", M_TRANS, M_MUTED, 0, "Left", 13, false);
                     DynTag(locVal, "Text", zonePrefix + "_TblLoc_" + slot);
 
+                    var funcVal = MakeTb(sc, "Tr_Func" + sfx, hxFunc, rY, funcW, rowH, "", M_TRANS, M_MUTED, 0, "Left", 13, false);
+                    DynTag(funcVal, "Text", zonePrefix + "_TblFunc_" + slot);
+
                     // Word comes ready-made from the PLC (direct bind); only its colour needs the
                     // value map, which is allowed on colour properties but not on Text.
                     var stVal = MakeLiveText(sc, "Tr_St" + sfx, hxSt, rY, statusW, rowH, M_MUTED, "Center", 14, true);
@@ -1249,6 +1607,16 @@ namespace ValveDemoHmiBuilder
                     // button's own white background (see FILL_OPEN/FILL_CLOSE).
                     AddValueMap(DynTag(openBtn,  "BackColor", stateTag), FILL_OPEN_CODES,  FILL_OPEN);
                     AddValueMap(DynTag(closeBtn, "BackColor", stateTag), FILL_CLOSE_CODES, FILL_CLOSE);
+                    // Set HERE, in the build path, not by the --finish-login-auth repair pass.
+                    // These buttons bypass the popup entirely, so without it a logged-out user can
+                    // stroke any valve straight from the list. The repair pass set it on the live
+                    // objects, which meant EVERY zone-screen rebuild silently wiped it again — and
+                    // that is exactly what happened on 2026-08-15, when Screen_AftBallast was
+                    // recreated for the popup refactor and the 28 table buttons came back
+                    // unprotected. The popup's own six buttons never had this problem precisely
+                    // because they set it at creation, like this. See handoff item 17.
+                    SetStr(openBtn,  "Authorization", "Operate");
+                    SetStr(closeBtn, "Authorization", "Operate");
                     // Commands stay scripts, but these are click *events* — they run on tap, never
                     // on screen activation, so they cost nothing at load time. The valve is
                     // resolved at click time from the slot's live NO. tag.
@@ -1258,7 +1626,7 @@ namespace ValveDemoHmiBuilder
             }
         }
 
-        // ── CONFIGURATION SCREEN — all 96 slots, one global paged table ───────────────────
+        // ── CONFIGURATION SCREEN — all 89 slots, one global paged table ───────────────────
         // Replaces the old Screen_Diagnostics placeholder. Shows every valve's Name/Location/live
         // Status plus an Enable/Disable toggle - the same Configured flag that gates whether
         // FB_ValveLoop runs a slot's control logic at all (the pre-allocated-UDT-pool "enable"
@@ -1270,11 +1638,11 @@ namespace ValveDemoHmiBuilder
         // panel to its right (BuildConfigSummaryPanel) instead of a single inline count - v2's
         // table alone still fits 16 rows/page (6 pages total).
         const int CFG_ROWS_PER_PAGE = 16;
-        const int CFG_MAX_PAGE = 5; // 96 slots / 16 per page - 1, 0-based (exactly 6 full pages)
+        const int CFG_MAX_PAGE = 5; // 89 slots / 16 per page - 1, 0-based (6 pages, last one ragged: 9 of 16)
 
         static void BuildConfigScreen(HmiScreen sc)
         {
-            Console.WriteLine("  Drawing Screen_Diagnostics as VALVE CONFIGURATION (96 slots, 6 pages)...");
+            Console.WriteLine("  Drawing Screen_Diagnostics as VALVE CONFIGURATION (89 slots, 6 pages)...");
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
             BuildHomeHeader(sc);
@@ -1283,7 +1651,7 @@ namespace ValveDemoHmiBuilder
             // Table now spans the screen's full width - the commissioning counts moved out of a
             // right-hand column into the bottom strip below, next to the page/jump controls, to
             // free that width for the client's 5 schedule columns.
-            const int px = 16, py = 198, pw = 1888, ph = 760;
+            const int px = 16, py = 174, pw = 1888, ph = 784;
             BuildConfigTable(sc, px, py, pw, ph);
             BuildConfigSummaryBar(sc, 1104, 966, 800, 92);
 
@@ -1317,7 +1685,7 @@ namespace ValveDemoHmiBuilder
             AddScriptEvent(goBtn,
                 JS_READ +
                 "let t=r(Tags(\"CfgJumpTarget\").Read())||1;\n" +
-                "if(t<1)t=1; if(t>96)t=96;\n" +
+                "if(t<1)t=1; if(t>" + VALVE_COUNT + ")t=" + VALVE_COUNT + ";\n" +
                 "let pg=Math.floor((t-1)/" + CFG_ROWS_PER_PAGE + ");\n" +
                 "if(pg<0)pg=0; if(pg>" + CFG_MAX_PAGE + ")pg=" + CFG_MAX_PAGE + ";\n" +
                 "Tags(\"Valves_DB_CfgPage\").Write(pg);");
@@ -1328,15 +1696,15 @@ namespace ValveDemoHmiBuilder
             int bulkX = px + 150;
             var aftBtn = MakeBtn(sc, "Cfg_BulkAft", bulkX, pbY2, 150, 34, "AFT BALLAST", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
             SetStr(aftBtn, "Authorization", "Operate");
-            AddScriptEvent(aftBtn, ZoneConfigureAllScript(1, 28));
+            AddScriptEvent(aftBtn, ZoneConfigureAllScript(1, 27));
 
             var bilgeBtn = MakeBtn(sc, "Cfg_BulkBilge", bulkX + 160, pbY2, 150, 34, "BILGE / ER", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
             SetStr(bilgeBtn, "Authorization", "Operate");
-            AddScriptEvent(bilgeBtn, ZoneConfigureAllScript(29, 56));
+            AddScriptEvent(bilgeBtn, ZoneConfigureAllScript(28, 54));
 
             var fwdBtn = MakeBtn(sc, "Cfg_BulkFwd", bulkX + 320, pbY2, 150, 34, "BALLAST FWD", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
             SetStr(fwdBtn, "Authorization", "Operate");
-            AddScriptEvent(fwdBtn, ZoneConfigureAllScript(57, 96));
+            AddScriptEvent(fwdBtn, ZoneConfigureAllScript(55, 89));
         }
 
         // One-time cost on tap only (not recurring per-scan work) - loops the zone's fixed valve
@@ -1358,7 +1726,7 @@ namespace ValveDemoHmiBuilder
         {
             MakePanel(sc, "CfgTbl_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             MakeRect(sc, "CfgTbl_Hdr", px, py, pw, 38, M_HDR, M_HDR, 0);
-            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 96 SLOTS", M_TRANS, M_HDRTXT, 0, "Left", 16, true);
+            MakeTb(sc, "CfgTbl_Ttl", px + 14, py + 6, pw - 28, 26, "VALVE CONFIGURATION &#x2014; ALL 89 SLOTS", M_TRANS, M_HDRTXT, 0, "Left", 16, true);
 
             const int colHdrH = 28;
             int rowH = (ph - 38 - colHdrH - 8) / CFG_ROWS_PER_PAGE;
@@ -1442,7 +1810,7 @@ namespace ValveDemoHmiBuilder
             MakeTb(sc, "CfgSum_TotalLbl", px + 18, py + 10, 190, 18, "TOTAL CONFIGURED", M_TRANS, M_MUTED, 0, "Left", 11, true);
             var totVal = MakeLiveText(sc, "CfgSum_TotalVal", px + 18, py + 28, 84, 46, M_GREEN, "Left", 32, true);
             DynTag(totVal, "Text", "Valves_DB_TotalConfigured");
-            MakeTb(sc, "CfgSum_TotalOf", px + 104, py + 40, 90, 30, "/ 96", M_TRANS, M_MUTED, 0, "Left", 17, false);
+            MakeTb(sc, "CfgSum_TotalOf", px + 104, py + 40, 90, 30, "/ " + VALVE_COUNT, M_TRANS, M_MUTED, 0, "Left", 17, false);
 
             MakeRect(sc, "CfgSum_DivMain", px + 215, py + 14, 1, ph - 28, M_LINE, M_LINE, 0);
 

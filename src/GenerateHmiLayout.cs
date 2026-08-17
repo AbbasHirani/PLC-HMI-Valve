@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
 using System.Collections;
@@ -22,7 +22,7 @@ using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 
 // ============================================================
-// valveDemo2 — Full 96-Slot HMI Layout Generator v8
+// valveDemo2 — Full 89-Slot HMI Layout Generator v8
 // Functional Fixes:
 //   1. Corrected UI.OpenFaceplateInPopup parameters order to match Siemens standard:
 //      UI.OpenFaceplateInPopup(faceplateType, title, interface, parentScreen, invisible, popupWindowName)
@@ -34,7 +34,7 @@ namespace ValveDemoHmiBuilder
 {
     partial class Program
     {
-        private const int    VALVE_COUNT    = 96;
+        private const int    VALVE_COUNT    = 89;
         private const string FACEPLATE_TYPE = "Valve_Faceplate_V_0_0_4";
         private const string HMI_CONNECTION = "HMI_Connection_1";
 
@@ -110,6 +110,7 @@ namespace ValveDemoHmiBuilder
             string exportBlock = null;
             bool importOnly = false;
             bool finishLoginAuth = false;
+            string purgeAlarmSuffix = null;
             foreach (var a in args) {
                 if (a.StartsWith("--only=")) {
                     only = new HashSet<string>(a.Substring(7).Split(','), StringComparer.OrdinalIgnoreCase);
@@ -123,15 +124,63 @@ namespace ValveDemoHmiBuilder
                     importOnly = true;
                 } else if (a == "--finish-login-auth") {
                     finishLoginAuth = true;
+                } else if (a.StartsWith("--purge-alarms=")) {
+                    purgeAlarmSuffix = a.Substring(15);
                 }
             }
             if (finishLoginAuth) { try { RunFinishLoginAuth(); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); } Console.WriteLine("\nDone."); return; }
+            if (purgeAlarmSuffix != null) { try { RunPurgeAlarms(purgeAlarmSuffix); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); } Console.WriteLine("\nDone."); return; }
             try { Run(only, fixTags, dumpTag, exportBlock, importOnly); }
             catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); }
             Console.WriteLine("\nDone."); 
         }
 
         static bool Want(HashSet<string> only, string key) { return only == null || only.Contains(key); }
+
+        // Deletes every discrete alarm whose name ends with the given suffix.
+        // Needed because renaming an alarm does not remove the old one: the generator creates the new
+        // name and the previous alarm survives, still bound to the SAME trigger tag and bit. TIA
+        // rejects that outright - "the tag/bit combination is also used for other HMI alarms" - so a
+        // rename is always a two-step operation: regenerate, then purge the old names.
+        // Suffix rather than an exact list so it stays useful for the next rename.
+        static void RunPurgeAlarms(string suffix)
+        {
+            var procs = TiaPortal.GetProcesses();
+            if (procs.Count == 0) { Console.WriteLine("[ERROR] TIA Portal not running."); return; }
+            TiaPortal portal = null; Project project = null;
+            foreach (var p in procs) {
+                try {
+                    var att = p.Attach();
+                    if (att != null && att.Projects.Count > 0) { portal = att; project = att.Projects[0]; break; }
+                } catch { }
+            }
+            if (portal == null || project == null) { Console.WriteLine("[ERROR] Could not attach."); return; }
+            Console.WriteLine("Attached to Project: " + project.Name);
+
+            Device hmiDevice = FindDeviceByPartialName(project, "HMI");
+            if (hmiDevice == null) { Console.WriteLine("[ERROR] HMI device not found."); return; }
+            HmiSoftware hmi = FindHmiSoftware(hmiDevice);
+            if (hmi == null) { Console.WriteLine("[ERROR] HMI software not found."); return; }
+
+            // Collect first, delete after: mutating the composition while enumerating it is the
+            // classic way to silently skip half the entries.
+            var doomed = new List<string>();
+            foreach (var al in hmi.DiscreteAlarms)
+                if (al.Name != null && al.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                    doomed.Add(al.Name);
+
+            Console.WriteLine("  Found " + doomed.Count + " alarms ending in '" + suffix + "'.");
+            int killed = 0;
+            foreach (var name in doomed) {
+                try {
+                    var al = hmi.DiscreteAlarms.Find(name);
+                    if (al != null) { al.Delete(); killed++; }
+                } catch (Exception ex) {
+                    Console.WriteLine("  [WARN] could not delete " + name + ": " + Root(ex));
+                }
+            }
+            Console.WriteLine("  Deleted " + killed + " of " + doomed.Count + ".");
+        }
 
         static void Run(HashSet<string> only, bool fixTags = false, string dumpTag = null, string exportBlock = null, bool importOnly = false)
         {
@@ -205,7 +254,7 @@ namespace ValveDemoHmiBuilder
                 if (plc == null) { Console.WriteLine("[ERROR] PlcSoftware not found."); return; }
                 var block = plc.BlockGroup.Blocks.Find(exportBlock);
                 if (block == null) { Console.WriteLine("[ERROR] Block " + exportBlock + " not found."); return; }
-                string outPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_export_" + exportBlock + ".xml";
+                string outPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_export_" + exportBlock + ".xml";
                 block.Export(new FileInfo(outPath), ExportOptions.WithDefaults);
                 Console.WriteLine("\n[EXPORT-BLOCK] " + exportBlock + " -> " + outPath);
                 Console.WriteLine("\n=== Export-block complete! ===");
@@ -260,17 +309,17 @@ namespace ValveDemoHmiBuilder
             // Rather than leave their nav buttons dead-clicking, each gets a
             if (Want(only, "Bilge")) {
                 HmiScreen scBilge = RecreateScreen(hmi, "Screen_Bilge");
-                if (scBilge != null) BuildZoneScreen(scBilge, "Screen_Bilge", "BILGE AND FIRE", 29, 56, "Er", 14);
+                if (scBilge != null) BuildZoneScreen(scBilge, "Screen_Bilge", "BILGE AND FIRE", 28, 54, "Er", 14);
             } else Console.WriteLine("  Skipping Screen_Bilge (not in --only)...");
 
             if (Want(only, "Fwd")) {
                 HmiScreen scFwd = RecreateScreen(hmi, "Screen_FwdBallast");
-                if (scFwd != null) BuildZoneScreen(scFwd, "Screen_FwdBallast", "FORWARD BALLAST", 57, 96, "Fwd", 20);
+                if (scFwd != null) BuildZoneScreen(scFwd, "Screen_FwdBallast", "FORWARD BALLAST", 55, 89, "Fwd", 18);
             } else Console.WriteLine("  Skipping Screen_FwdBallast (not in --only)...");
 
             if (Want(only, "Aft")) {
                 HmiScreen scAft = RecreateScreen(hmi, "Screen_AftBallast");
-                if (scAft != null) BuildZoneScreen(scAft, "Screen_AftBallast", "AFT BALLAST", 1, 28, "Aft", 14);
+                if (scAft != null) BuildZoneScreen(scAft, "Screen_AftBallast", "AFT BALLAST", 1, 27, "Aft", 14);
             } else Console.WriteLine("  Skipping Screen_AftBallast (not in --only)...");
 
             if (Want(only, "Diag")) {
@@ -366,20 +415,30 @@ namespace ValveDemoHmiBuilder
         {
             HmiScreen sc = RecreateScreen(hmi, "Screen_Popup");
             if (sc == null) return;
-            // 400 tall, was 360: the old single status line became a 2x2 identity card carrying
-            // the client's schedule fields (Valve Tag / System / Location / Function), which needs
-            // ~76px instead of 40. Everything below shifted down 40px to match. Growing the popup
-            // was preferred over shrinking the status circle - that circle is the main
-            // at-a-glance indicator and shouldn't lose prominence to make room for reference data.
+            // Redesigned 2026-08-17 after review on the panel. Four problems with the old layout:
+            //   1. Position, health and mode were crammed into ONE text line, which truncated -
+            //      "REMOTE" fell off the end entirely on a faulted valve.
+            //   2. Position had no visual weight. It is the single most important fact about a
+            //      ballast valve (open = flooding path, closed = blocked line) and it read as a
+            //      fragment mid-sentence, the same size as everything else.
+            //   3. The VALVE TAG card spent a whole row on one value. The tag now sits in the
+            //      header beside the CM number, which buys that row back.
+            //   4. CmdPos was computed in the PLC and never displayed, so a stuck limit switch -
+            //      valve reports CLOSED, operator asked for OPEN, nothing technically "faulted" -
+            //      was invisible.
+            //
+            // Layout: header 0..40 | position block 52..152 (circle left, big word right)
+            //         fault row 164..196 | mode row 198..224 | open/close 236..288
+            //         reset/service 300..348 | 32px bottom margin.
             SetPropUInt(sc, "Width", (uint)SX(460));
-            SetPropUInt(sc, "Height", (uint)SY(400));
+            SetPropUInt(sc, "Height", (uint)SY(380));
             sc.BackColor = BG_DARK;
 
             // Outer canvas
-            MakeRect(sc, "Pop_BG", 0, 0, 460, 400, BG_DARK, BORDER, 2);
+            MakeRect(sc, "Pop_BG", 0, 0, 460, 380, BG_DARK, BORDER, 2);
 
-            // ─── HEADER (Y=0..38): Dark bar + Centered Valve Name ─────────
-            MakeRect(sc, "Pop_Header", 0, 0, 460, 38, BG_HEADER, BORDER, 1);
+            // ─── HEADER (Y=0..40) ─────────
+            MakeRect(sc, "Pop_Header", 0, 0, 460, 40, BG_HEADER, BORDER, 1);
 
             // Valve name (centered horizontally across 460px width)
             var titleIO = sc.ScreenItems.Create<HmiIOField>("Pop_Title");
@@ -401,11 +460,16 @@ namespace ValveDemoHmiBuilder
                     // until the confirmed schedule is entered) so the header never renders empty,
                     // and says so explicitly rather than showing a slot number that could be
                     // mistaken for a CM number.
-                    "let idx = readTag(Tags(\"SelectedValve\").Read()) || 1;\n" +
-                    "let vTag = \"V\" + (\"000\" + idx).slice(-3);\n" +
-                    "let cm = readTag(Tags(vTag + \"_CmNo\").Read());\n" +
-                    "if (cm && cm !== \"\") return cm + \" — CONTROL PANEL\";\n" +
-                    "return \"VALVE \" + idx + \" (NO CM TAG) — CONTROL PANEL\";";
+                    // Both identities on one line: the CM number the crew uses, and the valve tag
+                    // from the schedule. "CONTROL PANEL" was dropped - the operator opened this
+                    // popup deliberately and does not need to be told what it is; the room it
+                    // freed goes to the tag instead.
+                    "let cm = readTag(Tags(\"Valve_Meta_DB_SelCmNo\").Read());\n" +
+                    "let vt = readTag(Tags(\"Valve_Meta_DB_SelVTag\").Read());\n" +
+                    "let idx = readTag(Tags(\"Valves_DB_SelIdx\").Read()) || 0;\n" +
+                    "let head = (cm && cm !== \"\") ? cm : (\"VALVE \" + idx + \" (NO CM TAG)\");\n" +
+                    "if (vt && vt !== \"\") head = head + \"      ·      \" + vt;\n" +
+                    "return head;";
                 tDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
@@ -417,20 +481,51 @@ namespace ValveDemoHmiBuilder
             // since the client explicitly asked that a valve in manual mode reads on screen as not
             // remotely operable. The freed space now carries the reference data an operator
             // actually can't get anywhere else on this popup.
-            MakeRect(sc, "Pop_MetaCard", 15, 46, 430, 76, BG_CARD, BORDER, 1);
+            // VALVE TAG only. SYSTEM / LOCATION / FUNCTION were dropped on request - they are
+            // reference data the operator can read off the zone valve table, and each one cost a
+            // polled T500ms script here (the tag name is computed from SelectedValve, so these
+            // cannot bind natively). Removing three of the four cut the popup's polling load by
+            // roughly a fifth, which is most of why it was slow to populate on open.
+            // ─── POSITION BLOCK (Y=52..152) — the hero of the popup ────────────────
+            // Big word beside the circle. An operator looking at a faulted valve reads the POSITION
+            // first and the fault second, which is the right order: position decides whether this
+            // is a flooding path or a blocked line.
+            MakeRect(sc, "Pop_PosCard", 15, 52, 430, 100, BG_CARD, BORDER, 1);
 
-            string[] metaLabels  = { "VALVE TAG", "SYSTEM", "LOCATION", "FUNCTION" };
-            string[] metaSuffix  = { "VTag",      "Sys",    "Location", "Func"     };
-            for (int m = 0; m < 4; m++) {
-                int mx = 25 + (m % 2) * 215;
-                int my = 52 + (m / 2) * 36;
-                MakeTb(sc, "Pop_MetaLbl" + m, mx, my, 200, 14, metaLabels[m], BG_CARD, TXT_MUTED, 0, "Left", 9, true);
-                PopMetaField(sc, "Pop_MetaVal" + m, mx, my + 14, 200, 20, metaSuffix[m]);
-            }
+            // TextBox, not MakeLiveText: that helper creates an HmiButton, which has no alignment
+            // property at all - its text is always centred and the align argument is silently
+            // dropped. These need to sit left, against the circle.
+            var posText = MakeTb(sc, "Pop_PosText", 142, 74, 292, 42, "", BG_CARD, Color.White, 0, "Left", 27, true);
+            Dyn(posText, "Text",
+                JS_READ +
+                "var code = r(Tags(\"Valves_DB_SelPosCode\").Read());\n" +
+                "var names = [\"UNCONFIGURED\", \"\", \"\", \"FULLY OPEN\", \"FULLY CLOSED\", \"NO POSITION\", \"OPENING\", \"CLOSING\"];\n" +
+                "return names[code] || \"NO POSITION\";\n", "AutomaticTags");
+            Dyn(posText, "ForeColor",
+                JS_READ +
+                "var code = r(Tags(\"Valves_DB_SelPosCode\").Read());\n" +
+                "if (code === 3) return 0xFF32C785;\n" +
+                "if (code === 4) return 0xFFD8DEE6;\n" +
+                "if (code === 0) return 0xFF8E8E93;\n" +
+                "return 0xFF00A2FF;\n", "AutomaticTags");
+
+            // Commanded-vs-actual. Blank unless they genuinely disagree — an always-on line saying
+            // the obvious trains the operator to ignore it. This is what catches a stuck limit
+            // switch, where nothing is "faulted" but the valve is not where it was told to go.
+            var cmdText = MakeTb(sc, "Pop_CmdText", 142, 118, 292, 24, "", BG_CARD, Color.FromArgb(255, 226, 168, 0), 0, "Left", 13, true);
+            Dyn(cmdText, "Text",
+                JS_READ +
+                "var cmd  = r(Tags(\"Valves_DB_SelCmdPos\").Read());\n" +
+                "var code = r(Tags(\"Valves_DB_SelPosCode\").Read());\n" +
+                "if (!cmd) return \"\";\n" +
+                "if (code === 6 || code === 7) return \"\";\n" +   // still travelling, not yet a disagreement
+                "var want = (cmd === 1) ? 3 : 4;\n" +
+                "if (code === want) return \"\";\n" +
+                "return \"COMMANDED:  \" + ((cmd === 1) ? \"OPEN\" : \"CLOSED\");\n", "AutomaticTags");
 
             // ─── OPEN / CLOSE Buttons (Y=136..184) ─────────────────────────────────
             var btnOpen = sc.ScreenItems.Create<HmiButton>("Btn_Open");
-            btnOpen.Left = SX(20); btnOpen.Top = SY(136); btnOpen.Width = (uint)SX(200); btnOpen.Height = (uint)SY(48);
+            btnOpen.Left = SX(20); btnOpen.Top = SY(236); btnOpen.Width = (uint)SX(200); btnOpen.Height = (uint)SY(52);
             btnOpen.BackColor = Color.FromArgb(255, 16, 185, 129); btnOpen.ForeColor = Color.White;
             btnOpen.BorderColor = Color.FromArgb(255, 52, 211, 153); btnOpen.BorderWidth = 2;
             SetMLText(btnOpen, "Text", "▲ OPEN VALVE");
@@ -439,7 +534,7 @@ namespace ValveDemoHmiBuilder
             AddRemoteLockStyling(btnOpen, 0xFF10B981);
 
             var btnClose = sc.ScreenItems.Create<HmiButton>("Btn_Close");
-            btnClose.Left = SX(240); btnClose.Top = SY(136); btnClose.Width = (uint)SX(200); btnClose.Height = (uint)SY(48);
+            btnClose.Left = SX(240); btnClose.Top = SY(236); btnClose.Width = (uint)SX(200); btnClose.Height = (uint)SY(52);
             btnClose.BackColor = Color.FromArgb(255, 55, 65, 81); btnClose.ForeColor = Color.White;
             btnClose.BorderColor = Color.FromArgb(255, 107, 114, 128); btnClose.BorderWidth = 2;
             SetMLText(btnClose, "Text", "▼ CLOSE VALVE");
@@ -449,7 +544,9 @@ namespace ValveDemoHmiBuilder
 
             // ─── Large Status Circle (Diameter=90, Y=195..285) ──
             var dot = sc.ScreenItems.Create<HmiEllipse>("Pop_Dot");
-            dot.CenterX = SX(230); dot.CenterY = SY(240); dot.RadiusX = (uint)SX(45); dot.RadiusY = (uint)SY(45);
+            // Moved into the position card, left of the big word, so colour and text read as one
+            // unit instead of the circle floating alone in the middle of the popup.
+            dot.CenterX = SX(82); dot.CenterY = SY(102); dot.RadiusX = (uint)SX(38); dot.RadiusY = (uint)SY(38);
             dot.BackColor = TEAL; dot.BorderColor = Color.White;
             try {
                 // Same fix as Pop_StatusText: read the single precomputed _State tag instead of an
@@ -461,54 +558,57 @@ namespace ValveDemoHmiBuilder
                 var dotDyn = dot.Dynamizations.Create<ScriptDynamization>("BackColor");
                 dotDyn.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let code  = readTag(Tags(vTag + \"_State\").Read());\n" +
+                    // The flash now alternates red against the valve's POSITION colour rather than
+                    // against a near-black dark red. The dark half previously conveyed nothing;
+                    // now a faulted-open valve pulses red/green and a faulted-closed one pulses
+                    // red/grey, so the circle carries fault AND position in one element.
+                    "let code  = readTag(Tags(\"Valves_DB_SelPosCode\").Read());\n" +
+                    "let flt   = readTag(Tags(\"Valves_DB_SelFaultCode\").Read());\n" +
+                    "let local = readTag(Tags(\"Valves_DB_SelLocalMode\").Read());\n" +
                     "let flash = readTag(Tags(\"Valves_DB_Clock1Hz\").Read());\n\n" +
                     "if (code === 0) return 0xFF8E8E93;\n" +
-                    "if (code === 1) return flash ? 0xFFFF0000 : 0xFF3A0000;\n" +
-                    "if (code === 2) return 0xFFFF9F0A;\n" +
-                    "if (code === 3) return 0xFF32C785;\n" +
-                    "if (code === 4) return 0xFF4B5563;\n" +
-                    "return 0xFF00A2FF;\n";
-                dotDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+                    "let pos = 0xFF00A2FF;\n" +
+                    "if (code === 3) pos = 0xFF32C785;\n" +
+                    "if (code === 4) pos = 0xFF4B5563;\n" +
+                    "if (flt > 0) return flash ? 0xFFFF0000 : pos;\n" +
+                    "if (local) return 0xFFFF9F0A;\n" +
+                    "return pos;\n";
+                dotDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
-            // State label below big circle (Y=295..321)
-            var stateLabel = sc.ScreenItems.Create<HmiIOField>("Pop_StateLabel");
-            stateLabel.Left = SX(30); stateLabel.Top = SY(295); stateLabel.Width = (uint)SX(400); stateLabel.Height = (uint)SY(26);
-            stateLabel.BackColor = BG_DARK; stateLabel.ForeColor = Color.White;
-            stateLabel.BorderColor = BG_DARK; stateLabel.BorderWidth = 0;
-            SetPropEnum(stateLabel, "IOFieldType", "Output");
-            SetMLText(stateLabel, "Text", "STATE: INITIALIZING");
-            try {
-                // Same _State-based fix as Pop_Dot/Pop_StatusText above - this was the third
-                // independent copy of the same now-fixed logic gap.
-                var slDyn = stateLabel.Dynamizations.Create<ScriptDynamization>("ProcessValue");
-                slDyn.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let code = readTag(Tags(vTag + \"_State\").Read());\n" +
-                    "let healthy = readTag(Tags(vTag + \"_Healthy\").Read());\n" +
-                    "let local   = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
-                    "let names = [\"⬤  UNCONFIGURED\", \"⬤  FAULT\", \"⬤  LOCAL MODE\", \"⬤  FULLY OPEN\", \"⬤  FULLY CLOSED\", \"⬤  MOVING\"];\n" +
-                    // Health and mode moved here from the removed status strip - they were the only
-                    // two parts of it not already shown elsewhere on the popup, and mode belongs
-                    // next to live state anyway. MODE reads REMOTE/LOCAL rather than AUTO/LOCAL:
-                    // the client's requirement is that a valve in manual mode is visibly not
-                    // remotely operable, and "REMOTE" states that directly where "AUTO" implied
-                    // something about automatic sequencing that this system doesn't do.
-                    "let st = names[code] || \"⬤  MOVING\";\n" +
-                    "let hl = (code === 0) ? \"N/A\" : (healthy ? \"HEALTHY\" : \"FAULT\");\n" +
-                    "let md = local ? \"LOCAL — REMOTE LOCKED\" : \"REMOTE\";\n" +
-                    "return st + \"     ·     \" + hl + \"     ·     \" + md;\n";
-                slDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
-            } catch {}
+            // ─── FAULT ROW (Y=164..196) ────────────────────────────────────────────
+            // Its own row, so nothing truncates the way the old three-in-one line did. Blank when
+            // healthy rather than printing "HEALTHY": the absence of a red row is a cleaner signal
+            // than a reassuring word, and it means anything appearing here is worth reading.
+            var faultRow = MakeTb(sc, "Pop_FaultRow", 20, 164, 420, 32, "", BG_DARK,
+                                  Color.FromArgb(255, 240, 90, 78), 0, "Left", 15, true);
+            Dyn(faultRow, "Text",
+                JS_READ +
+                "var flt = r(Tags(\"Valves_DB_SelFaultCode\").Read());\n" +
+                "var f = [\"\", \"UNHEALTHY — ACTUATOR FAULT\", \"DOUBLE INDICATION — BOTH LIMITS MADE\", \"FAIL TO OPEN\", \"FAIL TO CLOSE\", \"LOSS OF POSITION\", \"UNEXPECTED MOVEMENT\", \"DIRECTION / LIMIT FAULT\"];\n" +
+                "if (!flt) return \"\";\n" +
+                "return \"\\u26A0  \" + (f[flt] || \"FAULT\");\n", "AutomaticTags");
+
+            // ─── MODE ROW (Y=198..224) ─────────────────────────────────────────────
+            var modeRow = MakeTb(sc, "Pop_ModeRow", 20, 198, 420, 26, "", BG_DARK, TXT_MUTED, 0, "Left", 13, true);
+            Dyn(modeRow, "Text",
+                JS_READ +
+                "var local = r(Tags(\"Valves_DB_SelLocalMode\").Read());\n" +
+                "var cfg = r(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
+                "if (!cfg) return \"OUT OF SERVICE — NOT CONFIGURED\";\n" +
+                // REMOTE/LOCAL rather than AUTO/LOCAL: the client's requirement is that a valve
+                // under hand control reads as not remotely operable, and "AUTO" would imply
+                // automatic sequencing this system does not do.
+                "return local ? \"LOCAL — REMOTE COMMANDS LOCKED\" : \"REMOTE\";\n", "AutomaticTags");
+            Dyn(modeRow, "ForeColor",
+                JS_READ +
+                "var local = r(Tags(\"Valves_DB_SelLocalMode\").Read());\n" +
+                "var cfg = r(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
+                "return (local || !cfg) ? 0xFFE2A800 : 0xFF9AA3B0;\n", "AutomaticTags");
 
             // ─── RESET FAULT Button (Left=15, Y=292, Width=138, Height=46) ───────────
             var btnReset = sc.ScreenItems.Create<HmiButton>("Btn_Reset");
-            btnReset.Left = SX(15); btnReset.Top = SY(332); btnReset.Width = (uint)SX(138); btnReset.Height = (uint)SY(46);
+            btnReset.Left = SX(15); btnReset.Top = SY(300); btnReset.Width = (uint)SX(210); btnReset.Height = (uint)SY(46);
             btnReset.BackColor = Color.FromArgb(255, 194, 65, 12); btnReset.ForeColor = Color.White;
             btnReset.BorderColor = Color.FromArgb(255, 249, 115, 22); btnReset.BorderWidth = 2;
             SetMLText(btnReset, "Text", "⚡ RESET FAULT");
@@ -518,7 +618,7 @@ namespace ValveDemoHmiBuilder
 
             // ─── SERVICE ON/OFF Toggle Switch (Left=160, Y=292, Width=138, Height=46) ──
             var btnService = sc.ScreenItems.Create<HmiButton>("Btn_Service");
-            btnService.Left = SX(160); btnService.Top = SY(332); btnService.Width = (uint)SX(138); btnService.Height = (uint)SY(46);
+            btnService.Left = SX(235); btnService.Top = SY(300); btnService.Width = (uint)SX(210); btnService.Height = (uint)SY(46);
             btnService.BackColor = Color.FromArgb(255, 58, 58, 60); btnService.ForeColor = Color.White;
             btnService.BorderColor = TEAL; btnService.BorderWidth = 2;
             SetMLText(btnService, "Text", "🛠️ SERVICE:  OFF");
@@ -529,59 +629,28 @@ namespace ValveDemoHmiBuilder
                 var srvDyn = btnService.Dynamizations.Create<ScriptDynamization>("Text");
                 srvDyn.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let vTag = \"V\" + vNum;\n" +
-                    "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
+                    "let cfg = readTag(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
                     "return cfg ? \"🛠️ SERVICE:  ON\" : \"🛠️ SERVICE:  OFF\";\n";
-                // T500ms, not AutomaticTags - same dynamically-computed-tag-name issue as
-                // Pop_StatusText/Pop_Dot/Pop_StateLabel (vTag depends on SelectedValve), fixed the
-                // same way: a light poll guarantees correctness on every valve switch.
-                srvDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+                // AutomaticTags, not T500ms: this reads the fixed Valves_DB_SelConfigured mirror tag now,
+                // not a name computed from SelectedValve, so the dependency is trackable.
+                srvDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
             try {
                 var srvBg = btnService.Dynamizations.Create<ScriptDynamization>("BackColor");
                 srvBg.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let vTag = \"V\" + vNum;\n" +
-                    "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
+                    "let cfg = readTag(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
                     "return cfg ? 0xFF00C7BE : 0xFF3A3A3C;\n";
-                srvBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+                srvBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
 
-            // ─── SIMULATE STUCK Toggle Switch (Left=305, Y=292, Width=140, Height=46) ──
-            var btnStuck = sc.ScreenItems.Create<HmiButton>("Btn_Stuck");
-            btnStuck.Left = SX(305); btnStuck.Top = SY(332); btnStuck.Width = (uint)SX(140); btnStuck.Height = (uint)SY(46);
-            btnStuck.BackColor = Color.FromArgb(255, 58, 58, 60); btnStuck.ForeColor = Color.White;
-            btnStuck.BorderColor = Color.FromArgb(255, 234, 179, 8); btnStuck.BorderWidth = 2;
-            SetMLText(btnStuck, "Text", "⚠️ STUCK: OFF");
-            SetFont(btnStuck, SFont(12), true);
-            SetStr(btnStuck, "Authorization", "Operate");
-            AddPopupActionButton(btnStuck, "ToggleStuck");
-            try {
-                var stkDyn = btnStuck.Dynamizations.Create<ScriptDynamization>("Text");
-                stkDyn.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let vTag = \"V\" + vNum;\n" +
-                    "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
-                    "return stk ? \"⚠️ STUCK: ON\" : \"⚠️ STUCK: OFF\";\n";
-                stkDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
-            } catch {}
-            try {
-                var stkBg = btnStuck.Dynamizations.Create<ScriptDynamization>("BackColor");
-                stkBg.ScriptCode =
-                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
-                    "let vNum = (\"000\" + (idx || 1)).slice(-3);\n" +
-                    "let vTag = \"V\" + vNum;\n" +
-                    "let stk = readTag(Tags(vTag + \"_Stuck\").Read());\n" +
-                    "return stk ? 0xFF00A2FF : 0xFF3A3A3C;\n";
-                stkBg.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
-            } catch {}
+            // SIMULATE STUCK button removed on request 2026-08-15. It was simulation-only
+            // scaffolding (it drives Valves_DB.Stuck[i], which only the simulated-travel branch of
+            // FB_ValveLoop reads) and is meaningless once a valve runs on real I/O - a real valve
+            // that fails to travel latches Fail-to-Open/Close from the genuine timeout instead.
+            // Its two T500ms scripts went with it. The Stuck member and the ToggleStuck action
+            // handler are left in place, unused and inert, so simulated-valve testing still works
+            // from a watch table if it is ever needed again.
 
             Console.WriteLine("  Screen_Popup built: Direct PLC tag reading for live status, bracket-notation close button.");
         }
@@ -742,7 +811,7 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "OV_BG", 0, 0, SCREEN_W, SCREEN_H, BG_DARK, BG_DARK, 0);
 
             // Header and Summary bars
-            BuildHeaderBar(sc, "Valve Control System — 96 Slots Overview", true);
+            BuildHeaderBar(sc, "Valve Control System — 89 Slots Overview", true);
             BuildSummaryBar(sc);
 
             // Place VALVE_COUNT cards
@@ -896,7 +965,7 @@ namespace ValveDemoHmiBuilder
                             "let t = readTag(Tags(\"Valves_DB_TotalTransit\").Read()) || 0;\n" +
                             "let f = readTag(Tags(\"Valves_DB_TotalFault\").Read()) || 0;\n" +
                             "let l = readTag(Tags(\"Valves_DB_TotalLocal\").Read()) || 0;\n" +
-                            "return 96 - (o + c + t + f + l);";
+                            "return " + VALVE_COUNT + " - (o + c + t + f + l);";
                         sd.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
                     } catch (Exception ex) {
                         Console.WriteLine("  [DEBUG] Error scripting Summary Cnt: " + ex);
@@ -984,22 +1053,36 @@ namespace ValveDemoHmiBuilder
                         "Tags(vTag + \"_OpenCmd\").Write(false);\n" +
                         "Tags(vTag + \"_CloseCmd\").Write(true);";
                 } else if (action == "ResetFault") {
-                    // Just writing Healthy:=true isn't enough for a double-indication fault
-                    // (OpenFB && ClosedFB both true) — FB_ValveLoop re-derives Healthy:=false from
-                    // that same condition every scan, so the reset would be undone before the
-                    // operator even saw it. Clearing both feedback bits actually resolves the root
-                    // cause: the valve shows MOVING/unknown position until commanded again, which
-                    // is the honest state after a sensor conflict.
+                    // Clears the LATCHED alarms only. It must never write OpenFB/ClosedFB/Healthy:
+                    // those four feedbacks (plus LocalMode) are valve-owned signals - the valve
+                    // reports its real physical position on them, including while it is being
+                    // operated by hand in Local Mode. The PLC and HMI read them, never drive them.
+                    //
+                    // An earlier version wrote Healthy:=true, OpenFB:=false, ClosedFB:=false here.
+                    // On a simulated valve that broke a double-indication condition deliberately.
+                    // On a REAL valve it was actively harmful: writing ClosedFB:=false on a valve
+                    // that is genuinely closed makes FB_ValveLoop see a limit switch drop with no
+                    // command running on the very next scan, which latches Unexpected Movement -
+                    // so pressing "reset fault" manufactured a fresh fault. FC_IoMapper then
+                    // restored the real value later in that same scan, leaving only the bogus
+                    // alarm behind. Removed 2026-08-15.
+                    //
+                    // A condition that is still physically true cannot be acknowledged away, and
+                    // should not be: double-indication re-trips while both limits are made, and
+                    // Loss of Position (PosLostTmr) re-arms while the valve genuinely has no
+                    // position. Both clear on their own once the valve reports a real position.
                     scriptBody =
                         helper +
                         "let idx = readTag(Tags(\"SelectedValve\").Read());\n" +
                         "let vTag = \"V\" + (\"000\" + (idx || 1)).slice(-3);\n" +
-                        "Tags(vTag + \"_Healthy\").Write(true);\n" +
-                        "Tags(vTag + \"_OpenFB\").Write(false);\n" +
-                        "Tags(vTag + \"_ClosedFB\").Write(false);\n" +
                         "Tags(vTag + \"_TimeoutOpenAlarm\").Write(false);\n" +
                         "Tags(vTag + \"_TimeoutCloseAlarm\").Write(false);\n" +
-                        "Tags(vTag + \"_UnexpMove\").Write(false);";
+                        "Tags(vTag + \"_UnexpMove\").Write(false);\n" +
+                        // Direction/limit discrepancy (H) is latched like the three above, so it
+                        // clears the same way. If the wiring really is crossed it re-latches within
+                        // the 5s grace on the next command - correct, and the same self-re-trip
+                        // behaviour double-indication and Loss of Position already have.
+                        "Tags(vTag + \"_DirFault\").Write(false);";
                 } else if (action == "ToggleService") {
                     // SERVICE and CONFIGURED are the same underlying flag (this toggle just flips
                     // vTag+"_Configured", same as the Config screen's toggle) - reusing the exact
@@ -1066,8 +1149,14 @@ namespace ValveDemoHmiBuilder
                 // reset the flag and retargeting doesn't go through the X button at all. No guard
                 // needed on any of the 3 popups in the end: Edit/Confirm are modal, which already
                 // makes stacking structurally impossible without extra tracking.
+                // Two writes on purpose. SelectedValve stays an HMI-internal tag and is what the
+                // popup's ACTION scripts (open/close/reset/service) read to know which valve to
+                // command. Valves_DB_SelIdx is the PLC-side copy: FB_ValveLoop mirrors that valve's
+                // live fields into fixed Sel* tags so the popup's DISPLAY elements can bind to
+                // static tag names and run on AutomaticTags instead of polling at T500ms.
                 string jsCode =
                     "Tags(\"SelectedValve\").Write(" + vIndex + ");\n" +
+                    "Tags(\"Valves_DB_SelIdx\").Write(" + vIndex + ");\n" +
                     "HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_Valve\", \"Screen_Popup\", false, \" \", " + SX(730) + ", " + SY(340) + ", false);";
 
                 scp.SetValue(script, jsCode, null);
@@ -1262,20 +1351,24 @@ namespace ValveDemoHmiBuilder
         {
             string guard =
                 "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                "let idx = readTag(Tags(\"SelectedValve\").Read()) || 1;\n" +
-                "let vTag = \"V\" + (\"000\" + idx).slice(-3);\n" +
-                "let local = readTag(Tags(vTag + \"_LocalMode\").Read());\n" +
-                "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
-                "let locked = local || !cfg;\n";
+                "let local = readTag(Tags(\"Valves_DB_SelLocalMode\").Read());\n" +
+                "let cfg = readTag(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
+                // Healthy added 2026-08-16 from live test C3. The PLC's command guard is
+                // NOT LocalMode AND Healthy, but this styling only checked the first two - so on an
+                // unhealthy valve the buttons stayed fully lit while the PLC silently discarded
+                // every press. The lock must mirror what the PLC will actually accept, or the
+                // operator gets no explanation for a button that does nothing.
+                "let healthy = readTag(Tags(\"Valves_DB_SelHealthy\").Read());\n" +
+                "let locked = local || !cfg || !healthy;\n";
             try {
                 var bDyn = btn.Dynamizations.Create<ScriptDynamization>("BackColor");
                 bDyn.ScriptCode = guard + "return locked ? 0xFF2A2E38 : " + string.Format("0x{0:X8}", activeBackColor) + ";";
-                bDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+                bDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
             try {
                 var fDyn = btn.Dynamizations.Create<ScriptDynamization>("ForeColor");
                 fDyn.ScriptCode = guard + "return locked ? 0xFF6B7280 : 0xFFFFFFFF;";
-                fDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+                fDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
         }
 
@@ -1298,14 +1391,11 @@ namespace ValveDemoHmiBuilder
                 var d = f.Dynamizations.Create<ScriptDynamization>("ProcessValue");
                 d.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
-                    "let idx = readTag(Tags(\"SelectedValve\").Read()) || 1;\n" +
-                    "let vTag = \"V\" + (\"000\" + idx).slice(-3);\n" +
-                    "let s = readTag(Tags(vTag + \"_" + tagSuffix + "\").Read());\n" +
+                    "let s = readTag(Tags(\"Valve_Meta_DB_SelVTag\").Read());\n" +
                     "return (s === null || s === undefined || s === \"\") ? \"—\" : s;";
-                // T500ms for the same reason as the rest of this popup: the tag name is computed
-                // from SelectedValve, so AutomaticTags can't track the dependency reliably when the
-                // popup is retargeted at a different valve while already open.
-                d.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T500ms");
+                // AutomaticTags: reads the fixed Valve_Meta_DB_SelVTag mirror tag, so the dependency
+                // is statically known - no polling needed.
+                d.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
             } catch {}
         }
 
@@ -1337,7 +1427,7 @@ namespace ValveDemoHmiBuilder
 
                 // Import Valves_DB
                 try {
-                    string dbPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_valves_db.xml";
+                    string dbPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_valves_db.xml";
                     Console.WriteLine("  [PLC] Importing Valves_DB from " + dbPath + "...");
                     var dbBlock = plc.BlockGroup.Blocks.Import(new FileInfo(dbPath), ImportOptions.Override);
                     if (dbBlock != null && dbBlock.Count > 0) 
@@ -1348,7 +1438,7 @@ namespace ValveDemoHmiBuilder
                 
                 // Import FB_ValveLoop
                 try {
-                    string loopPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_fb_valveloop.xml";
+                    string loopPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_fb_valveloop.xml";
                     Console.WriteLine("  [PLC] Importing FB_ValveLoop from " + loopPath + "...");
                     var loopBlock = plc.BlockGroup.Blocks.Import(new FileInfo(loopPath), ImportOptions.Override);
                     if (loopBlock != null && loopBlock.Count > 0)
@@ -1359,7 +1449,7 @@ namespace ValveDemoHmiBuilder
 
                 // Import Valve_Meta_DB
                 try {
-                    string metaPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_valve_meta_db.xml";
+                    string metaPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_valve_meta_db.xml";
                     Console.WriteLine("  [PLC] Importing Valve_Meta_DB from " + metaPath + "...");
                     var metaBlock = plc.BlockGroup.Blocks.Import(new FileInfo(metaPath), ImportOptions.Override);
                     if (metaBlock != null && metaBlock.Count > 0)
@@ -1374,7 +1464,7 @@ namespace ValveDemoHmiBuilder
                 // channel indices default to 0 (unassigned), which every consumer treats as
                 // "still on symbolic simulation".
                 try {
-                    string udtPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_udt_valve_config.xml";
+                    string udtPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_udt_valve_config.xml";
                     Console.WriteLine("  [PLC] Importing UDT_Valve_Config from " + udtPath + "...");
                     var udtResult = plc.TypeGroup.Types.Import(new FileInfo(udtPath), ImportOptions.Override);
                     if (udtResult != null && udtResult.Count > 0)
@@ -1383,7 +1473,7 @@ namespace ValveDemoHmiBuilder
                     Console.WriteLine("  [PLC] (Skipping UDT_Valve_Config re-import - PLC is online or type exists)");
                 }
                 try {
-                    string chPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_valve_channels_db.xml";
+                    string chPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_valve_channels_db.xml";
                     Console.WriteLine("  [PLC] Importing Valve_Channels_DB from " + chPath + "...");
                     var chBlock = plc.BlockGroup.Blocks.Import(new FileInfo(chPath), ImportOptions.Override);
                     if (chBlock != null && chBlock.Count > 0)
@@ -1392,7 +1482,7 @@ namespace ValveDemoHmiBuilder
                     Console.WriteLine("  [PLC] (Skipping Valve_Channels_DB re-import - PLC is online or block exists)");
                 }
                 try {
-                    string ioPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_io_buffer_db.xml";
+                    string ioPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_io_buffer_db.xml";
                     Console.WriteLine("  [PLC] Importing IO_Buffer_DB from " + ioPath + "...");
                     var ioBlock = plc.BlockGroup.Blocks.Import(new FileInfo(ioPath), ImportOptions.Override);
                     if (ioBlock != null && ioBlock.Count > 0)
@@ -1401,7 +1491,7 @@ namespace ValveDemoHmiBuilder
                     Console.WriteLine("  [PLC] (Skipping IO_Buffer_DB re-import - PLC is online or block exists)");
                 }
                 try {
-                    string fcPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_fc_iomapper.xml";
+                    string fcPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_fc_iomapper.xml";
                     Console.WriteLine("  [PLC] Importing FC_IoMapper from " + fcPath + "...");
                     var fcBlock = plc.BlockGroup.Blocks.Import(new FileInfo(fcPath), ImportOptions.Override);
                     if (fcBlock != null && fcBlock.Count > 0)
@@ -1413,7 +1503,7 @@ namespace ValveDemoHmiBuilder
                 // TIA 2026-08-08 after assigning all 3 to PLC_1's PROFINET IO system) into/out of
                 // IO_Buffer_DB. Also not yet called from Main[OB1] - see its own header comment.
                 try {
-                    string physIoPath = @"C:\Users\Admin\Documents\Automation\valveDemo2\temp_fc_physical_io_copy.xml";
+                    string physIoPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_fc_physical_io_copy.xml";
                     Console.WriteLine("  [PLC] Importing FC_PhysicalIoCopy from " + physIoPath + "...");
                     var physIoBlock = plc.BlockGroup.Blocks.Import(new FileInfo(physIoPath), ImportOptions.Override);
                     if (physIoBlock != null && physIoBlock.Count > 0)
@@ -1427,6 +1517,23 @@ namespace ValveDemoHmiBuilder
         }
 
         static System.Collections.Generic.Dictionary<string, byte> _classPriorities;
+
+        // Slot -> client CM number, built from HOME_DIAGRAM (MarineScreens.cs) since that is the one
+        // table covering all 89 slots. Both files are `partial class Program`, so it is visible here.
+        // Single source of truth on purpose: a second hand-maintained list would drift the moment
+        // the client confirms their numbering.
+        static System.Collections.Generic.Dictionary<int, string> _slotCm;
+        static string CmForSlot(int slot)
+        {
+            if (_slotCm == null) {
+                _slotCm = new System.Collections.Generic.Dictionary<int, string>();
+                foreach (var v in HOME_DIAGRAM) if (!_slotCm.ContainsKey(v.Slot)) _slotCm[v.Slot] = v.Cm;
+            }
+            string cm;
+            // Falling back to the slot tag is deliberate: an unmapped slot must still get an alarm
+            // with a usable identifier rather than an empty one.
+            return _slotCm.TryGetValue(slot, out cm) ? cm : string.Format("V{0:D3}", slot);
+        }
 
         static void CreateAlarms(HmiSoftware hmi, string dbName = "Valves_DB")
         {
@@ -1469,21 +1576,38 @@ namespace ValveDemoHmiBuilder
 
             for (int i = 1; i <= VALVE_COUNT; i++) {
                 string vId = string.Format("V{0:D3}", i);
-                // Position-based zone boundaries: AFT 1-28, BILGE/ER 29-56, FWD 57-96.
-                string zoneArea = (i <= 28) ? "BALLAST AFT" : (i <= 56) ? "BILGE-ER" : "BALLAST FWD";
+                // Alarm NAME stays V0xx — a stable internal identifier that does not churn if the
+                // client renumbers. Everything the operator reads (Origin column and message text)
+                // uses the CM number, because that is what the crew and the schedule call the valve.
+                // Reported from the panel 2026-08-16: the alarm list said V001 for CM25.
+                string cm = CmForSlot(i);
+                // Position-based zone boundaries: AFT 1-27, BILGE/ER 28-54, FWD 55-89.
+                string zoneArea = (i <= 27) ? "BALLAST AFT" : (i <= 54) ? "BILGE-ER" : "BALLAST FWD";
 
                 // Pass 1: High priority alarms
-                CreateDiscreteAlarm(hmi, vId + "_Unhealthy", "ValveFault", vId + " reported Unhealthy status.", dbName + "_W_Unhealthy_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
-                CreateDiscreteAlarm(hmi, vId + "_Conflict", "ValveFault", vId + " Command Conflict (Open and Close requested).", dbName + "_W_Conflict_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
-                CreateDiscreteAlarm(hmi, vId + "_FailOpen", "ValveWarning", vId + " Failed to Open in automatic mode.", dbName + "_W_FailOpen_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
-                CreateDiscreteAlarm(hmi, vId + "_FailClose", "ValveWarning", vId + " Failed to Close in automatic mode.", dbName + "_W_FailClose_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_Unhealthy", "ValveFault", cm + " reported Unhealthy status.", dbName + "_W_Unhealthy_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
+                // W_Conflict is packed from OpenFB AND ClosedFB (FB_ValveLoop ~L545), i.e. DOUBLE
+                // INDICATION - not a command conflict. The old text said "Open and Close requested",
+                // which sent a technician looking at the command path when the actual fault is a
+                // limit switch or its wiring. Proven live 2026-08-16: test D1 (both limits made)
+                // raised it; test C5 (a genuine OpenCmd+CloseCmd in one scan) raised nothing.
+                // The real command conflict is handled at ~L210 but never packed, and deliberately
+                // gets no alarm: an operator cannot press two buttons in the same scan, the
+                // interlock clears both, and nothing moves. It is only reachable from a watch table.
+                // Renamed from _Conflict - the old alarms must be deleted during the regeneration.
+                CreateDiscreteAlarm(hmi, vId + "_DoubleInd", "ValveFault", cm + " Double indication - both limit switches made.", dbName + "_W_Conflict_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
+                // "on remote command", not "in automatic mode" - this system has REMOTE and LOCAL
+                // only, no automatic sequencing. The old wording caused real confusion during the
+                // 2026-08-15 local-mode test.
+                CreateDiscreteAlarm(hmi, vId + "_FailOpen", "ValveWarning", cm + " Failed to Open on remote command.", dbName + "_W_FailOpen_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_FailClose", "ValveWarning", cm + " Failed to Close on remote command.", dbName + "_W_FailClose_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
 
                 // Pass 2: E (Loss of Position, MED), F (Unexpected Movement, MED), G (Local Mode, LOW).
                 // Reuse ValveWarning for E/F (same tier as C/D's timeouts) and the new ValveEvent
                 // class for G, since Local Mode is a logged event rather than a real fault.
-                CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveWarning", vId + " Loss of Position Feedback (idle, no limit switch made).", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
-                CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", vId + " Unexpected Movement detected (uncommanded limit switch change).", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
-                CreateDiscreteAlarm(hmi, vId + "_Local", "ValveEvent", vId + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16, vId, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveWarning", cm + " Loss of Position Feedback (idle, no limit switch made).", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", cm + " Unexpected Movement detected (uncommanded limit switch change).", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
+                CreateDiscreteAlarm(hmi, vId + "_Local", "ValveEvent", cm + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
             }
             Console.WriteLine("  Created " + (VALVE_COUNT * 7 + 9) + " discrete alarms.");
         }
@@ -1515,7 +1639,7 @@ namespace ValveDemoHmiBuilder
 
         static void CreateSummaryHmiTags(HmiSoftware hmi, bool forceRefreshNewTags = false)
         {
-            Console.WriteLine("\n[STEP 2] Checking and creating HMI tags for all 96 slots...");
+            Console.WriteLine("\n[STEP 2] Checking and creating HMI tags for all 89 slots...");
             // SelectedValve is an INTERNAL HMI tag - no PLC address, just holds the selected index
             CreateInternalTag(hmi, "SelectedValve", "Int");
             // BilgePage tracks which page (0 or 1) of the Bilge valve table is currently shown —
@@ -1537,6 +1661,22 @@ namespace ValveDemoHmiBuilder
             CreateSummaryTag(hmi, "Valves_DB_TotalConfigured", "Valves_DB.TotalConfigured", "Int", forceRefreshNewTags);
             CreateSummaryTag(hmi, "Valves_DB_Clock1Hz",    "Valves_DB.Clock_1Hz",   "Bool");
 
+            // Selected-valve mirror for the control popup. The HMI writes SelIdx on valve tap;
+            // FB_ValveLoop copies that valve's live fields into these fixed tags every scan. Fixed
+            // names are the whole point - they let the popup's display scripts run on AutomaticTags
+            // instead of a T500ms poll, which is what made the popup slow to populate. New tags, so
+            // they need forceRefreshNewTags to get their PLC address bound (see the note above).
+            CreateSummaryTag(hmi, "Valves_DB_SelIdx",        "Valves_DB.SelIdx",        "Int",  forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valves_DB_SelState",      "Valves_DB.SelState",      "Int",  forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valves_DB_SelHealthy",    "Valves_DB.SelHealthy",    "Bool", forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valves_DB_SelLocalMode",  "Valves_DB.SelLocalMode",  "Bool", forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valves_DB_SelConfigured", "Valves_DB.SelConfigured", "Bool", forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valves_DB_SelCmdPos",    "Valves_DB.SelCmdPos",     "Int",  forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valves_DB_SelPosCode",   "Valves_DB.SelPosCode",    "Int",  forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valves_DB_SelFaultCode", "Valves_DB.SelFaultCode",  "Int",  forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valve_Meta_DB_SelCmNo",   "Valve_Meta_DB.SelCmNo",   "String", forceRefreshNewTags);
+            CreateSummaryTag(hmi, "Valve_Meta_DB_SelVTag",   "Valve_Meta_DB.SelVTag",   "String", forceRefreshNewTags);
+
             // Per-zone sub-totals — FB_ValveLoop computes these in the same 1..88 pass that
             // already builds the plant-wide totals above, so each KPI/caption cell on
             // Screen_Home can read one tag instead of looping its zone's valves itself.
@@ -1554,7 +1694,7 @@ namespace ValveDemoHmiBuilder
                 }
             }
 
-            Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 96 slots...");
+            Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 89 slots...");
             for (int i = 1; i <= VALVE_COUNT; i++) {
                 string vTag = string.Format("V{0:D3}", i);
                 string plcPrefix = string.Format("Valves_DB.Valve[{0}]", i);
@@ -1575,6 +1715,16 @@ namespace ValveDemoHmiBuilder
                 CreateSummaryTag(hmi, vTag + "_TimeoutOpenAlarm",  "Valves_DB.TimeoutOpenAlarm[" + i + "]",  "Bool", forceRefreshNewTags);
                 CreateSummaryTag(hmi, vTag + "_TimeoutCloseAlarm", "Valves_DB.TimeoutCloseAlarm[" + i + "]", "Bool", forceRefreshNewTags);
                 CreateSummaryTag(hmi, vTag + "_UnexpMove",         "Valves_DB.UnexpMove[" + i + "]",         "Bool", forceRefreshNewTags);
+                CreateSummaryTag(hmi, vTag + "_DirFault",          "Valves_DB.DirFault[" + i + "]",          "Bool", forceRefreshNewTags);
+                // _State is read by every mimic badge, every diagram overlay and the popup, but was
+                // never CREATED here - the whole set was inherited from an earlier script and just
+                // happened to resolve. It stopped happening the moment a screen referenced slot 89:
+                // V089_State had never been made (the pool was 96 slots, then cut to 89, and the
+                // orphan cleanup removed V090-V096), so Home's CM90 overlay failed to compile.
+                // Created explicitly now so the set is owned by this generator and complete.
+                CreateSummaryTag(hmi, vTag + "_State",             "Valves_DB.StateCode[" + i + "]",         "Int",  forceRefreshNewTags);
+                // Position-only code for the mimic fill, so a faulted valve still shows where it is.
+                CreateSummaryTag(hmi, vTag + "_PosCode",           "Valves_DB.PosCode[" + i + "]",           "Int",  forceRefreshNewTags);
                 // Manually-maintained reference data (Valve_Meta_DB) — not written by any
                 // script; an engineer fills these in by hand. Built for all 88 now so every
                 // future zone screen (not just Bilge/ER) can reuse them without another pass.
@@ -1621,6 +1771,9 @@ namespace ValveDemoHmiBuilder
                 for (int slot = 1; slot <= 14; slot++) {
                     CreateSummaryTag(hmi, zp + "_TblCmNo_" + slot, "Valve_Meta_DB." + zp + "TblCmNo[" + slot + "]", "String", forceRefreshNewTags);
                     CreateSummaryTag(hmi, zp + "_TblVTag_" + slot, "Valve_Meta_DB." + zp + "TblVTag[" + slot + "]", "String", forceRefreshNewTags);
+                    // FUNCTION column, added 2026-08-16. Like CmNo/VTag above this is a new tag,
+                    // so it needs the --fix-tags pass afterwards to bind its PLC address.
+                    CreateSummaryTag(hmi, zp + "_TblFunc_" + slot, "Valve_Meta_DB." + zp + "TblFunc[" + slot + "]", "String", forceRefreshNewTags);
                 }
             }
 
@@ -1648,18 +1801,30 @@ namespace ValveDemoHmiBuilder
                 if (tag != null && !forceRefresh) return;
                 if (tag == null) tag = table.Tags.Create(tagName, "ValveTags");
 
+                // Connection and PlcName FIRST. A brand-new tag has no connection assigned, and
+                // TIA rejects a PlcTag address on a tag that isn't attached to a PLC connection
+                // yet — which is why newly created tags always failed their address on the run
+                // that created them and had to be repaired by a second --fix-tags pass. Setting
+                // the connection up front removes the two-pass dance entirely.
+                SetStr(tag, "Connection", HMI_CONNECTION);
+                SetStr(tag, "PlcName", "PLC_1");
+
                 // Try all known property names for the PLC address field
                 bool addressSet = false;
+                string lastErr = "no writable address property found";
                 foreach (var propName in new string[]{ "LogicalAddress", "PlcTag", "Address", "TagAddress" }) {
                     try {
                         var pp = tag.GetType().GetProperty(propName);
                         if (pp != null && pp.CanWrite) { pp.SetValue(tag, plcAddress, null); addressSet = true; break; }
-                    } catch {}
+                    } catch (Exception aex) {
+                        // Keep the real reason. Swallowing it silently is what made this take a
+                        // diagnostic detour: the WARN said "could not set" but never said why.
+                        lastErr = propName + ": " + Root(aex);
+                    }
                 }
-                if (!addressSet) Console.WriteLine("  [WARN] Could not set address for " + tagName);
-
-                SetStr(tag, "Connection", HMI_CONNECTION);
-                SetStr(tag, "PlcName", "PLC_1");
+                if (!addressSet)
+                    Console.WriteLine("  [WARN] Could not set address for " + tagName +
+                                      " (" + plcAddress + ") -> " + lastErr);
 
                 // Set DataType by trying known enum values
                 try {

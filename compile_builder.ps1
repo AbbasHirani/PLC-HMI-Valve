@@ -2,7 +2,7 @@
 # the /nologo, /target: etc. switches into filesystem paths (MSYS path conversion turns "/nologo"
 # into "C:/Program Files/Git/nologo"), which fails with CS2001.
 $ErrorActionPreference = "Stop"
-Set-Location "c:\Users\Admin\Documents\Automation\valveDemo2"
+Set-Location "c:\Users\abbas\OneDrive\Documents\Automation\valveDemo2"
 
 $csc  = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $dll  = "C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\Siemens.Engineering.dll"

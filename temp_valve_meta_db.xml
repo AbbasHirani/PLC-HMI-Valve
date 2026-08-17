@@ -51,98 +51,98 @@
     <!-- Manually-maintained reference data, one entry per slot (V001..V096). Not written by
          any script or simulation — an engineer fills these in once via TIA's DB view (or online
          monitoring) after commissioning. Defaults to empty strings until populated. -->
-    <Member Name="Name" Datatype="Array[1..96] of String[20]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Name" Datatype="Array[1..89] of String[20]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="Location" Datatype="Array[1..96] of String[20]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Location" Datatype="Array[1..89] of String[20]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
-      <Subelement Path="29">
+      <Subelement Path="28">
         <StartValue>'Bow thruster room'</StartValue>
+      </Subelement>
+      <Subelement Path="29">
+        <StartValue>'Hold 4'</StartValue>
       </Subelement>
       <Subelement Path="30">
         <StartValue>'Hold 4'</StartValue>
       </Subelement>
       <Subelement Path="31">
-        <StartValue>'Hold 4'</StartValue>
+        <StartValue>'Hold 3'</StartValue>
       </Subelement>
       <Subelement Path="32">
         <StartValue>'Hold 3'</StartValue>
       </Subelement>
       <Subelement Path="33">
-        <StartValue>'Hold 3'</StartValue>
-      </Subelement>
-      <Subelement Path="34">
         <StartValue>'ER'</StartValue>
       </Subelement>
-      <Subelement Path="35">
+      <Subelement Path="34">
         <StartValue>'ER/Pipe void'</StartValue>
       </Subelement>
-      <Subelement Path="36">
+      <Subelement Path="35">
         <StartValue>'Pipe void aft'</StartValue>
+      </Subelement>
+      <Subelement Path="36">
+        <StartValue>'Engine Room'</StartValue>
       </Subelement>
       <Subelement Path="37">
         <StartValue>'Engine Room'</StartValue>
       </Subelement>
       <Subelement Path="38">
-        <StartValue>'Engine Room'</StartValue>
+        <StartValue>'Hold 2'</StartValue>
       </Subelement>
       <Subelement Path="39">
         <StartValue>'Hold 2'</StartValue>
       </Subelement>
       <Subelement Path="40">
-        <StartValue>'Hold 2'</StartValue>
+        <StartValue>'Hold 1'</StartValue>
       </Subelement>
       <Subelement Path="41">
         <StartValue>'Hold 1'</StartValue>
       </Subelement>
       <Subelement Path="42">
-        <StartValue>'Hold 1'</StartValue>
+        <StartValue>'ER'</StartValue>
       </Subelement>
       <Subelement Path="43">
-        <StartValue>'ER'</StartValue>
-      </Subelement>
-      <Subelement Path="44">
         <StartValue>'Pump suction'</StartValue>
       </Subelement>
-      <Subelement Path="45">
+      <Subelement Path="44">
         <StartValue>'ER'</StartValue>
       </Subelement>
-      <Subelement Path="46">
+      <Subelement Path="45">
         <StartValue>'Void Deck'</StartValue>
       </Subelement>
-      <Subelement Path="47">
+      <Subelement Path="46">
         <StartValue>'Pipe void aft'</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>'Hold 5'</StartValue>
       </Subelement>
       <Subelement Path="48">
         <StartValue>'Hold 5'</StartValue>
       </Subelement>
       <Subelement Path="49">
-        <StartValue>'Hold 5'</StartValue>
+        <StartValue>'Discharge'</StartValue>
       </Subelement>
       <Subelement Path="50">
         <StartValue>'Discharge'</StartValue>
       </Subelement>
       <Subelement Path="51">
-        <StartValue>'Discharge'</StartValue>
-      </Subelement>
-      <Subelement Path="52">
         <StartValue>'Fire main'</StartValue>
       </Subelement>
-      <Subelement Path="53">
+      <Subelement Path="52">
         <StartValue>'Fire line'</StartValue>
       </Subelement>
-      <Subelement Path="54">
+      <Subelement Path="53">
         <StartValue>'Bilge Fire Pump 2'</StartValue>
       </Subelement>
-      <Subelement Path="55">
+      <Subelement Path="54">
         <StartValue>'Bilge Fire Pump 1'</StartValue>
       </Subelement>
       <Subelement Path="1">
@@ -226,106 +226,106 @@
       <Subelement Path="27">
         <StartValue>'Cross line'</StartValue>
       </Subelement>
-      <Subelement Path="57">
+      <Subelement Path="55">
         <StartValue>'TK6 High P'</StartValue>
       </Subelement>
+      <Subelement Path="56">
+        <StartValue>'Manifold'</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>'Manifold'</StartValue>
+      </Subelement>
       <Subelement Path="58">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="59">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="60">
         <StartValue>'TK5 Wing P'</StartValue>
       </Subelement>
-      <Subelement Path="61">
+      <Subelement Path="59">
         <StartValue>'TK4 DB'</StartValue>
+      </Subelement>
+      <Subelement Path="60">
+        <StartValue>'Manifold'</StartValue>
+      </Subelement>
+      <Subelement Path="61">
+        <StartValue>'TK5 DB P'</StartValue>
       </Subelement>
       <Subelement Path="62">
         <StartValue>'Manifold'</StartValue>
       </Subelement>
       <Subelement Path="63">
-        <StartValue>'TK5 DB P'</StartValue>
+        <StartValue>'TK3 Wing S'</StartValue>
       </Subelement>
       <Subelement Path="64">
         <StartValue>'Manifold'</StartValue>
       </Subelement>
       <Subelement Path="65">
-        <StartValue>'TK3 Wing S'</StartValue>
+        <StartValue>'Manifold'</StartValue>
       </Subelement>
       <Subelement Path="66">
         <StartValue>'Manifold'</StartValue>
       </Subelement>
       <Subelement Path="67">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="68">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="69">
         <StartValue>'TK2 Wing P'</StartValue>
       </Subelement>
-      <Subelement Path="70">
+      <Subelement Path="68">
         <StartValue>'TK1 DB C'</StartValue>
+      </Subelement>
+      <Subelement Path="69">
+        <StartValue>'Main line'</StartValue>
+      </Subelement>
+      <Subelement Path="70">
+        <StartValue>'TK2 High C'</StartValue>
       </Subelement>
       <Subelement Path="71">
         <StartValue>'Main line'</StartValue>
       </Subelement>
       <Subelement Path="72">
-        <StartValue>'TK2 High C'</StartValue>
+        <StartValue>'TK2 Wing S'</StartValue>
       </Subelement>
       <Subelement Path="73">
-        <StartValue>'Main line'</StartValue>
+        <StartValue>'Fwd peak'</StartValue>
       </Subelement>
       <Subelement Path="74">
-        <StartValue>'TK2 Wing S'</StartValue>
+        <StartValue>'Main line'</StartValue>
       </Subelement>
       <Subelement Path="75">
         <StartValue>'Fwd peak'</StartValue>
       </Subelement>
       <Subelement Path="76">
-        <StartValue>'Main line'</StartValue>
-      </Subelement>
-      <Subelement Path="77">
-        <StartValue>'Fwd peak'</StartValue>
-      </Subelement>
-      <Subelement Path="78">
         <StartValue>'TK3 Wing P'</StartValue>
       </Subelement>
+      <Subelement Path="77">
+        <StartValue>'Manifold'</StartValue>
+      </Subelement>
+      <Subelement Path="78">
+        <StartValue>'Manifold'</StartValue>
+      </Subelement>
       <Subelement Path="79">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="80">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="81">
         <StartValue>'TK4 Wing P'</StartValue>
       </Subelement>
-      <Subelement Path="82">
+      <Subelement Path="80">
         <StartValue>'TK4 Wing S'</StartValue>
       </Subelement>
+      <Subelement Path="81">
+        <StartValue>'Manifold'</StartValue>
+      </Subelement>
+      <Subelement Path="82">
+        <StartValue>'Manifold'</StartValue>
+      </Subelement>
       <Subelement Path="83">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="84">
-        <StartValue>'Manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="85">
         <StartValue>'TK3 DB'</StartValue>
       </Subelement>
-      <Subelement Path="86">
+      <Subelement Path="84">
         <StartValue>'Cross line'</StartValue>
+      </Subelement>
+      <Subelement Path="85">
+        <StartValue>'Cross-over manifold'</StartValue>
+      </Subelement>
+      <Subelement Path="86">
+        <StartValue>'Cross-over manifold'</StartValue>
       </Subelement>
       <Subelement Path="87">
         <StartValue>'Cross-over manifold'</StartValue>
       </Subelement>
-      <Subelement Path="88">
-        <StartValue>'Cross-over manifold'</StartValue>
-      </Subelement>
       <Subelement Path="89">
-        <StartValue>'Cross-over manifold'</StartValue>
-      </Subelement>
-      <Subelement Path="91">
         <StartValue>'Cross-over manifold'</StartValue>
       </Subelement>
     </Member>
@@ -336,91 +336,91 @@
          things. SysName likewise replaces the old index-range-derived zone string - a valve's
          system is schedule data, not something to infer from where it happens to sit in the array.
          Member names avoid SCL reserved words (FuncName not Function, SysName not System). -->
-    <Member Name="CmNo" Datatype="Array[1..96] of String[6]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="CmNo" Datatype="Array[1..89] of String[6]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
-      <Subelement Path="29">
+      <Subelement Path="28">
         <StartValue>'CM01'</StartValue>
       </Subelement>
-      <Subelement Path="30">
+      <Subelement Path="29">
         <StartValue>'CM02'</StartValue>
       </Subelement>
-      <Subelement Path="31">
+      <Subelement Path="30">
         <StartValue>'CM03'</StartValue>
       </Subelement>
-      <Subelement Path="32">
+      <Subelement Path="31">
         <StartValue>'CM04'</StartValue>
       </Subelement>
-      <Subelement Path="33">
+      <Subelement Path="32">
         <StartValue>'CM05'</StartValue>
       </Subelement>
-      <Subelement Path="34">
+      <Subelement Path="33">
         <StartValue>'CM06'</StartValue>
       </Subelement>
-      <Subelement Path="35">
+      <Subelement Path="34">
         <StartValue>'CM07'</StartValue>
       </Subelement>
-      <Subelement Path="36">
+      <Subelement Path="35">
         <StartValue>'CM08'</StartValue>
       </Subelement>
-      <Subelement Path="37">
+      <Subelement Path="36">
         <StartValue>'CM09'</StartValue>
       </Subelement>
-      <Subelement Path="38">
+      <Subelement Path="37">
         <StartValue>'CM10'</StartValue>
       </Subelement>
-      <Subelement Path="39">
+      <Subelement Path="38">
         <StartValue>'CM11'</StartValue>
       </Subelement>
-      <Subelement Path="40">
+      <Subelement Path="39">
         <StartValue>'CM12'</StartValue>
       </Subelement>
-      <Subelement Path="41">
+      <Subelement Path="40">
         <StartValue>'CM13'</StartValue>
       </Subelement>
-      <Subelement Path="42">
+      <Subelement Path="41">
         <StartValue>'CM14'</StartValue>
       </Subelement>
-      <Subelement Path="43">
+      <Subelement Path="42">
         <StartValue>'CM15'</StartValue>
       </Subelement>
-      <Subelement Path="44">
+      <Subelement Path="43">
         <StartValue>'CM16'</StartValue>
       </Subelement>
-      <Subelement Path="45">
+      <Subelement Path="44">
         <StartValue>'CM17'</StartValue>
       </Subelement>
-      <Subelement Path="46">
+      <Subelement Path="45">
         <StartValue>'CM18'</StartValue>
       </Subelement>
-      <Subelement Path="47">
+      <Subelement Path="46">
         <StartValue>'CM19'</StartValue>
       </Subelement>
-      <Subelement Path="48">
+      <Subelement Path="47">
         <StartValue>'CM20'</StartValue>
       </Subelement>
-      <Subelement Path="49">
+      <Subelement Path="48">
         <StartValue>'CM21'</StartValue>
       </Subelement>
-      <Subelement Path="50">
+      <Subelement Path="49">
         <StartValue>'CM23'</StartValue>
       </Subelement>
-      <Subelement Path="51">
+      <Subelement Path="50">
         <StartValue>'CM24'</StartValue>
       </Subelement>
-      <Subelement Path="52">
+      <Subelement Path="51">
         <StartValue>'CM94'</StartValue>
       </Subelement>
-      <Subelement Path="53">
+      <Subelement Path="52">
         <StartValue>'CM95'</StartValue>
       </Subelement>
-      <Subelement Path="54">
+      <Subelement Path="53">
         <StartValue>'CM96'</StartValue>
       </Subelement>
-      <Subelement Path="55">
+      <Subelement Path="54">
         <StartValue>'CM97'</StartValue>
       </Subelement>
       <Subelement Path="1">
@@ -504,197 +504,197 @@
       <Subelement Path="27">
         <StartValue>'CM85'</StartValue>
       </Subelement>
-      <Subelement Path="57">
+      <Subelement Path="55">
         <StartValue>'CM27'</StartValue>
       </Subelement>
-      <Subelement Path="58">
+      <Subelement Path="56">
         <StartValue>'CM28'</StartValue>
       </Subelement>
-      <Subelement Path="59">
+      <Subelement Path="57">
         <StartValue>'CM29'</StartValue>
       </Subelement>
-      <Subelement Path="60">
+      <Subelement Path="58">
         <StartValue>'CM30'</StartValue>
       </Subelement>
-      <Subelement Path="61">
+      <Subelement Path="59">
         <StartValue>'CM31'</StartValue>
       </Subelement>
-      <Subelement Path="62">
+      <Subelement Path="60">
         <StartValue>'CM32'</StartValue>
       </Subelement>
-      <Subelement Path="63">
+      <Subelement Path="61">
         <StartValue>'CM33'</StartValue>
       </Subelement>
-      <Subelement Path="64">
+      <Subelement Path="62">
         <StartValue>'CM34'</StartValue>
       </Subelement>
-      <Subelement Path="65">
+      <Subelement Path="63">
         <StartValue>'CM35'</StartValue>
       </Subelement>
-      <Subelement Path="66">
+      <Subelement Path="64">
         <StartValue>'CM36'</StartValue>
       </Subelement>
-      <Subelement Path="67">
+      <Subelement Path="65">
         <StartValue>'CM37'</StartValue>
       </Subelement>
-      <Subelement Path="68">
+      <Subelement Path="66">
         <StartValue>'CM38'</StartValue>
       </Subelement>
-      <Subelement Path="69">
+      <Subelement Path="67">
         <StartValue>'CM39'</StartValue>
       </Subelement>
-      <Subelement Path="70">
+      <Subelement Path="68">
         <StartValue>'CM40'</StartValue>
       </Subelement>
-      <Subelement Path="71">
+      <Subelement Path="69">
         <StartValue>'CM41'</StartValue>
       </Subelement>
-      <Subelement Path="72">
+      <Subelement Path="70">
         <StartValue>'CM42'</StartValue>
       </Subelement>
-      <Subelement Path="73">
+      <Subelement Path="71">
         <StartValue>'CM43'</StartValue>
       </Subelement>
-      <Subelement Path="74">
+      <Subelement Path="72">
         <StartValue>'CM44'</StartValue>
       </Subelement>
-      <Subelement Path="75">
+      <Subelement Path="73">
         <StartValue>'CM45'</StartValue>
       </Subelement>
-      <Subelement Path="76">
+      <Subelement Path="74">
         <StartValue>'CM46'</StartValue>
       </Subelement>
-      <Subelement Path="77">
+      <Subelement Path="75">
         <StartValue>'CM47'</StartValue>
       </Subelement>
-      <Subelement Path="78">
+      <Subelement Path="76">
         <StartValue>'CM48'</StartValue>
       </Subelement>
-      <Subelement Path="79">
+      <Subelement Path="77">
         <StartValue>'CM49'</StartValue>
       </Subelement>
-      <Subelement Path="80">
+      <Subelement Path="78">
         <StartValue>'CM61'</StartValue>
       </Subelement>
-      <Subelement Path="81">
+      <Subelement Path="79">
         <StartValue>'CM62'</StartValue>
       </Subelement>
-      <Subelement Path="82">
+      <Subelement Path="80">
         <StartValue>'CM63'</StartValue>
       </Subelement>
-      <Subelement Path="83">
+      <Subelement Path="81">
         <StartValue>'CM64'</StartValue>
       </Subelement>
-      <Subelement Path="84">
+      <Subelement Path="82">
         <StartValue>'CM65'</StartValue>
       </Subelement>
-      <Subelement Path="85">
+      <Subelement Path="83">
         <StartValue>'CM66'</StartValue>
       </Subelement>
-      <Subelement Path="86">
+      <Subelement Path="84">
         <StartValue>'CM77'</StartValue>
       </Subelement>
-      <Subelement Path="87">
+      <Subelement Path="85">
         <StartValue>'CM86'</StartValue>
       </Subelement>
-      <Subelement Path="88">
+      <Subelement Path="86">
         <StartValue>'CM87'</StartValue>
       </Subelement>
-      <Subelement Path="89">
+      <Subelement Path="87">
         <StartValue>'CM88'</StartValue>
       </Subelement>
-      <Subelement Path="90">
+      <Subelement Path="88">
         <StartValue>'CM89'</StartValue>
       </Subelement>
-      <Subelement Path="91">
+      <Subelement Path="89">
         <StartValue>'CM90'</StartValue>
       </Subelement>
     </Member>
-    <Member Name="VTag" Datatype="Array[1..96] of String[12]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="VTag" Datatype="Array[1..89] of String[12]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
-      <Subelement Path="29">
+      <Subelement Path="28">
         <StartValue>'10-041-A1'</StartValue>
       </Subelement>
-      <Subelement Path="30">
+      <Subelement Path="29">
         <StartValue>'10-017-A1'</StartValue>
       </Subelement>
-      <Subelement Path="31">
+      <Subelement Path="30">
         <StartValue>'10-018-A1'</StartValue>
       </Subelement>
-      <Subelement Path="32">
+      <Subelement Path="31">
         <StartValue>'10-021-A1'</StartValue>
       </Subelement>
-      <Subelement Path="33">
+      <Subelement Path="32">
         <StartValue>'10-022-A1'</StartValue>
       </Subelement>
-      <Subelement Path="34">
+      <Subelement Path="33">
         <StartValue>'10-007-A1'</StartValue>
       </Subelement>
-      <Subelement Path="35">
+      <Subelement Path="34">
         <StartValue>'10-009-A1'</StartValue>
       </Subelement>
-      <Subelement Path="36">
+      <Subelement Path="35">
         <StartValue>'10-012-A1'</StartValue>
       </Subelement>
-      <Subelement Path="37">
+      <Subelement Path="36">
         <StartValue>'10-001-A1'</StartValue>
       </Subelement>
-      <Subelement Path="38">
+      <Subelement Path="37">
         <StartValue>'10-002-A1'</StartValue>
       </Subelement>
-      <Subelement Path="39">
+      <Subelement Path="38">
         <StartValue>'10-025-A1'</StartValue>
       </Subelement>
-      <Subelement Path="40">
+      <Subelement Path="39">
         <StartValue>'10-026-A1'</StartValue>
       </Subelement>
-      <Subelement Path="41">
+      <Subelement Path="40">
         <StartValue>'10-034-A1'</StartValue>
       </Subelement>
-      <Subelement Path="42">
+      <Subelement Path="41">
         <StartValue>'10-035-A1'</StartValue>
       </Subelement>
-      <Subelement Path="43">
+      <Subelement Path="42">
         <StartValue>'10-003-A1'</StartValue>
       </Subelement>
-      <Subelement Path="44">
+      <Subelement Path="43">
         <StartValue>'10-004-A1'</StartValue>
       </Subelement>
-      <Subelement Path="45">
+      <Subelement Path="44">
         <StartValue>'10-005-A1'</StartValue>
       </Subelement>
-      <Subelement Path="46">
+      <Subelement Path="45">
         <StartValue>'10-001-A2'</StartValue>
       </Subelement>
-      <Subelement Path="47">
+      <Subelement Path="46">
         <StartValue>'10-013-A1'</StartValue>
       </Subelement>
-      <Subelement Path="48">
+      <Subelement Path="47">
         <StartValue>'10-010-A1'</StartValue>
       </Subelement>
-      <Subelement Path="49">
+      <Subelement Path="48">
         <StartValue>'10-011-A1'</StartValue>
       </Subelement>
-      <Subelement Path="50">
+      <Subelement Path="49">
         <StartValue>'10-046-A1'</StartValue>
       </Subelement>
-      <Subelement Path="51">
+      <Subelement Path="50">
         <StartValue>'10-047-A2'</StartValue>
       </Subelement>
-      <Subelement Path="52">
+      <Subelement Path="51">
         <StartValue>'20-023-A1'</StartValue>
       </Subelement>
-      <Subelement Path="53">
+      <Subelement Path="52">
         <StartValue>'20-025-A1'</StartValue>
       </Subelement>
-      <Subelement Path="54">
+      <Subelement Path="53">
         <StartValue>'20-022-A1'</StartValue>
       </Subelement>
-      <Subelement Path="55">
+      <Subelement Path="54">
         <StartValue>'20-024-A1'</StartValue>
       </Subelement>
       <Subelement Path="1">
@@ -778,118 +778,121 @@
       <Subelement Path="27">
         <StartValue>'11-003-A1'</StartValue>
       </Subelement>
-      <Subelement Path="57">
+      <Subelement Path="55">
         <StartValue>'11-030-A1'</StartValue>
       </Subelement>
-      <Subelement Path="58">
+      <Subelement Path="56">
         <StartValue>'11-031-A1'</StartValue>
       </Subelement>
-      <Subelement Path="59">
+      <Subelement Path="57">
         <StartValue>'11-032-A1'</StartValue>
       </Subelement>
-      <Subelement Path="60">
+      <Subelement Path="58">
         <StartValue>'11-033-A1'</StartValue>
       </Subelement>
-      <Subelement Path="61">
+      <Subelement Path="59">
         <StartValue>'11-034-A2'</StartValue>
       </Subelement>
-      <Subelement Path="62">
+      <Subelement Path="60">
         <StartValue>'11-035-A1'</StartValue>
       </Subelement>
-      <Subelement Path="63">
+      <Subelement Path="61">
         <StartValue>'11-036-A1'</StartValue>
       </Subelement>
-      <Subelement Path="64">
+      <Subelement Path="62">
         <StartValue>'11-037-A1'</StartValue>
       </Subelement>
-      <Subelement Path="65">
+      <Subelement Path="63">
         <StartValue>'11-046-A1'</StartValue>
       </Subelement>
-      <Subelement Path="66">
+      <Subelement Path="64">
         <StartValue>'11-047-A2'</StartValue>
       </Subelement>
-      <Subelement Path="67">
+      <Subelement Path="65">
         <StartValue>'11-048-A1'</StartValue>
       </Subelement>
-      <Subelement Path="68">
+      <Subelement Path="66">
         <StartValue>'11-049-A1'</StartValue>
       </Subelement>
-      <Subelement Path="69">
+      <Subelement Path="67">
         <StartValue>'11-050-A1'</StartValue>
       </Subelement>
-      <Subelement Path="70">
+      <Subelement Path="68">
         <StartValue>'11-051-A1'</StartValue>
       </Subelement>
-      <Subelement Path="71">
+      <Subelement Path="69">
         <StartValue>'11-052-A1'</StartValue>
       </Subelement>
-      <Subelement Path="72">
+      <Subelement Path="70">
         <StartValue>'11-053-A1'</StartValue>
       </Subelement>
-      <Subelement Path="73">
+      <Subelement Path="71">
         <StartValue>'11-054-A2'</StartValue>
       </Subelement>
-      <Subelement Path="74">
+      <Subelement Path="72">
         <StartValue>'11-055-A1'</StartValue>
       </Subelement>
-      <Subelement Path="75">
+      <Subelement Path="73">
         <StartValue>'11-056-A1'</StartValue>
       </Subelement>
-      <Subelement Path="76">
+      <Subelement Path="74">
         <StartValue>'11-057-A1'</StartValue>
       </Subelement>
-      <Subelement Path="77">
+      <Subelement Path="75">
         <StartValue>'11-058-A1'</StartValue>
       </Subelement>
-      <Subelement Path="78">
+      <Subelement Path="76">
         <StartValue>'11-042-A1'</StartValue>
       </Subelement>
-      <Subelement Path="79">
+      <Subelement Path="77">
         <StartValue>'11-043-A1'</StartValue>
       </Subelement>
-      <Subelement Path="80">
+      <Subelement Path="78">
         <StartValue>'11-043-A2'</StartValue>
       </Subelement>
-      <Subelement Path="81">
+      <Subelement Path="79">
         <StartValue>'11-041-A2'</StartValue>
       </Subelement>
-      <Subelement Path="82">
+      <Subelement Path="80">
         <StartValue>'11-039-A1'</StartValue>
       </Subelement>
-      <Subelement Path="83">
+      <Subelement Path="81">
         <StartValue>'11-040-A1'</StartValue>
       </Subelement>
-      <Subelement Path="84">
+      <Subelement Path="82">
         <StartValue>'11-044-A2'</StartValue>
       </Subelement>
-      <Subelement Path="85">
+      <Subelement Path="83">
         <StartValue>'11-045-A2'</StartValue>
       </Subelement>
-      <Subelement Path="86">
+      <Subelement Path="84">
         <StartValue>'11-014-A1'</StartValue>
       </Subelement>
-      <Subelement Path="87">
+      <Subelement Path="85">
         <StartValue>'11-063-A1'</StartValue>
       </Subelement>
-      <Subelement Path="88">
+      <Subelement Path="86">
         <StartValue>'11-064-A1'</StartValue>
       </Subelement>
-      <Subelement Path="89">
+      <Subelement Path="87">
         <StartValue>'11-065-A1'</StartValue>
       </Subelement>
-      <Subelement Path="90">
+      <Subelement Path="88">
         <StartValue>'11-066-A1'</StartValue>
       </Subelement>
-      <Subelement Path="91">
+      <Subelement Path="89">
         <StartValue>'11-067-A1'</StartValue>
       </Subelement>
     </Member>
-    <Member Name="SysName" Datatype="Array[1..96] of String[12]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="SysName" Datatype="Array[1..89] of String[12]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
+      <Subelement Path="28">
+        <StartValue>'Bilge'</StartValue>
+      </Subelement>
       <Subelement Path="29">
         <StartValue>'Bilge'</StartValue>
       </Subelement>
@@ -966,9 +969,6 @@
         <StartValue>'Bilge'</StartValue>
       </Subelement>
       <Subelement Path="54">
-        <StartValue>'Bilge'</StartValue>
-      </Subelement>
-      <Subelement Path="55">
         <StartValue>'Bilge'</StartValue>
       </Subelement>
       <Subelement Path="1">
@@ -1052,6 +1052,12 @@
       <Subelement Path="27">
         <StartValue>'Ballast Aft'</StartValue>
       </Subelement>
+      <Subelement Path="55">
+        <StartValue>'Ballast Fwd'</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>'Ballast Fwd'</StartValue>
+      </Subelement>
       <Subelement Path="57">
         <StartValue>'Ballast Fwd'</StartValue>
       </Subelement>
@@ -1151,19 +1157,16 @@
       <Subelement Path="89">
         <StartValue>'Ballast Fwd'</StartValue>
       </Subelement>
-      <Subelement Path="90">
-        <StartValue>'Ballast Fwd'</StartValue>
-      </Subelement>
-      <Subelement Path="91">
-        <StartValue>'Ballast Fwd'</StartValue>
-      </Subelement>
     </Member>
-    <Member Name="FuncName" Datatype="Array[1..96] of String[22]" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="FuncName" Datatype="Array[1..89] of String[22]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
+      <Subelement Path="28">
+        <StartValue>'Bilge suction'</StartValue>
+      </Subelement>
       <Subelement Path="29">
         <StartValue>'Bilge suction'</StartValue>
       </Subelement>
@@ -1177,22 +1180,22 @@
         <StartValue>'Bilge suction'</StartValue>
       </Subelement>
       <Subelement Path="33">
-        <StartValue>'Bilge suction'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="34">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="35">
         <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="36">
-        <StartValue>'Isolation'</StartValue>
-      </Subelement>
-      <Subelement Path="37">
         <StartValue>'Suction'</StartValue>
       </Subelement>
-      <Subelement Path="38">
+      <Subelement Path="37">
         <StartValue>'Main suction'</StartValue>
+      </Subelement>
+      <Subelement Path="38">
+        <StartValue>'Bilge suction'</StartValue>
       </Subelement>
       <Subelement Path="39">
         <StartValue>'Bilge suction'</StartValue>
@@ -1204,28 +1207,28 @@
         <StartValue>'Bilge suction'</StartValue>
       </Subelement>
       <Subelement Path="42">
-        <StartValue>'Bilge suction'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="43">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="44">
-        <StartValue>'Isolation'</StartValue>
-      </Subelement>
-      <Subelement Path="45">
         <StartValue>'Suction'</StartValue>
       </Subelement>
-      <Subelement Path="46">
+      <Subelement Path="45">
         <StartValue>'Bilge suction'</StartValue>
       </Subelement>
-      <Subelement Path="47">
+      <Subelement Path="46">
         <StartValue>'Isolation'</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>'Bilge suction'</StartValue>
       </Subelement>
       <Subelement Path="48">
         <StartValue>'Bilge suction'</StartValue>
       </Subelement>
       <Subelement Path="49">
-        <StartValue>'Bilge suction'</StartValue>
+        <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="50">
         <StartValue>'Isolation'</StartValue>
@@ -1234,15 +1237,12 @@
         <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="52">
-        <StartValue>'Isolation'</StartValue>
-      </Subelement>
-      <Subelement Path="53">
         <StartValue>'Fire/Bilge crossover'</StartValue>
       </Subelement>
-      <Subelement Path="54">
+      <Subelement Path="53">
         <StartValue>'Seawater priming'</StartValue>
       </Subelement>
-      <Subelement Path="55">
+      <Subelement Path="54">
         <StartValue>'Seawater priming'</StartValue>
       </Subelement>
       <Subelement Path="1">
@@ -1326,17 +1326,23 @@
       <Subelement Path="27">
         <StartValue>'Isolation'</StartValue>
       </Subelement>
-      <Subelement Path="57">
+      <Subelement Path="55">
         <StartValue>'Filling'</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>'Suction'</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="58">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="59">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="60">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="61">
         <StartValue>'Filling'</StartValue>
@@ -1351,19 +1357,19 @@
         <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="65">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="66">
         <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="67">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="68">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="69">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="70">
         <StartValue>'Filling'</StartValue>
@@ -1375,43 +1381,43 @@
         <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="73">
-        <StartValue>'Isolation'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="74">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="75">
         <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="76">
-        <StartValue>'Isolation'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="77">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="78">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="79">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="80">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="81">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="82">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Suction'</StartValue>
       </Subelement>
       <Subelement Path="83">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Filling'</StartValue>
       </Subelement>
       <Subelement Path="84">
-        <StartValue>'Suction'</StartValue>
+        <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="85">
-        <StartValue>'Filling'</StartValue>
+        <StartValue>'Isolation'</StartValue>
       </Subelement>
       <Subelement Path="86">
         <StartValue>'Isolation'</StartValue>
@@ -1419,13 +1425,7 @@
       <Subelement Path="87">
         <StartValue>'Isolation'</StartValue>
       </Subelement>
-      <Subelement Path="88">
-        <StartValue>'Isolation'</StartValue>
-      </Subelement>
       <Subelement Path="89">
-        <StartValue>'Isolation'</StartValue>
-      </Subelement>
-      <Subelement Path="91">
         <StartValue>'Isolation'</StartValue>
       </Subelement>
     </Member>
@@ -1523,6 +1523,31 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
+    <!-- FUNCTION column for the zone valve lists. String[22] to match CfgTblFunc, which is sized
+         for the longest value in the client schedule ("Cross-over manifold" / "Bilge system tie").
+         The Config screen already had its equivalent; the zone lists did not, which is why adding
+         the column needed a PLC change and not just an HMI one. -->
+    <Member Name="AftTblFunc" Datatype="Array[1..14] of String[22]" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErTblFunc" Datatype="Array[1..14] of String[22]" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdTblFunc" Datatype="Array[1..14] of String[22]" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <!-- Configuration screen's global (all-96) paged window - same mirroring pattern as the
          per-zone Aft/Er/FwdTblName/Loc above. -->
     <Member Name="CfgTblName" Datatype="Array[1..16] of String[20]" Remanence="NonRetain" Accessibility="Public">
@@ -1563,6 +1588,20 @@
       </AttributeList>
     </Member>
     <Member Name="CfgTblFunc" Datatype="Array[1..16] of String[22]" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelCmNo" Datatype="String[6]" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelVTag" Datatype="String[12]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>

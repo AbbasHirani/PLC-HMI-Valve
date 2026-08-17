@@ -48,7 +48,7 @@
       <HeaderVersion>0.1</HeaderVersion>
       <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
   <Section Name="Static">
-    <Member Name="Valve" Datatype="Array[1..96] of &quot;Valve_IO&quot;" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Valve" Datatype="Array[1..89] of &quot;Valve_IO&quot;" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -123,7 +123,7 @@
          Lets every HMI badge/status cell read ONE tag instead of the five raw bits
          (Configured/OpenFB/ClosedFB/Healthy/LocalMode) it used to combine itself — on Screen_Home
          that is 96 reads/cycle instead of 480. -->
-    <Member Name="StateCode" Datatype="Array[1..96] of Int" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="StateCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -137,7 +137,7 @@
          only by Reset Fault).
          Loss of Position (E) is NOT latched — its own 2s TON (PosLostTmr) IS the alarm condition,
          so it clears the moment the valve stops being idle-with-no-position. -->
-    <Member Name="Stuck" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Stuck" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -149,7 +149,7 @@
          switch inputs once the real Dynamic I/O Mapper replaces this simulation, at which point
          this member (and the auto-init logic that reads it) should be removed entirely - real
          hardware never needs to guess a starting position. -->
-    <Member Name="Initialized" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="Initialized" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -158,21 +158,71 @@
     </Member>
     <!-- Split by direction (not one shared bit) since Fail to Open (C) and Fail to Close (D)
          are two separate alarms with separate messages/columns in the catalogue. -->
-    <Member Name="TimeoutOpenAlarm" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="TimeoutOpenAlarm" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="TimeoutCloseAlarm" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="TimeoutCloseAlarm" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="UnexpMove" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="UnexpMove" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- Direction / limit-switch discrepancy (H). Latched when a valve has been driven for 5s
+         and the OPPOSITE limit switch is still made — i.e. the physical evidence contradicts the
+         command. Covers two causes the PLC cannot tell apart from two limit switches: the valve
+         moved the wrong way (OPEN/CLOSE swapped at the interposing relays, a commissioning fault)
+         and the valve never left its seat (dead actuator / stuck limit switch). Both need the same
+         operator response - go look at the valve - so they share one alarm rather than splitting
+         into two the operator would treat identically. Found 2026-08-15 by live reversal test:
+         previously a valve commanded CLOSE whose OPEN limit made would display a settled green
+         "FULLY OPEN" for the full 8s travel timeout, then raise a misleading Fail-to-Close. -->
+    <Member Name="DirFault" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- Last commanded position: 0 = none since startup, 1 = OPEN, 2 = CLOSE. Set when a command
+         is accepted, never cleared on arrival - it is the operator's intent, not a live state, so
+         the HMI can show COMMANDED vs ACTUAL whenever the two disagree. That comparison is what
+         catches a stuck limit switch (valve reports a position it is not in), which is the more
+         likely in-service fault than wrong-direction movement. -->
+    <!-- Position-only state, 3=OPEN 4=CLOSED 5=NO POSITION 6=OPENING 7=CLOSING, 0=unconfigured.
+         Identical to StateCode EXCEPT that a fault never overrides it. StateCode answers "is this
+         valve alright"; PosCode answers "where is it". Both are needed at once: a faulted ballast
+         valve sitting open is a flooding path and a faulted one sitting closed is a blocked line,
+         and the operator could not tell them apart when FAULT replaced the position on screen. -->
+    <Member Name="PosCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- Which fault, most specific first: 0=none 1=unhealthy 2=double indication 3=fail to open
+         4=fail to close 5=loss of position 6=unexpected movement 7=direction/limit fault.
+         Lets the popup name the cause instead of just saying FAULT. -->
+    <Member Name="FaultCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="CmdPos" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -181,14 +231,14 @@
     </Member>
     <!-- Previous-scan snapshot of the limit switches — comparing this scan to last scan is the
          only way to catch a position change that nobody commanded (Unexpected Movement, F). -->
-    <Member Name="PrevOpenFB" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="PrevOpenFB" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="PrevClosedFB" Datatype="Array[1..96] of Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="PrevClosedFB" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -200,7 +250,30 @@
          here in the DB (an array of the same TON_TIME type as Valve_IO's TimerOpen/TimerClose)
          rather than inside the Valve_IO UDT, so adding it doesn't touch every existing block that
          already uses that UDT. -->
-    <Member Name="PosLostTmr" Datatype="Array[1..96] of TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="PosLostTmr" Datatype="Array[1..89] of TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Sections>
+        <Section Name="None">
+          <Member Name="PT" Datatype="Time" />
+          <Member Name="ET" Datatype="Time" />
+          <Member Name="IN" Datatype="Bool" />
+          <Member Name="Q" Datatype="Bool" />
+        </Section>
+      </Sections>
+    </Member>
+    <!-- 5-second grace before the direction/limit discrepancy (H) fires. The grace is the whole
+         trick: a valve leaving a fully-open seat legitimately holds OpenFB made for the first
+         moment of a close, so an instant check would false-trip on every normal stroke. 5s (not
+         the 3s first considered) because a false alarm in week one costs more operator trust than
+         a true one two seconds later - retune per valve at commissioning alongside the travel
+         timeout (both are currently one-size-fits-all and both should not be; see handoff item 13).
+         One timer serves both directions: OpenValve and CloseValve are mutually exclusive by
+         construction, so they can never both need it in the same scan. -->
+    <Member Name="DirTmr" Datatype="Array[1..89] of TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -273,6 +346,16 @@
       </AttributeList>
     </Member>
     <Member Name="W_Local" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- Alarm-word packing for the direction/limit discrepancy (H). Same 6-word x 16-bit layout as
+         every other condition above. The matching discrete alarms do not exist yet - they land with
+         the 89-slot alarm regeneration (handoff item 1), which has to run before install anyway. -->
+    <Member Name="W_DirFault" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
@@ -433,6 +516,15 @@
     </Member>
     <Member Name="Clock_1Hz" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="ClockCounter" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelIdx" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelState" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelHealthy" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelLocalMode" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelConfigured" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelDirFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelCmdPos" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelPosCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelFaultCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
   </Section>
 </Sections></Interface>
       <IsOnlyStoredInLoadMemory>false</IsOnlyStoredInLoadMemory>

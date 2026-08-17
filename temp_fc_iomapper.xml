@@ -80,30 +80,47 @@
           <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v4">
   <Text UId="1">
     // Dynamic I/O Mapper: translates each valve's abstract channel-index config
-    // (Valve_Channels_DB.Channel[i]) into real feedback/health bits by looking them up in
+    // (Valve_Channels_DB's six flat OpenFbChannel[]/ClosedFbChannel[]/etc arrays) into real feedback/health bits by looking them up in
     // IO_Buffer_DB.DI[], and writes commanded outputs into IO_Buffer_DB.DQ[] the same way.
     // A channel value of 0 means "not assigned" - that field is simply left untouched, so an
     // unconfigured channel never overwrites a valve's simulated status with a false FALSE.
-    FOR #i := 1 TO 88 DO
+    FOR #i := 1 TO 89 DO
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
-            IF &quot;Valve_Channels_DB&quot;.Channel[#i].OpenFb_Channel &gt; 0 THEN
-                &quot;Valves_DB&quot;.Valve[#i].OpenFB := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.Channel[#i].OpenFb_Channel];
+            IF &quot;Valve_Channels_DB&quot;.OpenFbChannel[#i] &gt; 0 THEN
+                &quot;Valves_DB&quot;.Valve[#i].OpenFB := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.OpenFbChannel[#i]];
             END_IF;
-            IF &quot;Valve_Channels_DB&quot;.Channel[#i].ClosedFb_Channel &gt; 0 THEN
-                &quot;Valves_DB&quot;.Valve[#i].ClosedFB := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.Channel[#i].ClosedFb_Channel];
+            IF &quot;Valve_Channels_DB&quot;.ClosedFbChannel[#i] &gt; 0 THEN
+                &quot;Valves_DB&quot;.Valve[#i].ClosedFB := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.ClosedFbChannel[#i]];
             END_IF;
-            IF &quot;Valve_Channels_DB&quot;.Channel[#i].Healthy_Channel &gt; 0 THEN
-                &quot;Valves_DB&quot;.Valve[#i].Healthy := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.Channel[#i].Healthy_Channel];
+            IF &quot;Valve_Channels_DB&quot;.HealthyChannel[#i] &gt; 0 THEN
+                &quot;Valves_DB&quot;.Valve[#i].Healthy := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.HealthyChannel[#i]];
             END_IF;
-            IF &quot;Valve_Channels_DB&quot;.Channel[#i].LocalMode_Channel &gt; 0 THEN
-                &quot;Valves_DB&quot;.Valve[#i].LocalMode := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.Channel[#i].LocalMode_Channel];
+            // Double-indication safety trip, re-applied here on purpose: FB_ValveLoop already
+            // checks this earlier in the same scan, but for a real-channel valve this Healthy
+            // write above runs AFTER that check and would silently undo it - a real valve with
+            // both limit switches made (physically impossible, a wiring/sensor fault) would show
+            // Healthy=TRUE if the real Healthy channel itself doesn't happen to also be false.
+            // Found by reasoning through the watch-table test 2026-08-14, not observed live (that
+            // test only forced OpenFB, never both at once) - fixing before it's ever hit for real.
+            IF &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
+                &quot;Valves_DB&quot;.Valve[#i].Healthy := FALSE;
             END_IF;
-            IF &quot;Valve_Channels_DB&quot;.Channel[#i].OpenCmd_Channel &gt; 0 THEN
-                &quot;IO_Buffer_DB&quot;.DQ[&quot;Valve_Channels_DB&quot;.Channel[#i].OpenCmd_Channel] := &quot;Valves_DB&quot;.Valve[#i].OpenValve;
+            IF &quot;Valve_Channels_DB&quot;.LocalModeChannel[#i] &gt; 0 THEN
+                &quot;Valves_DB&quot;.Valve[#i].LocalMode := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.LocalModeChannel[#i]];
             END_IF;
-            IF &quot;Valve_Channels_DB&quot;.Channel[#i].CloseCmd_Channel &gt; 0 THEN
-                &quot;IO_Buffer_DB&quot;.DQ[&quot;Valve_Channels_DB&quot;.Channel[#i].CloseCmd_Channel] := &quot;Valves_DB&quot;.Valve[#i].CloseValve;
-            END_IF;
+        END_IF;
+        // Outputs are driven UNCONDITIONALLY - deliberately outside the Configured guard above.
+        // That guard exists to protect a simulated valve's feedbacks from being overwritten by a
+        // real DI; it has no business gating the outputs. When it did, de-configuring a valve
+        // mid-travel froze its DQ bit at whatever it was last written to, and FC_PhysicalIoCopy
+        // kept copying that stale TRUE to the real %Q forever - a relay energised with nothing
+        // managing it. FB_ValveLoop now forces OpenValve/CloseValve FALSE for any unconfigured
+        // valve, so writing DQ every scan regardless is what actually de-energises the output.
+        IF &quot;Valve_Channels_DB&quot;.OpenCmdChannel[#i] &gt; 0 THEN
+            &quot;IO_Buffer_DB&quot;.DQ[&quot;Valve_Channels_DB&quot;.OpenCmdChannel[#i]] := &quot;Valves_DB&quot;.Valve[#i].OpenValve;
+        END_IF;
+        IF &quot;Valve_Channels_DB&quot;.CloseCmdChannel[#i] &gt; 0 THEN
+            &quot;IO_Buffer_DB&quot;.DQ[&quot;Valve_Channels_DB&quot;.CloseCmdChannel[#i]] := &quot;Valves_DB&quot;.Valve[#i].CloseValve;
         END_IF;
     END_FOR;
   </Text>

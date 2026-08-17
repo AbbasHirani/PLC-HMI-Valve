@@ -1,0 +1,140 @@
+# Hardware Install Troubleshooting Sheet — MV Westerly Valve Control System
+
+**Read this before you leave, and keep it open/printed on-site.** Written for a no-network
+situation — no links out, no "ask Claude," just symptom → likely cause → fix. If none of these
+fixes it, STOP and don't force it (see the last section).
+
+---
+
+## 0. Before you leave — pre-flight checklist
+
+- [ ] Laptop has the full project folder: `C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\`
+- [ ] TIA Portal V20 opens the `.ap20` project file successfully, offline, right now
+- [ ] Full offline compile (PLC + HMI) shows 0 errors — if it doesn't, fix it now, not on-site
+- [ ] `MV_Westerly_IO_Wiring_Schedule.xlsx` is on the laptop AND printed on paper (screens die,
+      paper doesn't)
+- [ ] This file is either printed or saved somewhere you can open without TIA/internet (e.g. a
+      phone photo of each page, or a second device)
+- [ ] Know your PLC's static IP / device name and each ET200SP station's device name — write them
+      down separately from the laptop in case the laptop itself has problems
+
+---
+
+## 1. Downloading to the real PLC
+
+**Symptom: "No accessible devices found" when trying to go online / download**
+- Check the physical Ethernet cable is actually in the PLC's PROFINET port, not a different port
+- Check your laptop's network adapter is set to the SAME subnet as the PLC (if PLC is
+  192.168.0.1, your laptop's Ethernet adapter needs a 192.168.0.x address, not DHCP/auto — S7-1200s
+  don't hand out DHCP by default)
+- Try "Accessible devices" (not "Download") first — if the PLC doesn't show up there, it's a
+  network/cabling problem, not a TIA problem
+- A cheap unmanaged switch between laptop and PLC can help if you also need the ET200SP stations
+  reachable at the same time — don't daisy-chain through a station unless the bus adapter
+  (BA 2xRJ45) is actually wired for pass-through
+
+**Symptom: Download fails with "Online and offline configurations are different" /
+"Incompatible configuration"**
+- Someone (or a previous session) changed the module config in a way that doesn't match the
+  physical rack. Don't just force-override — first check: does the real physical module order in
+  each ET200SP rack actually match what's in the TIA project (DI/DQ module count and order)? If a
+  module was swapped or added on-site, the project needs updating, not the other way around.
+
+**Symptom: Download fails with a PROFINET device-name mismatch (e.g. "device name
+'et200sp_aft' expected, found 'et200sp-aft-1'")**
+- The physical station's PROFINET name (set via its display, or via "Assign device name" in TIA)
+  doesn't match what the project expects. Use TIA's **Online > Assign PROFINET device name**
+  dialog, select the actual physical device, and either rename it to match, or update the project
+  if the physical name is what should be kept.
+
+**Symptom: "Not enough work memory" or similar during download**
+- Genuinely rare on a 1214C for a project this size (already verified to fit — see project history).
+  If this happens, it likely means something got duplicated or bloated since the last known-good
+  compile. Don't try to fix this live on-site; fall back to the simulator-tested version.
+
+---
+
+## 2. Going online / first power-up
+
+- Bring the PLC up **without the HMI panel connected first**, if practical — easier to diagnose
+  PLC-only problems (via TIA's own online diagnostics) without a second device in the loop.
+- **Online > Diagnostics** in TIA shows module-level LED-equivalent status. A red module in this
+  view means a real hardware fault (module not seated, no power to the rack, etc.) — not
+  something software can fix.
+- If a specific ET200SP station doesn't come online: check its own power supply first (each
+  station needs its own 24V feed, separate from signal wiring), then check the PROFINET cable
+  into its bus adapter.
+
+---
+
+## 3. I/O-specific checks (this is the part that matters most for this trip)
+
+The whole point of this trip is validating that real field signals reach the right valve on the
+HMI. Do this in order, valve by valve, starting with just 1-2 valves before assuming everything's
+fine:
+
+1. **Confirm the wire is physically at the right terminal** — cross-check against
+   `MV_Westerly_IO_Wiring_Schedule.xlsx` (DI Schedule / DO Schedule tabs). Every row has the exact
+   `%I`/`%Q` address, station, module, and channel.
+2. **Open a Watch Table in TIA** (or use "Monitor all" on the block) and watch
+   `IO_Buffer_DB.DI[n]` / `IO_Buffer_DB.DQ[n]` for that channel's index (also in the Excel sheet,
+   "Sl. No" column corresponds to the array index within that signal type — DI schedule and DQ
+   schedule are numbered separately). Toggling the real field device (e.g. manually operating a
+   limit switch) should flip that bit live.
+   - **If the bit doesn't move at all**: the physical wiring or the field device itself is the
+     problem, not the PLC program — check polarity (24V DI: is it wired for sourcing or sinking
+     correctly?), check the field device is actually powered.
+   - **If the bit moves but a DIFFERENT index than expected changes**: the physical wire is in the
+     wrong terminal — cross-check the module/channel against the schedule again, terminal numbers
+     count 1-16 per module in the physical rack.
+3. **Then check `Valve_Channels_DB`** for that valve's slot — `OpenFbChannel[n]`,
+   `ClosedFbChannel[n]` etc. should hold the same channel number you just confirmed above. This
+   was already populated and verified in software (see project history) — it should not need
+   changing unless the client's wiring plan itself changed.
+4. **Then check the HMI** — the valve's popup / zone screen should now reflect the real signal.
+   If step 2 and 3 both check out but the HMI still shows the wrong thing, that's a genuine
+   software bug worth writing down precisely (which valve, which signal, what you saw vs.
+   expected) to fix once you're back online.
+
+**Important, don't skip this:** before trusting any of the above, confirm
+`FB_ValveLoop`'s simulation guard is actually in place (this was being added the same week as this
+sheet — check the block's code has a check like "skip simulated OpenFB/ClosedFB write if a real
+channel is assigned" near the top). If that guard isn't there, the simulator will keep overwriting
+real signals and every test above will look broken even if the wiring is perfect. **This is the
+single most likely false alarm on-site — check it first if things look wrong.**
+
+---
+
+## 4. TIA Portal quirks already known from this project (don't waste time rediscovering these)
+
+- **`Attach()` / online operations occasionally throw a timeout error even when TIA is completely
+  healthy.** Check Task Manager — if TIA is using real CPU (not stuck at 0%), it's just slow, not
+  hung. Wait and retry once before assuming something's broken.
+- **A brand-new Windows account needs to be in the local "Siemens TIA Openness" group**, and needs
+  a full logoff/login (not just restarting TIA) after being added, before Openness tools will work.
+  Not relevant to manual TIA UI use, only if you're trying to run any of the `.exe` automation
+  tools in `src/` on a different machine.
+- **Manual edits made directly in a TIA screen get wiped** if that screen is ever rebuilt by the
+  generator tool later. If you tweak something in the HMI screen editor on-site to get through an
+  install, write down what you changed so it can be re-applied properly later — don't just leave it
+  as an undocumented one-off.
+- **Block export fails if the target file already exists** — if you're exporting anything for your
+  own reference on-site, delete any old file with the same name first.
+
+---
+
+## 5. When to stop and not force it
+
+Do **not**:
+- Force-download over a device-name or module mismatch without understanding why it doesn't match
+- Wire around a wrong physical terminal "just to test" without immediately fixing it back or
+  writing it down — this is exactly how real installs end up with silent wiring errors that surface
+  months later
+- Change `Valve_Channels_DB` values on-site without a clear reason tied to something you've
+  physically confirmed — these were generated from a reviewed mapping, don't second-guess them from
+  a single confusing reading without ruling out the simulation-guard issue first (Section 3)
+
+If you hit something not covered here and have zero connectivity: **document it precisely**
+(valve/CM tag, what you expected, what you saw, exact error text if any) rather than guessing a
+fix under pressure. A precise problem description gets solved in five minutes once you're back
+online; a vague "it didn't work" plus a guessed workaround can cost hours untangling later.

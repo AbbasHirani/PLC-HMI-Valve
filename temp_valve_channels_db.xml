@@ -48,25 +48,1651 @@
       <HeaderVersion>0.1</HeaderVersion>
       <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
   <Section Name="Static">
-    <Member Name="Channel" Datatype="Array[1..88] of &quot;UDT_Valve_Config&quot;" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="OpenFbChannel" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
-        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
-      <Sections>
-        <Section Name="None">
-          <Member Name="OpenFb_Channel" Datatype="Int" />
-          <Member Name="ClosedFb_Channel" Datatype="Int" />
-          <Member Name="Healthy_Channel" Datatype="Int" />
-          <Member Name="LocalMode_Channel" Datatype="Int" />
-          <Member Name="OpenCmd_Channel" Datatype="Int" />
-          <Member Name="CloseCmd_Channel" Datatype="Int" />
-        </Section>
-      </Sections>
+      <Subelement Path="1">
+        <StartValue>1</StartValue>
+      </Subelement>
+      <Subelement Path="2">
+        <StartValue>5</StartValue>
+      </Subelement>
+      <Subelement Path="3">
+        <StartValue>9</StartValue>
+      </Subelement>
+      <Subelement Path="4">
+        <StartValue>13</StartValue>
+      </Subelement>
+      <Subelement Path="5">
+        <StartValue>17</StartValue>
+      </Subelement>
+      <Subelement Path="6">
+        <StartValue>21</StartValue>
+      </Subelement>
+      <Subelement Path="7">
+        <StartValue>25</StartValue>
+      </Subelement>
+      <Subelement Path="8">
+        <StartValue>29</StartValue>
+      </Subelement>
+      <Subelement Path="9">
+        <StartValue>33</StartValue>
+      </Subelement>
+      <Subelement Path="10">
+        <StartValue>37</StartValue>
+      </Subelement>
+      <Subelement Path="11">
+        <StartValue>41</StartValue>
+      </Subelement>
+      <Subelement Path="12">
+        <StartValue>45</StartValue>
+      </Subelement>
+      <Subelement Path="13">
+        <StartValue>49</StartValue>
+      </Subelement>
+      <Subelement Path="14">
+        <StartValue>53</StartValue>
+      </Subelement>
+      <Subelement Path="15">
+        <StartValue>57</StartValue>
+      </Subelement>
+      <Subelement Path="16">
+        <StartValue>61</StartValue>
+      </Subelement>
+      <Subelement Path="17">
+        <StartValue>65</StartValue>
+      </Subelement>
+      <Subelement Path="18">
+        <StartValue>69</StartValue>
+      </Subelement>
+      <Subelement Path="19">
+        <StartValue>73</StartValue>
+      </Subelement>
+      <Subelement Path="20">
+        <StartValue>77</StartValue>
+      </Subelement>
+      <Subelement Path="21">
+        <StartValue>81</StartValue>
+      </Subelement>
+      <Subelement Path="22">
+        <StartValue>85</StartValue>
+      </Subelement>
+      <Subelement Path="23">
+        <StartValue>89</StartValue>
+      </Subelement>
+      <Subelement Path="24">
+        <StartValue>93</StartValue>
+      </Subelement>
+      <Subelement Path="25">
+        <StartValue>97</StartValue>
+      </Subelement>
+      <Subelement Path="26">
+        <StartValue>101</StartValue>
+      </Subelement>
+      <Subelement Path="27">
+        <StartValue>105</StartValue>
+      </Subelement>
+      <Subelement Path="28">
+        <StartValue>113</StartValue>
+      </Subelement>
+      <Subelement Path="29">
+        <StartValue>117</StartValue>
+      </Subelement>
+      <Subelement Path="30">
+        <StartValue>121</StartValue>
+      </Subelement>
+      <Subelement Path="31">
+        <StartValue>125</StartValue>
+      </Subelement>
+      <Subelement Path="32">
+        <StartValue>129</StartValue>
+      </Subelement>
+      <Subelement Path="33">
+        <StartValue>133</StartValue>
+      </Subelement>
+      <Subelement Path="34">
+        <StartValue>137</StartValue>
+      </Subelement>
+      <Subelement Path="35">
+        <StartValue>141</StartValue>
+      </Subelement>
+      <Subelement Path="36">
+        <StartValue>145</StartValue>
+      </Subelement>
+      <Subelement Path="37">
+        <StartValue>149</StartValue>
+      </Subelement>
+      <Subelement Path="38">
+        <StartValue>153</StartValue>
+      </Subelement>
+      <Subelement Path="39">
+        <StartValue>157</StartValue>
+      </Subelement>
+      <Subelement Path="40">
+        <StartValue>161</StartValue>
+      </Subelement>
+      <Subelement Path="41">
+        <StartValue>165</StartValue>
+      </Subelement>
+      <Subelement Path="42">
+        <StartValue>169</StartValue>
+      </Subelement>
+      <Subelement Path="43">
+        <StartValue>173</StartValue>
+      </Subelement>
+      <Subelement Path="44">
+        <StartValue>177</StartValue>
+      </Subelement>
+      <Subelement Path="45">
+        <StartValue>181</StartValue>
+      </Subelement>
+      <Subelement Path="46">
+        <StartValue>185</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>189</StartValue>
+      </Subelement>
+      <Subelement Path="48">
+        <StartValue>193</StartValue>
+      </Subelement>
+      <Subelement Path="49">
+        <StartValue>197</StartValue>
+      </Subelement>
+      <Subelement Path="50">
+        <StartValue>201</StartValue>
+      </Subelement>
+      <Subelement Path="51">
+        <StartValue>205</StartValue>
+      </Subelement>
+      <Subelement Path="52">
+        <StartValue>209</StartValue>
+      </Subelement>
+      <Subelement Path="53">
+        <StartValue>213</StartValue>
+      </Subelement>
+      <Subelement Path="54">
+        <StartValue>217</StartValue>
+      </Subelement>
+      <Subelement Path="55">
+        <StartValue>225</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>229</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>233</StartValue>
+      </Subelement>
+      <Subelement Path="58">
+        <StartValue>237</StartValue>
+      </Subelement>
+      <Subelement Path="59">
+        <StartValue>241</StartValue>
+      </Subelement>
+      <Subelement Path="60">
+        <StartValue>245</StartValue>
+      </Subelement>
+      <Subelement Path="61">
+        <StartValue>249</StartValue>
+      </Subelement>
+      <Subelement Path="62">
+        <StartValue>253</StartValue>
+      </Subelement>
+      <Subelement Path="63">
+        <StartValue>257</StartValue>
+      </Subelement>
+      <Subelement Path="64">
+        <StartValue>261</StartValue>
+      </Subelement>
+      <Subelement Path="65">
+        <StartValue>265</StartValue>
+      </Subelement>
+      <Subelement Path="66">
+        <StartValue>269</StartValue>
+      </Subelement>
+      <Subelement Path="67">
+        <StartValue>273</StartValue>
+      </Subelement>
+      <Subelement Path="68">
+        <StartValue>277</StartValue>
+      </Subelement>
+      <Subelement Path="69">
+        <StartValue>281</StartValue>
+      </Subelement>
+      <Subelement Path="70">
+        <StartValue>285</StartValue>
+      </Subelement>
+      <Subelement Path="71">
+        <StartValue>289</StartValue>
+      </Subelement>
+      <Subelement Path="72">
+        <StartValue>293</StartValue>
+      </Subelement>
+      <Subelement Path="73">
+        <StartValue>297</StartValue>
+      </Subelement>
+      <Subelement Path="74">
+        <StartValue>301</StartValue>
+      </Subelement>
+      <Subelement Path="75">
+        <StartValue>305</StartValue>
+      </Subelement>
+      <Subelement Path="76">
+        <StartValue>309</StartValue>
+      </Subelement>
+      <Subelement Path="77">
+        <StartValue>313</StartValue>
+      </Subelement>
+      <Subelement Path="78">
+        <StartValue>317</StartValue>
+      </Subelement>
+      <Subelement Path="79">
+        <StartValue>321</StartValue>
+      </Subelement>
+      <Subelement Path="80">
+        <StartValue>325</StartValue>
+      </Subelement>
+      <Subelement Path="81">
+        <StartValue>329</StartValue>
+      </Subelement>
+      <Subelement Path="82">
+        <StartValue>333</StartValue>
+      </Subelement>
+      <Subelement Path="83">
+        <StartValue>337</StartValue>
+      </Subelement>
+      <Subelement Path="84">
+        <StartValue>341</StartValue>
+      </Subelement>
+      <Subelement Path="85">
+        <StartValue>345</StartValue>
+      </Subelement>
+      <Subelement Path="86">
+        <StartValue>349</StartValue>
+      </Subelement>
+      <Subelement Path="87">
+        <StartValue>353</StartValue>
+      </Subelement>
+      <Subelement Path="88">
+        <StartValue>357</StartValue>
+      </Subelement>
+      <Subelement Path="89">
+        <StartValue>361</StartValue>
+      </Subelement>
     </Member>
-  </Section>
+    <Member Name="ClosedFbChannel" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Subelement Path="1">
+        <StartValue>2</StartValue>
+      </Subelement>
+      <Subelement Path="2">
+        <StartValue>6</StartValue>
+      </Subelement>
+      <Subelement Path="3">
+        <StartValue>10</StartValue>
+      </Subelement>
+      <Subelement Path="4">
+        <StartValue>14</StartValue>
+      </Subelement>
+      <Subelement Path="5">
+        <StartValue>18</StartValue>
+      </Subelement>
+      <Subelement Path="6">
+        <StartValue>22</StartValue>
+      </Subelement>
+      <Subelement Path="7">
+        <StartValue>26</StartValue>
+      </Subelement>
+      <Subelement Path="8">
+        <StartValue>30</StartValue>
+      </Subelement>
+      <Subelement Path="9">
+        <StartValue>34</StartValue>
+      </Subelement>
+      <Subelement Path="10">
+        <StartValue>38</StartValue>
+      </Subelement>
+      <Subelement Path="11">
+        <StartValue>42</StartValue>
+      </Subelement>
+      <Subelement Path="12">
+        <StartValue>46</StartValue>
+      </Subelement>
+      <Subelement Path="13">
+        <StartValue>50</StartValue>
+      </Subelement>
+      <Subelement Path="14">
+        <StartValue>54</StartValue>
+      </Subelement>
+      <Subelement Path="15">
+        <StartValue>58</StartValue>
+      </Subelement>
+      <Subelement Path="16">
+        <StartValue>62</StartValue>
+      </Subelement>
+      <Subelement Path="17">
+        <StartValue>66</StartValue>
+      </Subelement>
+      <Subelement Path="18">
+        <StartValue>70</StartValue>
+      </Subelement>
+      <Subelement Path="19">
+        <StartValue>74</StartValue>
+      </Subelement>
+      <Subelement Path="20">
+        <StartValue>78</StartValue>
+      </Subelement>
+      <Subelement Path="21">
+        <StartValue>82</StartValue>
+      </Subelement>
+      <Subelement Path="22">
+        <StartValue>86</StartValue>
+      </Subelement>
+      <Subelement Path="23">
+        <StartValue>90</StartValue>
+      </Subelement>
+      <Subelement Path="24">
+        <StartValue>94</StartValue>
+      </Subelement>
+      <Subelement Path="25">
+        <StartValue>98</StartValue>
+      </Subelement>
+      <Subelement Path="26">
+        <StartValue>102</StartValue>
+      </Subelement>
+      <Subelement Path="27">
+        <StartValue>106</StartValue>
+      </Subelement>
+      <Subelement Path="28">
+        <StartValue>114</StartValue>
+      </Subelement>
+      <Subelement Path="29">
+        <StartValue>118</StartValue>
+      </Subelement>
+      <Subelement Path="30">
+        <StartValue>122</StartValue>
+      </Subelement>
+      <Subelement Path="31">
+        <StartValue>126</StartValue>
+      </Subelement>
+      <Subelement Path="32">
+        <StartValue>130</StartValue>
+      </Subelement>
+      <Subelement Path="33">
+        <StartValue>134</StartValue>
+      </Subelement>
+      <Subelement Path="34">
+        <StartValue>138</StartValue>
+      </Subelement>
+      <Subelement Path="35">
+        <StartValue>142</StartValue>
+      </Subelement>
+      <Subelement Path="36">
+        <StartValue>146</StartValue>
+      </Subelement>
+      <Subelement Path="37">
+        <StartValue>150</StartValue>
+      </Subelement>
+      <Subelement Path="38">
+        <StartValue>154</StartValue>
+      </Subelement>
+      <Subelement Path="39">
+        <StartValue>158</StartValue>
+      </Subelement>
+      <Subelement Path="40">
+        <StartValue>162</StartValue>
+      </Subelement>
+      <Subelement Path="41">
+        <StartValue>166</StartValue>
+      </Subelement>
+      <Subelement Path="42">
+        <StartValue>170</StartValue>
+      </Subelement>
+      <Subelement Path="43">
+        <StartValue>174</StartValue>
+      </Subelement>
+      <Subelement Path="44">
+        <StartValue>178</StartValue>
+      </Subelement>
+      <Subelement Path="45">
+        <StartValue>182</StartValue>
+      </Subelement>
+      <Subelement Path="46">
+        <StartValue>186</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>190</StartValue>
+      </Subelement>
+      <Subelement Path="48">
+        <StartValue>194</StartValue>
+      </Subelement>
+      <Subelement Path="49">
+        <StartValue>198</StartValue>
+      </Subelement>
+      <Subelement Path="50">
+        <StartValue>202</StartValue>
+      </Subelement>
+      <Subelement Path="51">
+        <StartValue>206</StartValue>
+      </Subelement>
+      <Subelement Path="52">
+        <StartValue>210</StartValue>
+      </Subelement>
+      <Subelement Path="53">
+        <StartValue>214</StartValue>
+      </Subelement>
+      <Subelement Path="54">
+        <StartValue>218</StartValue>
+      </Subelement>
+      <Subelement Path="55">
+        <StartValue>226</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>230</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>234</StartValue>
+      </Subelement>
+      <Subelement Path="58">
+        <StartValue>238</StartValue>
+      </Subelement>
+      <Subelement Path="59">
+        <StartValue>242</StartValue>
+      </Subelement>
+      <Subelement Path="60">
+        <StartValue>246</StartValue>
+      </Subelement>
+      <Subelement Path="61">
+        <StartValue>250</StartValue>
+      </Subelement>
+      <Subelement Path="62">
+        <StartValue>254</StartValue>
+      </Subelement>
+      <Subelement Path="63">
+        <StartValue>258</StartValue>
+      </Subelement>
+      <Subelement Path="64">
+        <StartValue>262</StartValue>
+      </Subelement>
+      <Subelement Path="65">
+        <StartValue>266</StartValue>
+      </Subelement>
+      <Subelement Path="66">
+        <StartValue>270</StartValue>
+      </Subelement>
+      <Subelement Path="67">
+        <StartValue>274</StartValue>
+      </Subelement>
+      <Subelement Path="68">
+        <StartValue>278</StartValue>
+      </Subelement>
+      <Subelement Path="69">
+        <StartValue>282</StartValue>
+      </Subelement>
+      <Subelement Path="70">
+        <StartValue>286</StartValue>
+      </Subelement>
+      <Subelement Path="71">
+        <StartValue>290</StartValue>
+      </Subelement>
+      <Subelement Path="72">
+        <StartValue>294</StartValue>
+      </Subelement>
+      <Subelement Path="73">
+        <StartValue>298</StartValue>
+      </Subelement>
+      <Subelement Path="74">
+        <StartValue>302</StartValue>
+      </Subelement>
+      <Subelement Path="75">
+        <StartValue>306</StartValue>
+      </Subelement>
+      <Subelement Path="76">
+        <StartValue>310</StartValue>
+      </Subelement>
+      <Subelement Path="77">
+        <StartValue>314</StartValue>
+      </Subelement>
+      <Subelement Path="78">
+        <StartValue>318</StartValue>
+      </Subelement>
+      <Subelement Path="79">
+        <StartValue>322</StartValue>
+      </Subelement>
+      <Subelement Path="80">
+        <StartValue>326</StartValue>
+      </Subelement>
+      <Subelement Path="81">
+        <StartValue>330</StartValue>
+      </Subelement>
+      <Subelement Path="82">
+        <StartValue>334</StartValue>
+      </Subelement>
+      <Subelement Path="83">
+        <StartValue>338</StartValue>
+      </Subelement>
+      <Subelement Path="84">
+        <StartValue>342</StartValue>
+      </Subelement>
+      <Subelement Path="85">
+        <StartValue>346</StartValue>
+      </Subelement>
+      <Subelement Path="86">
+        <StartValue>350</StartValue>
+      </Subelement>
+      <Subelement Path="87">
+        <StartValue>354</StartValue>
+      </Subelement>
+      <Subelement Path="88">
+        <StartValue>358</StartValue>
+      </Subelement>
+      <Subelement Path="89">
+        <StartValue>362</StartValue>
+      </Subelement>
+    </Member>
+    <Member Name="HealthyChannel" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Subelement Path="1">
+        <StartValue>3</StartValue>
+      </Subelement>
+      <Subelement Path="2">
+        <StartValue>7</StartValue>
+      </Subelement>
+      <Subelement Path="3">
+        <StartValue>11</StartValue>
+      </Subelement>
+      <Subelement Path="4">
+        <StartValue>15</StartValue>
+      </Subelement>
+      <Subelement Path="5">
+        <StartValue>19</StartValue>
+      </Subelement>
+      <Subelement Path="6">
+        <StartValue>23</StartValue>
+      </Subelement>
+      <Subelement Path="7">
+        <StartValue>27</StartValue>
+      </Subelement>
+      <Subelement Path="8">
+        <StartValue>31</StartValue>
+      </Subelement>
+      <Subelement Path="9">
+        <StartValue>35</StartValue>
+      </Subelement>
+      <Subelement Path="10">
+        <StartValue>39</StartValue>
+      </Subelement>
+      <Subelement Path="11">
+        <StartValue>43</StartValue>
+      </Subelement>
+      <Subelement Path="12">
+        <StartValue>47</StartValue>
+      </Subelement>
+      <Subelement Path="13">
+        <StartValue>51</StartValue>
+      </Subelement>
+      <Subelement Path="14">
+        <StartValue>55</StartValue>
+      </Subelement>
+      <Subelement Path="15">
+        <StartValue>59</StartValue>
+      </Subelement>
+      <Subelement Path="16">
+        <StartValue>63</StartValue>
+      </Subelement>
+      <Subelement Path="17">
+        <StartValue>67</StartValue>
+      </Subelement>
+      <Subelement Path="18">
+        <StartValue>71</StartValue>
+      </Subelement>
+      <Subelement Path="19">
+        <StartValue>75</StartValue>
+      </Subelement>
+      <Subelement Path="20">
+        <StartValue>79</StartValue>
+      </Subelement>
+      <Subelement Path="21">
+        <StartValue>83</StartValue>
+      </Subelement>
+      <Subelement Path="22">
+        <StartValue>87</StartValue>
+      </Subelement>
+      <Subelement Path="23">
+        <StartValue>91</StartValue>
+      </Subelement>
+      <Subelement Path="24">
+        <StartValue>95</StartValue>
+      </Subelement>
+      <Subelement Path="25">
+        <StartValue>99</StartValue>
+      </Subelement>
+      <Subelement Path="26">
+        <StartValue>103</StartValue>
+      </Subelement>
+      <Subelement Path="27">
+        <StartValue>107</StartValue>
+      </Subelement>
+      <Subelement Path="28">
+        <StartValue>115</StartValue>
+      </Subelement>
+      <Subelement Path="29">
+        <StartValue>119</StartValue>
+      </Subelement>
+      <Subelement Path="30">
+        <StartValue>123</StartValue>
+      </Subelement>
+      <Subelement Path="31">
+        <StartValue>127</StartValue>
+      </Subelement>
+      <Subelement Path="32">
+        <StartValue>131</StartValue>
+      </Subelement>
+      <Subelement Path="33">
+        <StartValue>135</StartValue>
+      </Subelement>
+      <Subelement Path="34">
+        <StartValue>139</StartValue>
+      </Subelement>
+      <Subelement Path="35">
+        <StartValue>143</StartValue>
+      </Subelement>
+      <Subelement Path="36">
+        <StartValue>147</StartValue>
+      </Subelement>
+      <Subelement Path="37">
+        <StartValue>151</StartValue>
+      </Subelement>
+      <Subelement Path="38">
+        <StartValue>155</StartValue>
+      </Subelement>
+      <Subelement Path="39">
+        <StartValue>159</StartValue>
+      </Subelement>
+      <Subelement Path="40">
+        <StartValue>163</StartValue>
+      </Subelement>
+      <Subelement Path="41">
+        <StartValue>167</StartValue>
+      </Subelement>
+      <Subelement Path="42">
+        <StartValue>171</StartValue>
+      </Subelement>
+      <Subelement Path="43">
+        <StartValue>175</StartValue>
+      </Subelement>
+      <Subelement Path="44">
+        <StartValue>179</StartValue>
+      </Subelement>
+      <Subelement Path="45">
+        <StartValue>183</StartValue>
+      </Subelement>
+      <Subelement Path="46">
+        <StartValue>187</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>191</StartValue>
+      </Subelement>
+      <Subelement Path="48">
+        <StartValue>195</StartValue>
+      </Subelement>
+      <Subelement Path="49">
+        <StartValue>199</StartValue>
+      </Subelement>
+      <Subelement Path="50">
+        <StartValue>203</StartValue>
+      </Subelement>
+      <Subelement Path="51">
+        <StartValue>207</StartValue>
+      </Subelement>
+      <Subelement Path="52">
+        <StartValue>211</StartValue>
+      </Subelement>
+      <Subelement Path="53">
+        <StartValue>215</StartValue>
+      </Subelement>
+      <Subelement Path="54">
+        <StartValue>219</StartValue>
+      </Subelement>
+      <Subelement Path="55">
+        <StartValue>227</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>231</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>235</StartValue>
+      </Subelement>
+      <Subelement Path="58">
+        <StartValue>239</StartValue>
+      </Subelement>
+      <Subelement Path="59">
+        <StartValue>243</StartValue>
+      </Subelement>
+      <Subelement Path="60">
+        <StartValue>247</StartValue>
+      </Subelement>
+      <Subelement Path="61">
+        <StartValue>251</StartValue>
+      </Subelement>
+      <Subelement Path="62">
+        <StartValue>255</StartValue>
+      </Subelement>
+      <Subelement Path="63">
+        <StartValue>259</StartValue>
+      </Subelement>
+      <Subelement Path="64">
+        <StartValue>263</StartValue>
+      </Subelement>
+      <Subelement Path="65">
+        <StartValue>267</StartValue>
+      </Subelement>
+      <Subelement Path="66">
+        <StartValue>271</StartValue>
+      </Subelement>
+      <Subelement Path="67">
+        <StartValue>275</StartValue>
+      </Subelement>
+      <Subelement Path="68">
+        <StartValue>279</StartValue>
+      </Subelement>
+      <Subelement Path="69">
+        <StartValue>283</StartValue>
+      </Subelement>
+      <Subelement Path="70">
+        <StartValue>287</StartValue>
+      </Subelement>
+      <Subelement Path="71">
+        <StartValue>291</StartValue>
+      </Subelement>
+      <Subelement Path="72">
+        <StartValue>295</StartValue>
+      </Subelement>
+      <Subelement Path="73">
+        <StartValue>299</StartValue>
+      </Subelement>
+      <Subelement Path="74">
+        <StartValue>303</StartValue>
+      </Subelement>
+      <Subelement Path="75">
+        <StartValue>307</StartValue>
+      </Subelement>
+      <Subelement Path="76">
+        <StartValue>311</StartValue>
+      </Subelement>
+      <Subelement Path="77">
+        <StartValue>315</StartValue>
+      </Subelement>
+      <Subelement Path="78">
+        <StartValue>319</StartValue>
+      </Subelement>
+      <Subelement Path="79">
+        <StartValue>323</StartValue>
+      </Subelement>
+      <Subelement Path="80">
+        <StartValue>327</StartValue>
+      </Subelement>
+      <Subelement Path="81">
+        <StartValue>331</StartValue>
+      </Subelement>
+      <Subelement Path="82">
+        <StartValue>335</StartValue>
+      </Subelement>
+      <Subelement Path="83">
+        <StartValue>339</StartValue>
+      </Subelement>
+      <Subelement Path="84">
+        <StartValue>343</StartValue>
+      </Subelement>
+      <Subelement Path="85">
+        <StartValue>347</StartValue>
+      </Subelement>
+      <Subelement Path="86">
+        <StartValue>351</StartValue>
+      </Subelement>
+      <Subelement Path="87">
+        <StartValue>355</StartValue>
+      </Subelement>
+      <Subelement Path="88">
+        <StartValue>359</StartValue>
+      </Subelement>
+      <Subelement Path="89">
+        <StartValue>363</StartValue>
+      </Subelement>
+    </Member>
+    <Member Name="LocalModeChannel" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Subelement Path="1">
+        <StartValue>4</StartValue>
+      </Subelement>
+      <Subelement Path="2">
+        <StartValue>8</StartValue>
+      </Subelement>
+      <Subelement Path="3">
+        <StartValue>12</StartValue>
+      </Subelement>
+      <Subelement Path="4">
+        <StartValue>16</StartValue>
+      </Subelement>
+      <Subelement Path="5">
+        <StartValue>20</StartValue>
+      </Subelement>
+      <Subelement Path="6">
+        <StartValue>24</StartValue>
+      </Subelement>
+      <Subelement Path="7">
+        <StartValue>28</StartValue>
+      </Subelement>
+      <Subelement Path="8">
+        <StartValue>32</StartValue>
+      </Subelement>
+      <Subelement Path="9">
+        <StartValue>36</StartValue>
+      </Subelement>
+      <Subelement Path="10">
+        <StartValue>40</StartValue>
+      </Subelement>
+      <Subelement Path="11">
+        <StartValue>44</StartValue>
+      </Subelement>
+      <Subelement Path="12">
+        <StartValue>48</StartValue>
+      </Subelement>
+      <Subelement Path="13">
+        <StartValue>52</StartValue>
+      </Subelement>
+      <Subelement Path="14">
+        <StartValue>56</StartValue>
+      </Subelement>
+      <Subelement Path="15">
+        <StartValue>60</StartValue>
+      </Subelement>
+      <Subelement Path="16">
+        <StartValue>64</StartValue>
+      </Subelement>
+      <Subelement Path="17">
+        <StartValue>68</StartValue>
+      </Subelement>
+      <Subelement Path="18">
+        <StartValue>72</StartValue>
+      </Subelement>
+      <Subelement Path="19">
+        <StartValue>76</StartValue>
+      </Subelement>
+      <Subelement Path="20">
+        <StartValue>80</StartValue>
+      </Subelement>
+      <Subelement Path="21">
+        <StartValue>84</StartValue>
+      </Subelement>
+      <Subelement Path="22">
+        <StartValue>88</StartValue>
+      </Subelement>
+      <Subelement Path="23">
+        <StartValue>92</StartValue>
+      </Subelement>
+      <Subelement Path="24">
+        <StartValue>96</StartValue>
+      </Subelement>
+      <Subelement Path="25">
+        <StartValue>100</StartValue>
+      </Subelement>
+      <Subelement Path="26">
+        <StartValue>104</StartValue>
+      </Subelement>
+      <Subelement Path="27">
+        <StartValue>108</StartValue>
+      </Subelement>
+      <Subelement Path="28">
+        <StartValue>116</StartValue>
+      </Subelement>
+      <Subelement Path="29">
+        <StartValue>120</StartValue>
+      </Subelement>
+      <Subelement Path="30">
+        <StartValue>124</StartValue>
+      </Subelement>
+      <Subelement Path="31">
+        <StartValue>128</StartValue>
+      </Subelement>
+      <Subelement Path="32">
+        <StartValue>132</StartValue>
+      </Subelement>
+      <Subelement Path="33">
+        <StartValue>136</StartValue>
+      </Subelement>
+      <Subelement Path="34">
+        <StartValue>140</StartValue>
+      </Subelement>
+      <Subelement Path="35">
+        <StartValue>144</StartValue>
+      </Subelement>
+      <Subelement Path="36">
+        <StartValue>148</StartValue>
+      </Subelement>
+      <Subelement Path="37">
+        <StartValue>152</StartValue>
+      </Subelement>
+      <Subelement Path="38">
+        <StartValue>156</StartValue>
+      </Subelement>
+      <Subelement Path="39">
+        <StartValue>160</StartValue>
+      </Subelement>
+      <Subelement Path="40">
+        <StartValue>164</StartValue>
+      </Subelement>
+      <Subelement Path="41">
+        <StartValue>168</StartValue>
+      </Subelement>
+      <Subelement Path="42">
+        <StartValue>172</StartValue>
+      </Subelement>
+      <Subelement Path="43">
+        <StartValue>176</StartValue>
+      </Subelement>
+      <Subelement Path="44">
+        <StartValue>180</StartValue>
+      </Subelement>
+      <Subelement Path="45">
+        <StartValue>184</StartValue>
+      </Subelement>
+      <Subelement Path="46">
+        <StartValue>188</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>192</StartValue>
+      </Subelement>
+      <Subelement Path="48">
+        <StartValue>196</StartValue>
+      </Subelement>
+      <Subelement Path="49">
+        <StartValue>200</StartValue>
+      </Subelement>
+      <Subelement Path="50">
+        <StartValue>204</StartValue>
+      </Subelement>
+      <Subelement Path="51">
+        <StartValue>208</StartValue>
+      </Subelement>
+      <Subelement Path="52">
+        <StartValue>212</StartValue>
+      </Subelement>
+      <Subelement Path="53">
+        <StartValue>216</StartValue>
+      </Subelement>
+      <Subelement Path="54">
+        <StartValue>220</StartValue>
+      </Subelement>
+      <Subelement Path="55">
+        <StartValue>228</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>232</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>236</StartValue>
+      </Subelement>
+      <Subelement Path="58">
+        <StartValue>240</StartValue>
+      </Subelement>
+      <Subelement Path="59">
+        <StartValue>244</StartValue>
+      </Subelement>
+      <Subelement Path="60">
+        <StartValue>248</StartValue>
+      </Subelement>
+      <Subelement Path="61">
+        <StartValue>252</StartValue>
+      </Subelement>
+      <Subelement Path="62">
+        <StartValue>256</StartValue>
+      </Subelement>
+      <Subelement Path="63">
+        <StartValue>260</StartValue>
+      </Subelement>
+      <Subelement Path="64">
+        <StartValue>264</StartValue>
+      </Subelement>
+      <Subelement Path="65">
+        <StartValue>268</StartValue>
+      </Subelement>
+      <Subelement Path="66">
+        <StartValue>272</StartValue>
+      </Subelement>
+      <Subelement Path="67">
+        <StartValue>276</StartValue>
+      </Subelement>
+      <Subelement Path="68">
+        <StartValue>280</StartValue>
+      </Subelement>
+      <Subelement Path="69">
+        <StartValue>284</StartValue>
+      </Subelement>
+      <Subelement Path="70">
+        <StartValue>288</StartValue>
+      </Subelement>
+      <Subelement Path="71">
+        <StartValue>292</StartValue>
+      </Subelement>
+      <Subelement Path="72">
+        <StartValue>296</StartValue>
+      </Subelement>
+      <Subelement Path="73">
+        <StartValue>300</StartValue>
+      </Subelement>
+      <Subelement Path="74">
+        <StartValue>304</StartValue>
+      </Subelement>
+      <Subelement Path="75">
+        <StartValue>308</StartValue>
+      </Subelement>
+      <Subelement Path="76">
+        <StartValue>312</StartValue>
+      </Subelement>
+      <Subelement Path="77">
+        <StartValue>316</StartValue>
+      </Subelement>
+      <Subelement Path="78">
+        <StartValue>320</StartValue>
+      </Subelement>
+      <Subelement Path="79">
+        <StartValue>324</StartValue>
+      </Subelement>
+      <Subelement Path="80">
+        <StartValue>328</StartValue>
+      </Subelement>
+      <Subelement Path="81">
+        <StartValue>332</StartValue>
+      </Subelement>
+      <Subelement Path="82">
+        <StartValue>336</StartValue>
+      </Subelement>
+      <Subelement Path="83">
+        <StartValue>340</StartValue>
+      </Subelement>
+      <Subelement Path="84">
+        <StartValue>344</StartValue>
+      </Subelement>
+      <Subelement Path="85">
+        <StartValue>348</StartValue>
+      </Subelement>
+      <Subelement Path="86">
+        <StartValue>352</StartValue>
+      </Subelement>
+      <Subelement Path="87">
+        <StartValue>356</StartValue>
+      </Subelement>
+      <Subelement Path="88">
+        <StartValue>360</StartValue>
+      </Subelement>
+      <Subelement Path="89">
+        <StartValue>364</StartValue>
+      </Subelement>
+    </Member>
+    <Member Name="OpenCmdChannel" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Subelement Path="1">
+        <StartValue>1</StartValue>
+      </Subelement>
+      <Subelement Path="2">
+        <StartValue>3</StartValue>
+      </Subelement>
+      <Subelement Path="3">
+        <StartValue>5</StartValue>
+      </Subelement>
+      <Subelement Path="4">
+        <StartValue>7</StartValue>
+      </Subelement>
+      <Subelement Path="5">
+        <StartValue>9</StartValue>
+      </Subelement>
+      <Subelement Path="6">
+        <StartValue>11</StartValue>
+      </Subelement>
+      <Subelement Path="7">
+        <StartValue>13</StartValue>
+      </Subelement>
+      <Subelement Path="8">
+        <StartValue>15</StartValue>
+      </Subelement>
+      <Subelement Path="9">
+        <StartValue>17</StartValue>
+      </Subelement>
+      <Subelement Path="10">
+        <StartValue>19</StartValue>
+      </Subelement>
+      <Subelement Path="11">
+        <StartValue>21</StartValue>
+      </Subelement>
+      <Subelement Path="12">
+        <StartValue>23</StartValue>
+      </Subelement>
+      <Subelement Path="13">
+        <StartValue>25</StartValue>
+      </Subelement>
+      <Subelement Path="14">
+        <StartValue>27</StartValue>
+      </Subelement>
+      <Subelement Path="15">
+        <StartValue>29</StartValue>
+      </Subelement>
+      <Subelement Path="16">
+        <StartValue>31</StartValue>
+      </Subelement>
+      <Subelement Path="17">
+        <StartValue>33</StartValue>
+      </Subelement>
+      <Subelement Path="18">
+        <StartValue>35</StartValue>
+      </Subelement>
+      <Subelement Path="19">
+        <StartValue>37</StartValue>
+      </Subelement>
+      <Subelement Path="20">
+        <StartValue>39</StartValue>
+      </Subelement>
+      <Subelement Path="21">
+        <StartValue>41</StartValue>
+      </Subelement>
+      <Subelement Path="22">
+        <StartValue>43</StartValue>
+      </Subelement>
+      <Subelement Path="23">
+        <StartValue>45</StartValue>
+      </Subelement>
+      <Subelement Path="24">
+        <StartValue>47</StartValue>
+      </Subelement>
+      <Subelement Path="25">
+        <StartValue>49</StartValue>
+      </Subelement>
+      <Subelement Path="26">
+        <StartValue>51</StartValue>
+      </Subelement>
+      <Subelement Path="27">
+        <StartValue>53</StartValue>
+      </Subelement>
+      <Subelement Path="28">
+        <StartValue>65</StartValue>
+      </Subelement>
+      <Subelement Path="29">
+        <StartValue>67</StartValue>
+      </Subelement>
+      <Subelement Path="30">
+        <StartValue>69</StartValue>
+      </Subelement>
+      <Subelement Path="31">
+        <StartValue>71</StartValue>
+      </Subelement>
+      <Subelement Path="32">
+        <StartValue>73</StartValue>
+      </Subelement>
+      <Subelement Path="33">
+        <StartValue>75</StartValue>
+      </Subelement>
+      <Subelement Path="34">
+        <StartValue>77</StartValue>
+      </Subelement>
+      <Subelement Path="35">
+        <StartValue>79</StartValue>
+      </Subelement>
+      <Subelement Path="36">
+        <StartValue>81</StartValue>
+      </Subelement>
+      <Subelement Path="37">
+        <StartValue>83</StartValue>
+      </Subelement>
+      <Subelement Path="38">
+        <StartValue>85</StartValue>
+      </Subelement>
+      <Subelement Path="39">
+        <StartValue>87</StartValue>
+      </Subelement>
+      <Subelement Path="40">
+        <StartValue>89</StartValue>
+      </Subelement>
+      <Subelement Path="41">
+        <StartValue>91</StartValue>
+      </Subelement>
+      <Subelement Path="42">
+        <StartValue>93</StartValue>
+      </Subelement>
+      <Subelement Path="43">
+        <StartValue>95</StartValue>
+      </Subelement>
+      <Subelement Path="44">
+        <StartValue>97</StartValue>
+      </Subelement>
+      <Subelement Path="45">
+        <StartValue>99</StartValue>
+      </Subelement>
+      <Subelement Path="46">
+        <StartValue>101</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>103</StartValue>
+      </Subelement>
+      <Subelement Path="48">
+        <StartValue>105</StartValue>
+      </Subelement>
+      <Subelement Path="49">
+        <StartValue>107</StartValue>
+      </Subelement>
+      <Subelement Path="50">
+        <StartValue>109</StartValue>
+      </Subelement>
+      <Subelement Path="51">
+        <StartValue>111</StartValue>
+      </Subelement>
+      <Subelement Path="52">
+        <StartValue>113</StartValue>
+      </Subelement>
+      <Subelement Path="53">
+        <StartValue>115</StartValue>
+      </Subelement>
+      <Subelement Path="54">
+        <StartValue>117</StartValue>
+      </Subelement>
+      <Subelement Path="55">
+        <StartValue>129</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>131</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>133</StartValue>
+      </Subelement>
+      <Subelement Path="58">
+        <StartValue>135</StartValue>
+      </Subelement>
+      <Subelement Path="59">
+        <StartValue>137</StartValue>
+      </Subelement>
+      <Subelement Path="60">
+        <StartValue>139</StartValue>
+      </Subelement>
+      <Subelement Path="61">
+        <StartValue>141</StartValue>
+      </Subelement>
+      <Subelement Path="62">
+        <StartValue>143</StartValue>
+      </Subelement>
+      <Subelement Path="63">
+        <StartValue>145</StartValue>
+      </Subelement>
+      <Subelement Path="64">
+        <StartValue>147</StartValue>
+      </Subelement>
+      <Subelement Path="65">
+        <StartValue>149</StartValue>
+      </Subelement>
+      <Subelement Path="66">
+        <StartValue>151</StartValue>
+      </Subelement>
+      <Subelement Path="67">
+        <StartValue>153</StartValue>
+      </Subelement>
+      <Subelement Path="68">
+        <StartValue>155</StartValue>
+      </Subelement>
+      <Subelement Path="69">
+        <StartValue>157</StartValue>
+      </Subelement>
+      <Subelement Path="70">
+        <StartValue>159</StartValue>
+      </Subelement>
+      <Subelement Path="71">
+        <StartValue>161</StartValue>
+      </Subelement>
+      <Subelement Path="72">
+        <StartValue>163</StartValue>
+      </Subelement>
+      <Subelement Path="73">
+        <StartValue>165</StartValue>
+      </Subelement>
+      <Subelement Path="74">
+        <StartValue>167</StartValue>
+      </Subelement>
+      <Subelement Path="75">
+        <StartValue>169</StartValue>
+      </Subelement>
+      <Subelement Path="76">
+        <StartValue>171</StartValue>
+      </Subelement>
+      <Subelement Path="77">
+        <StartValue>173</StartValue>
+      </Subelement>
+      <Subelement Path="78">
+        <StartValue>175</StartValue>
+      </Subelement>
+      <Subelement Path="79">
+        <StartValue>177</StartValue>
+      </Subelement>
+      <Subelement Path="80">
+        <StartValue>179</StartValue>
+      </Subelement>
+      <Subelement Path="81">
+        <StartValue>181</StartValue>
+      </Subelement>
+      <Subelement Path="82">
+        <StartValue>183</StartValue>
+      </Subelement>
+      <Subelement Path="83">
+        <StartValue>185</StartValue>
+      </Subelement>
+      <Subelement Path="84">
+        <StartValue>187</StartValue>
+      </Subelement>
+      <Subelement Path="85">
+        <StartValue>189</StartValue>
+      </Subelement>
+      <Subelement Path="86">
+        <StartValue>191</StartValue>
+      </Subelement>
+      <Subelement Path="87">
+        <StartValue>193</StartValue>
+      </Subelement>
+      <Subelement Path="88">
+        <StartValue>195</StartValue>
+      </Subelement>
+      <Subelement Path="89">
+        <StartValue>197</StartValue>
+      </Subelement>
+    </Member>
+    <Member Name="CloseCmdChannel" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Subelement Path="1">
+        <StartValue>2</StartValue>
+      </Subelement>
+      <Subelement Path="2">
+        <StartValue>4</StartValue>
+      </Subelement>
+      <Subelement Path="3">
+        <StartValue>6</StartValue>
+      </Subelement>
+      <Subelement Path="4">
+        <StartValue>8</StartValue>
+      </Subelement>
+      <Subelement Path="5">
+        <StartValue>10</StartValue>
+      </Subelement>
+      <Subelement Path="6">
+        <StartValue>12</StartValue>
+      </Subelement>
+      <Subelement Path="7">
+        <StartValue>14</StartValue>
+      </Subelement>
+      <Subelement Path="8">
+        <StartValue>16</StartValue>
+      </Subelement>
+      <Subelement Path="9">
+        <StartValue>18</StartValue>
+      </Subelement>
+      <Subelement Path="10">
+        <StartValue>20</StartValue>
+      </Subelement>
+      <Subelement Path="11">
+        <StartValue>22</StartValue>
+      </Subelement>
+      <Subelement Path="12">
+        <StartValue>24</StartValue>
+      </Subelement>
+      <Subelement Path="13">
+        <StartValue>26</StartValue>
+      </Subelement>
+      <Subelement Path="14">
+        <StartValue>28</StartValue>
+      </Subelement>
+      <Subelement Path="15">
+        <StartValue>30</StartValue>
+      </Subelement>
+      <Subelement Path="16">
+        <StartValue>32</StartValue>
+      </Subelement>
+      <Subelement Path="17">
+        <StartValue>34</StartValue>
+      </Subelement>
+      <Subelement Path="18">
+        <StartValue>36</StartValue>
+      </Subelement>
+      <Subelement Path="19">
+        <StartValue>38</StartValue>
+      </Subelement>
+      <Subelement Path="20">
+        <StartValue>40</StartValue>
+      </Subelement>
+      <Subelement Path="21">
+        <StartValue>42</StartValue>
+      </Subelement>
+      <Subelement Path="22">
+        <StartValue>44</StartValue>
+      </Subelement>
+      <Subelement Path="23">
+        <StartValue>46</StartValue>
+      </Subelement>
+      <Subelement Path="24">
+        <StartValue>48</StartValue>
+      </Subelement>
+      <Subelement Path="25">
+        <StartValue>50</StartValue>
+      </Subelement>
+      <Subelement Path="26">
+        <StartValue>52</StartValue>
+      </Subelement>
+      <Subelement Path="27">
+        <StartValue>54</StartValue>
+      </Subelement>
+      <Subelement Path="28">
+        <StartValue>66</StartValue>
+      </Subelement>
+      <Subelement Path="29">
+        <StartValue>68</StartValue>
+      </Subelement>
+      <Subelement Path="30">
+        <StartValue>70</StartValue>
+      </Subelement>
+      <Subelement Path="31">
+        <StartValue>72</StartValue>
+      </Subelement>
+      <Subelement Path="32">
+        <StartValue>74</StartValue>
+      </Subelement>
+      <Subelement Path="33">
+        <StartValue>76</StartValue>
+      </Subelement>
+      <Subelement Path="34">
+        <StartValue>78</StartValue>
+      </Subelement>
+      <Subelement Path="35">
+        <StartValue>80</StartValue>
+      </Subelement>
+      <Subelement Path="36">
+        <StartValue>82</StartValue>
+      </Subelement>
+      <Subelement Path="37">
+        <StartValue>84</StartValue>
+      </Subelement>
+      <Subelement Path="38">
+        <StartValue>86</StartValue>
+      </Subelement>
+      <Subelement Path="39">
+        <StartValue>88</StartValue>
+      </Subelement>
+      <Subelement Path="40">
+        <StartValue>90</StartValue>
+      </Subelement>
+      <Subelement Path="41">
+        <StartValue>92</StartValue>
+      </Subelement>
+      <Subelement Path="42">
+        <StartValue>94</StartValue>
+      </Subelement>
+      <Subelement Path="43">
+        <StartValue>96</StartValue>
+      </Subelement>
+      <Subelement Path="44">
+        <StartValue>98</StartValue>
+      </Subelement>
+      <Subelement Path="45">
+        <StartValue>100</StartValue>
+      </Subelement>
+      <Subelement Path="46">
+        <StartValue>102</StartValue>
+      </Subelement>
+      <Subelement Path="47">
+        <StartValue>104</StartValue>
+      </Subelement>
+      <Subelement Path="48">
+        <StartValue>106</StartValue>
+      </Subelement>
+      <Subelement Path="49">
+        <StartValue>108</StartValue>
+      </Subelement>
+      <Subelement Path="50">
+        <StartValue>110</StartValue>
+      </Subelement>
+      <Subelement Path="51">
+        <StartValue>112</StartValue>
+      </Subelement>
+      <Subelement Path="52">
+        <StartValue>114</StartValue>
+      </Subelement>
+      <Subelement Path="53">
+        <StartValue>116</StartValue>
+      </Subelement>
+      <Subelement Path="54">
+        <StartValue>118</StartValue>
+      </Subelement>
+      <Subelement Path="55">
+        <StartValue>130</StartValue>
+      </Subelement>
+      <Subelement Path="56">
+        <StartValue>132</StartValue>
+      </Subelement>
+      <Subelement Path="57">
+        <StartValue>134</StartValue>
+      </Subelement>
+      <Subelement Path="58">
+        <StartValue>136</StartValue>
+      </Subelement>
+      <Subelement Path="59">
+        <StartValue>138</StartValue>
+      </Subelement>
+      <Subelement Path="60">
+        <StartValue>140</StartValue>
+      </Subelement>
+      <Subelement Path="61">
+        <StartValue>142</StartValue>
+      </Subelement>
+      <Subelement Path="62">
+        <StartValue>144</StartValue>
+      </Subelement>
+      <Subelement Path="63">
+        <StartValue>146</StartValue>
+      </Subelement>
+      <Subelement Path="64">
+        <StartValue>148</StartValue>
+      </Subelement>
+      <Subelement Path="65">
+        <StartValue>150</StartValue>
+      </Subelement>
+      <Subelement Path="66">
+        <StartValue>152</StartValue>
+      </Subelement>
+      <Subelement Path="67">
+        <StartValue>154</StartValue>
+      </Subelement>
+      <Subelement Path="68">
+        <StartValue>156</StartValue>
+      </Subelement>
+      <Subelement Path="69">
+        <StartValue>158</StartValue>
+      </Subelement>
+      <Subelement Path="70">
+        <StartValue>160</StartValue>
+      </Subelement>
+      <Subelement Path="71">
+        <StartValue>162</StartValue>
+      </Subelement>
+      <Subelement Path="72">
+        <StartValue>164</StartValue>
+      </Subelement>
+      <Subelement Path="73">
+        <StartValue>166</StartValue>
+      </Subelement>
+      <Subelement Path="74">
+        <StartValue>168</StartValue>
+      </Subelement>
+      <Subelement Path="75">
+        <StartValue>170</StartValue>
+      </Subelement>
+      <Subelement Path="76">
+        <StartValue>172</StartValue>
+      </Subelement>
+      <Subelement Path="77">
+        <StartValue>174</StartValue>
+      </Subelement>
+      <Subelement Path="78">
+        <StartValue>176</StartValue>
+      </Subelement>
+      <Subelement Path="79">
+        <StartValue>178</StartValue>
+      </Subelement>
+      <Subelement Path="80">
+        <StartValue>180</StartValue>
+      </Subelement>
+      <Subelement Path="81">
+        <StartValue>182</StartValue>
+      </Subelement>
+      <Subelement Path="82">
+        <StartValue>184</StartValue>
+      </Subelement>
+      <Subelement Path="83">
+        <StartValue>186</StartValue>
+      </Subelement>
+      <Subelement Path="84">
+        <StartValue>188</StartValue>
+      </Subelement>
+      <Subelement Path="85">
+        <StartValue>190</StartValue>
+      </Subelement>
+      <Subelement Path="86">
+        <StartValue>192</StartValue>
+      </Subelement>
+      <Subelement Path="87">
+        <StartValue>194</StartValue>
+      </Subelement>
+      <Subelement Path="88">
+        <StartValue>196</StartValue>
+      </Subelement>
+      <Subelement Path="89">
+        <StartValue>198</StartValue>
+      </Subelement>
+    </Member>
+    </Section>
 </Sections></Interface>
       <IsOnlyStoredInLoadMemory>false</IsOnlyStoredInLoadMemory>
       <IsRetainMemResEnabled>false</IsRetainMemResEnabled>
@@ -83,7 +1709,7 @@
           <MultilingualTextItem ID="2" CompositionName="Items">
             <AttributeList>
               <Culture>en-US</Culture>
-              <Text>Per-valve physical channel assignment table (1..88). All zero until the confirmed valve list / channel schedule is filled in - the mapper and everything downstream treats a zero channel as "use symbolic simulation, no real I/O assigned yet" so this DB is safe to exist unfilled.</Text>
+              <Text>Per-valve physical channel assignment, as six parallel flat arrays (one per UDT_Valve_Config field) rather than an array of the struct itself - Openness Import rejects StartValues on struct-typed array elements (confirmed via direct testing 2026-08-13, every encoding tried), while flat arrays of a simple type accept per-index StartValues cleanly, same as Valve_Meta_DB. Populated from the proposed station-by-zone channel assignment (AFT->ET200SP_AFT, ER->MID, FWD->FWD), reviewed and confirmed by the client before this import.</Text>
             </AttributeList>
           </MultilingualTextItem>
         </ObjectList>
