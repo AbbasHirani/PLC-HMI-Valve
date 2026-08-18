@@ -393,6 +393,29 @@ namespace ValveDemoHmiBuilder
         // Command buttons fill only in their own state; every other state has no entry, so the
         // button keeps its own (white) background. Verify this fallback holds in runtime — if an
         // unmatched value renders wrong instead, these need all seven codes spelled out.
+        // Command buttons grey out when the PLC will actually REFUSE the press, so a tap never
+        // fails silently. Two states qualify: 0 = UNCONFIGURED (FC_IoMapper skips the valve
+        // entirely, so nothing happens at all) and 2 = LOCAL (hand control at the valve).
+        // A latched FAULT deliberately does NOT grey out — a latched alarm must never block a
+        // command, because you have to be able to close a ballast valve in an emergency without
+        // first finding a reset button. Greying it would imply blocked when it is not.
+        // Known gap: an UNHEALTHY valve is also refused but reports StateCode 1, which it shares
+        // with latched-alarm-but-healthy. StateCode alone cannot separate them, so that case is
+        // not covered here; it needs a per-slot fault code in the table window.
+        static readonly int[] LOCK_CODES = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        static readonly object[] LOCK_OPEN_FORE = {
+            Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255,   0, 158,  74),
+            Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255,   0, 158,  74),
+            Color.FromArgb(255,   0, 158,  74), Color.FromArgb(255,   0, 158,  74),
+            Color.FromArgb(255,   0, 158,  74), Color.FromArgb(255,   0, 158,  74)
+        };
+        static readonly object[] LOCK_CLOSE_FORE = {
+            Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255, 205,  32,  38),
+            Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255, 205,  32,  38),
+            Color.FromArgb(255, 205,  32,  38), Color.FromArgb(255, 205,  32,  38),
+            Color.FromArgb(255, 205,  32,  38), Color.FromArgb(255, 205,  32,  38)
+        };
+
         static readonly int[] FILL_OPEN_CODES  = { 3 };
         static readonly object[] FILL_OPEN     = { Color.FromArgb(255, 0, 158, 74) };
         static readonly int[] FILL_CLOSE_CODES = { 4 };
@@ -488,144 +511,118 @@ namespace ValveDemoHmiBuilder
             public DiagValve(string cm, int slot, int ax, int ay) { Cm = cm; Slot = slot; Ax = ax; Ay = ay; }
         }
 
-        // AFT zone, slots 1..27, in "AFT zone1.png"'s own 1888x500 coordinates (placed 1:1, no
-        // scaling). Slot order is the client's schedule order (CM25, CM26, CM50, CM51 ...), NOT
-        // sorted by CM number; see Valve_Meta_DB.
-        //
-        // Coordinates are MEASURED, not estimated: DetectBoxes.exe scans the PNG for the grey valve
-        // squares and reports each centre, and the printed CM labels were read off 2.4x crops and
-        // matched to those centres one by one. Re-run DetectBoxes.exe rather than eyeballing if the
-        // artwork is ever re-exported. All 23 printed labels resolved; every one cross-checks as
-        // System = "Ballast Aft" in Annex_B_IO_List_Full_Mapped.xlsx, and each sits at the location
-        // its schedule row claims (aft-peak group at the aft peak, pump/cross-line group in the ER,
-        // DB-tank group at TK7 DB).
-        //
-        // The four marked ASSIGNED below are drawn as untagged placeholder boxes in the artwork -
-        // the client has not confirmed them (CM80/CM85 are two of the seven outstanding). They are
-        // placed on the untagged box that best matches their schedule Location so the zone is fully
-        // operable for testing; the artwork must be re-exported with real labels once confirmed.
-        // Five untagged boxes are deliberately left with no overlay: they are almost certainly the
-        // "Cross-over manifold" group (CM86-CM90), which the schedule files under Ballast *Fwd*
-        // despite sitting physically here at ~Fr 128. See handoff item 19.
+        // AFT zone, slots 1..27, in "AFT zone.png"'s own 1888x500 coordinates (re-exported
+        // 2026-08-18 — NOT the earlier "AFT zone1" artwork; the graphic name changed too).
+        // Coordinates measured with DetectBoxes.exe; every CM number read off 2.5x crops and
+        // matched to its box. All 27 Ballast-Aft valves are placed — the earlier version omitted
+        // CM57/CM58/CM80/CM85 because the old artwork did not label them; this one does.
+        // The artwork has 28 boxes: the one at (299,126) carries a "?" and NO CM label, so it is
+        // unconfirmed and deliberately gets no overlay.
         static readonly DiagValve[] AFT_DIAGRAM = {
-            new DiagValve("CM52",  5,  145, 114),   // Aft peak      (P)
-            new DiagValve("CM53",  6,  145, 188),   // Aft peak P    tank suction
-            new DiagValve("CM51",  4,  134, 243),   // Aft peak      (C)
-            new DiagValve("CM54",  7,  144, 304),   // Aft peak S    tank suction
-            new DiagValve("CM50",  3,  144, 375),   // Main line     isolation
-
-            new DiagValve("CM71", 18,  356,  84),   // ER  main line     distribution
-            new DiagValve("CM85", 27,  299, 126),   // ER  cross line    isolation      [ASSIGNED]
-            new DiagValve("CM67", 14,  413, 126),   // ER  cross line    isolation
-            new DiagValve("CM78", 20,  572, 126),   // ER  pump 1        discharge
-            new DiagValve("CM83", 25,  681,  83),   // ER  tank branch   isolation
-            new DiagValve("CM79", 21,  681, 132),   // ER  bilge tie     cross connect
-            new DiagValve("CM80", 22,  751, 200),   // ER  bilge tie     isolation      [ASSIGNED]
-            new DiagValve("CM68", 15,  299, 189),   // ER  cross line    isolation
-            new DiagValve("CM72", 19,  356, 341),   // ER  pump 2        suction
-            new DiagValve("CM70", 17,  299, 383),   // ER  pump 2        isolation
-            new DiagValve("CM69", 16,  413, 383),   // ER  pump 2        isolation
-            new DiagValve("CM81", 23,  569, 383),   // ER  pump 2 disch  isolation
-            new DiagValve("CM82", 24,  674, 383),   // ER  pump 2 disch  isolation
-            new DiagValve("CM84", 26,  673, 435),   // ER  main line     isolation
-
-            new DiagValve("CM25",  1, 1089, 183),   // TK7 DB   P  filling
-            new DiagValve("CM59", 12, 1341, 122),   // TK7 DB   P  suction
-            new DiagValve("CM26",  2, 1089, 300),   // TK7 DB   S  suction
-            new DiagValve("CM60", 13, 1299, 366),   // TK7 DB   S  filling
-            new DiagValve("CM55",  8, 1419, 126),   // DB tank     filling
-            new DiagValve("CM56",  9, 1420, 356),   // DB tank     suction
-            new DiagValve("CM57", 10, 1632, 176),   // DB tank     suction        [ASSIGNED]
-            new DiagValve("CM58", 11, 1603, 303),   // DB tank     filling        [ASSIGNED]
+            new DiagValve("CM25",  1, 1089, 183),  new DiagValve("CM26",  2, 1089, 300),
+            new DiagValve("CM50",  3,  144, 375),  new DiagValve("CM51",  4,  134, 243),
+            new DiagValve("CM52",  5,  145, 114),  new DiagValve("CM53",  6,  145, 188),
+            new DiagValve("CM54",  7,  144, 304),  new DiagValve("CM55",  8, 1419, 126),
+            new DiagValve("CM56",  9, 1420, 356),  new DiagValve("CM57", 10, 1603, 303),
+            new DiagValve("CM58", 11, 1684, 176),  new DiagValve("CM59", 12, 1299, 366),
+            new DiagValve("CM60", 13, 1341, 122),  new DiagValve("CM67", 14,  413, 126),
+            new DiagValve("CM68", 15,  299, 189),  new DiagValve("CM69", 16,  413, 383),
+            new DiagValve("CM70", 17,  299, 383),  new DiagValve("CM71", 18,  356,  84),
+            new DiagValve("CM72", 19,  356, 341),  new DiagValve("CM78", 20,  572, 126),
+            new DiagValve("CM79", 21,  681, 132),  new DiagValve("CM80", 22,  751, 200),
+            new DiagValve("CM81", 23,  569, 383),  new DiagValve("CM82", 24,  674, 383),
+            new DiagValve("CM83", 25,  681,  83),  new DiagValve("CM84", 26,  673, 435),
+            new DiagValve("CM85", 27,  206, 436),
         };
 
-        // FWD zone, slots 55..89, in "FWD Zone1.png"'s own 1888x500 coordinates.
-        // Every box in this artwork is a "CM00" placeholder - the client has confirmed no forward
-        // numbering yet - so slots are assigned in the artwork's own reading order (top-to-bottom,
-        // left-to-right, exactly as DetectBoxes.exe emits them) against the schedule's slot order.
-        // That mapping is ARBITRARY BUT STABLE: it makes every forward valve reachable and testable
-        // now, and has to be redone against real labels once the client confirms. Do not treat the
-        // pairing of a CM number to a position here as meaningful.
-        //
-        // The artwork has 32 boxes for 35 forward valves, so the last three (CM88/CM89/CM90) have
-        // nowhere to sit and are parked bottom-right, on request, rather than being dropped - an
-        // unreachable valve is worse than an oddly-placed one. See handoff item 19: the shortfall
-        // is a schedule/drawing reconciliation problem, not a drawing error.
+        // FWD zone, slots 55..89, in "FWD Zone.png"'s own 1888x500 coordinates (re-exported
+        // 2026-08-18; graphic name changed from "FWD Zone1"). All 35 Ballast-Fwd valves placed
+        // against their PRINTED CM numbers. This replaces the earlier reading-order assignment,
+        // which was explicitly arbitrary because that artwork carried no real labels.
+        // The artwork has 36 boxes; 35 get overlays. The one at (1735,242) is labelled "CM00"
+        // and gets none — it is a REAL valve in the forepeak (between TK 1 DB C and Forepeak TK C)
+        // that the client's schedule simply does not contain, so there is no PLC slot to bind it
+        // to. The numbering points at 11-059: the forepeak run goes 11-056 (CM45), 11-057 (CM46),
+        // 11-058 (CM47) and then stops, and 11-059 is absent from the schedule. Unconfirmed —
+        // inferred from the gap, not read off the P&ID. If the client confirms it is in scope the
+        // pool needs a 90th slot. Same family as the seven other drawn-but-unscheduled valves
+        // (11-007, 11-013, 11-017, 11-018, 11-019, 11-070, 11-090) in handoff item 3.
+        // An earlier revision of this artwork also carried a duplicate CM48 outside the hull at
+        // (1732,419); it was never mapped here, and has since been removed from the drawing.
         static readonly DiagValve[] FWD_DIAGRAM = {
-            new DiagValve("CM27", 55,  452, 125),  new DiagValve("CM28", 56,  550, 120),
-            new DiagValve("CM29", 57,  742, 130),  new DiagValve("CM30", 58,  116, 180),
-            new DiagValve("CM31", 59,  178, 180),  new DiagValve("CM32", 60,  604, 179),
-            new DiagValve("CM33", 61,  863, 180),  new DiagValve("CM34", 62, 1147, 180),
-            new DiagValve("CM35", 63, 1355, 206),  new DiagValve("CM36", 64,  926, 249),
-            new DiagValve("CM37", 65,  977, 234),  new DiagValve("CM38", 66, 1028, 234),
-            new DiagValve("CM39", 67, 1079, 253),  new DiagValve("CM40", 68, 1210, 250),
-            new DiagValve("CM41", 69, 1261, 234),  new DiagValve("CM42", 70, 1315, 233),
-            new DiagValve("CM43", 71, 1356, 243),  new DiagValve("CM44", 72, 1730, 242),
-            new DiagValve("CM45", 73,  116, 306),  new DiagValve("CM46", 74,  178, 306),
-            new DiagValve("CM47", 75,  604, 306),  new DiagValve("CM48", 76,  863, 305),
-            new DiagValve("CM49", 77, 1147, 305),  new DiagValve("CM61", 78, 1355, 281),
-            new DiagValve("CM62", 79,  240, 358),  new DiagValve("CM63", 80,  293, 358),
-            new DiagValve("CM64", 81,  346, 358),  new DiagValve("CM65", 82,  399, 358),
-            new DiagValve("CM66", 83,  485, 358),  new DiagValve("CM77", 84,  651, 345),
-            new DiagValve("CM86", 85,  711, 370),  new DiagValve("CM87", 86,  772, 345),
-            // No box in the artwork for these three - parked bottom-right so they stay operable.
-            new DiagValve("CM88", 87, 1706, 455),  new DiagValve("CM89", 88, 1766, 455),
-            new DiagValve("CM90", 89, 1826, 455),
+            new DiagValve("CM27", 55,   21, 179),  new DiagValve("CM28", 56,   21, 306),
+            new DiagValve("CM29", 57,   60, 244),  new DiagValve("CM30", 58,   96, 244),
+            new DiagValve("CM31", 59,  175, 179),  new DiagValve("CM32", 60,  175, 306),
+            new DiagValve("CM33", 61,  235, 179),  new DiagValve("CM34", 62,  235, 306),
+            new DiagValve("CM35", 63,  897, 180),  new DiagValve("CM36", 64,  897, 305),
+            new DiagValve("CM37", 65, 1007, 234),  new DiagValve("CM38", 66,  958, 249),
+            new DiagValve("CM39", 67, 1171, 180),  new DiagValve("CM40", 68, 1373, 206),
+            new DiagValve("CM41", 69, 1232, 250),  new DiagValve("CM42", 70, 1057, 234),
+            new DiagValve("CM43", 71, 1106, 253),  new DiagValve("CM44", 72, 1282, 234),
+            new DiagValve("CM45", 73, 1373, 281),  new DiagValve("CM46", 74, 1171, 305),
+            new DiagValve("CM47", 75, 1374, 243),  new DiagValve("CM48", 76,  647, 179),
+            new DiagValve("CM49", 77,  646, 306),  new DiagValve("CM61", 78,  448, 358),
+            new DiagValve("CM62", 79,  594, 120),  new DiagValve("CM63", 80,  499, 125),
+            new DiagValve("CM64", 81,  532, 358),  new DiagValve("CM65", 82,  809, 345),
+            new DiagValve("CM66", 83,  781, 130),  new DiagValve("CM77", 84, 1333, 233),
+            new DiagValve("CM86", 85,  295, 358),  new DiagValve("CM87", 86,  346, 358),
+            new DiagValve("CM88", 87,  396, 358),  new DiagValve("CM89", 88,  692, 345),
+            new DiagValve("CM90", 89,  750, 370),
         };
 
-        // HOME overview, all 89 slots, in "Full.png"'s own 1888x584 coordinates. Boxes here are
-        // 20px, not 30 - the whole vessel is compressed onto one sheet.
+        // HOME overview, in "full.png"'s own 1888x584 coordinates. Boxes are 20px here, not 30.
         //
-        // Full.png is NOT a composite of the two zone drawings: it carries 45 boxes aft of Fr 128
-        // and 19 forward, where the zone sheets carry 32 and 32. The three drawings do not agree
-        // with each other, so no attempt is made to keep a valve at the "same" spot on Home as on
-        // its zone screen - that correspondence does not exist to preserve.
+        // Home shows the FULL BALLAST system only. Bilge is a separate system, not a region of the
+        // ballast one, and drawing both on one sheet crams it past readability — so Bilge gets its
+        // own screen and its own artwork (decided 2026-08-18). The 27 Bilge valves are still PARKED
+        // in a grid at the bottom here, so every valve stays reachable from the landing page even
+        // though this drawing does not depict them.
         //
-        // What IS meaningful here is the hull split: boxes are sorted by x and the 27 sternmost go
-        // to the AFT slots, the next 35 to FWD. That lands AFT at x=100..929 (aft peak, ER, TK7)
-        // and FWD at x=958..1655, which matches the vessel. Within each group the pairing of a CM
-        // number to a box is arbitrary - every label in this artwork reads "CM00" - and must be
-        // redone once the client confirms numbering. Two boxes are left spare.
-        //
-        // The 27 Bilge valves have no artwork at all yet, so they are parked in a 6x5 grid bottom
-        // right rather than dropped: an unreachable valve is worse than an oddly-placed one, and
-        // Home is the only screen that offers a whole-vessel view.
+        // All 62 ballast valves placed against their printed CM numbers; coordinates measured with
+        // DetectBoxes.exe, labels read off 3.2-6.0x crops.
+        // The artwork has 64 boxes; 62 get overlays. The two labelled "CM00" at (196,156) and
+        // (1808,274) are unconfirmed and get none — binding a real valve's live state to an
+        // unconfirmed box on a ballast system is worse than leaving the box bare.
+        // An earlier revision also carried a duplicate CM48 at (1851,56) in the top-right corner;
+        // it was never mapped here, and has since been removed from the drawing.
         static readonly DiagValve[] HOME_DIAGRAM = {
-            new DiagValve("CM25", 1,  100, 144),   new DiagValve("CM26", 2,  100, 217),
-            new DiagValve("CM50", 3,  100, 272),   new DiagValve("CM51", 4,  100, 334),
-            new DiagValve("CM52", 5,  100, 405),   new DiagValve("CM53", 6,  196, 156),
-            new DiagValve("CM54", 7,  196, 219),   new DiagValve("CM55", 8,  196, 413),
-            new DiagValve("CM56", 9,  227, 127),   new DiagValve("CM57", 10, 227, 388),
-            new DiagValve("CM58", 11, 258, 156),   new DiagValve("CM59", 12, 258, 413),
-            new DiagValve("CM60", 13, 338, 156),   new DiagValve("CM67", 14, 338, 413),
-            new DiagValve("CM68", 15, 370, 388),   new DiagValve("CM69", 16, 397, 109),
-            new DiagValve("CM70", 17, 397, 156),   new DiagValve("CM71", 18, 401, 413),
-            new DiagValve("CM72", 19, 401, 464),   new DiagValve("CM78", 20, 443, 230),
-            new DiagValve("CM79", 21, 638, 214),   new DiagValve("CM80", 22, 638, 331),
-            new DiagValve("CM81", 23, 764, 402),   new DiagValve("CM82", 24, 792, 144),
-            new DiagValve("CM83", 25, 846, 144),   new DiagValve("CM84", 26, 846, 402),
-            new DiagValve("CM85", 27, 929, 336),
+            // ---- BALLAST AFT, slots 1-27 ----
+            new DiagValve("CM25",  1,  638, 214),  new DiagValve("CM26",  2,  638, 331),
+            new DiagValve("CM50",  3,  100, 405),  new DiagValve("CM51",  4,  100, 272),
+            new DiagValve("CM52",  5,  100, 144),  new DiagValve("CM53",  6,  100, 217),
+            new DiagValve("CM54",  7,  100, 334),  new DiagValve("CM55",  8,  846, 144),
+            new DiagValve("CM56",  9,  846, 402),  new DiagValve("CM57", 10,  929, 336),
+            new DiagValve("CM58", 11,  958, 198),  new DiagValve("CM59", 12,  764, 402),
+            new DiagValve("CM60", 13,  792, 144),  new DiagValve("CM67", 14,  258, 156),
+            new DiagValve("CM68", 15,  196, 219),  new DiagValve("CM69", 16,  258, 413),
+            new DiagValve("CM70", 17,  196, 413),  new DiagValve("CM71", 18,  227, 127),
+            new DiagValve("CM72", 19,  227, 388),  new DiagValve("CM78", 20,  338, 156),
+            new DiagValve("CM79", 21,  397, 156),  new DiagValve("CM80", 22,  443, 230),
+            new DiagValve("CM81", 23,  338, 413),  new DiagValve("CM82", 24,  401, 413),
+            new DiagValve("CM83", 25,  397, 109),  new DiagValve("CM84", 26,  401, 464),
+            new DiagValve("CM85", 27,  142, 497),
 
-            new DiagValve("CM27", 55,  958, 198),  new DiagValve("CM28", 56, 1008, 198),
-            new DiagValve("CM29", 57, 1008, 346),  new DiagValve("CM30", 58, 1051, 271),
-            new DiagValve("CM31", 59, 1075, 271),  new DiagValve("CM32", 60, 1103, 209),
-            new DiagValve("CM33", 61, 1103, 332),  new DiagValve("CM34", 62, 1137, 208),
-            new DiagValve("CM35", 63, 1137, 332),  new DiagValve("CM36", 64, 1173, 392),
-            new DiagValve("CM37", 65, 1202, 391),  new DiagValve("CM38", 66, 1232, 392),
-            new DiagValve("CM39", 67, 1262, 392),  new DiagValve("CM40", 68, 1270, 147),
-            new DiagValve("CM41", 69, 1291, 392),  new DiagValve("CM42", 70, 1297, 147),
-            new DiagValve("CM43", 71, 1321, 216),  new DiagValve("CM44", 72, 1321, 332),
-            new DiagValve("CM45", 73, 1346, 378),  new DiagValve("CM46", 74, 1370, 403),
-            new DiagValve("CM47", 75, 1392, 157),  new DiagValve("CM48", 76, 1412, 378),
-            new DiagValve("CM49", 77, 1431, 214),  new DiagValve("CM61", 78, 1431, 332),
-            new DiagValve("CM62", 79, 1456, 283),  new DiagValve("CM63", 80, 1481, 263),
-            new DiagValve("CM64", 81, 1507, 263),  new DiagValve("CM65", 82, 1530, 282),
-            new DiagValve("CM66", 83, 1554, 216),  new DiagValve("CM77", 84, 1554, 332),
-            new DiagValve("CM86", 85, 1577, 282),  new DiagValve("CM87", 86, 1602, 263),
-            new DiagValve("CM88", 87, 1628, 263),  new DiagValve("CM89", 88, 1655, 244),
-            new DiagValve("CM90", 89, 1655, 275),
+            // ---- BALLAST FWD, slots 55-89 ----
+            new DiagValve("CM27", 55, 1008, 198),  new DiagValve("CM28", 56, 1008, 346),
+            new DiagValve("CM29", 57, 1051, 271),  new DiagValve("CM30", 58, 1075, 271),
+            new DiagValve("CM31", 59, 1103, 209),  new DiagValve("CM32", 60, 1103, 332),
+            new DiagValve("CM33", 61, 1137, 208),  new DiagValve("CM34", 62, 1137, 332),
+            new DiagValve("CM35", 63, 1431, 214),  new DiagValve("CM36", 64, 1431, 332),
+            new DiagValve("CM37", 65, 1481, 263),  new DiagValve("CM38", 66, 1456, 283),
+            new DiagValve("CM39", 67, 1554, 216),  new DiagValve("CM40", 68, 1655, 244),
+            new DiagValve("CM41", 69, 1577, 282),  new DiagValve("CM42", 70, 1507, 263),
+            new DiagValve("CM43", 71, 1530, 282),  new DiagValve("CM44", 72, 1602, 263),
+            new DiagValve("CM45", 73, 1655, 306),  new DiagValve("CM46", 74, 1554, 332),
+            new DiagValve("CM47", 75, 1655, 275),  new DiagValve("CM48", 76, 1321, 216),
+            new DiagValve("CM49", 77, 1321, 332),  new DiagValve("CM61", 78, 1262, 392),
+            new DiagValve("CM62", 79, 1297, 147),  new DiagValve("CM63", 80, 1270, 147),
+            new DiagValve("CM64", 81, 1291, 392),  new DiagValve("CM65", 82, 1412, 378),
+            new DiagValve("CM66", 83, 1392, 157),  new DiagValve("CM77", 84, 1628, 263),
+            new DiagValve("CM86", 85, 1173, 392),  new DiagValve("CM87", 86, 1202, 391),
+            new DiagValve("CM88", 87, 1232, 392),  new DiagValve("CM89", 88, 1346, 378),
+            new DiagValve("CM90", 89, 1370, 403),
 
-            // Bilge — parked, no artwork yet.
+            // ---- BILGE, slots 28-54 — PARKED, not on this drawing (see header) ----
             new DiagValve("CM01", 28, 1640, 440),  new DiagValve("CM02", 29, 1678, 440),
             new DiagValve("CM03", 30, 1716, 440),  new DiagValve("CM04", 31, 1754, 440),
             new DiagValve("CM05", 32, 1792, 440),  new DiagValve("CM06", 33, 1830, 440),
@@ -640,6 +637,31 @@ namespace ValveDemoHmiBuilder
             new DiagValve("CM24", 50, 1792, 524),  new DiagValve("CM94", 51, 1830, 524),
             new DiagValve("CM95", 52, 1640, 552),  new DiagValve("CM96", 53, 1678, 552),
             new DiagValve("CM97", 54, 1716, 552),
+        };
+
+        // BILGE zone, slots 28..54, in "Bilge.png"'s own 1888x500 coordinates.
+        // Bilge is a SEPARATE SYSTEM from ballast, so it gets its own drawing and its own screen
+        // (decided 2026-08-18). All 27 CM numbers printed on the artwork match the schedule's Bilge
+        // system exactly: CM01-CM21 (the schedule has no CM22), CM23, CM24, and the four Fire tags
+        // CM94-CM97. Coordinates measured with DetectBoxes.exe, labels read off 2.3x crops.
+        // The artwork has 31 boxes; the four labelled "CM00" are UNCONFIRMED and get no overlay —
+        // they sit at (434,138), (333,177), (240,284) and (428,283).
+        static readonly DiagValve[] BILGE_DIAGRAM = {
+            new DiagValve("CM01", 28, 1765, 263),  new DiagValve("CM02", 29, 1037, 207),
+            new DiagValve("CM03", 30, 1036, 273),  new DiagValve("CM04", 31, 1168, 210),
+            new DiagValve("CM05", 32, 1168, 276),  new DiagValve("CM06", 33,  143, 240),
+            new DiagValve("CM07", 34,  592, 189),  new DiagValve("CM08", 35,  592, 285),
+            new DiagValve("CM09", 36,  246, 177),  new DiagValve("CM10", 37,  368, 107),
+            new DiagValve("CM11", 38, 1409, 210),  new DiagValve("CM12", 39, 1409, 272),
+            new DiagValve("CM13", 40, 1654, 270),  new DiagValve("CM14", 41, 1671, 210),
+            new DiagValve("CM15", 42,  277, 323),  new DiagValve("CM16", 43,  312, 265),
+            new DiagValve("CM17", 44,  396, 322),  new DiagValve("CM18", 45,  218,  32),
+            new DiagValve("CM19", 46,  856, 273),  new DiagValve("CM20", 47,  727, 205),
+            new DiagValve("CM21", 48,  734, 272),  new DiagValve("CM23", 49, 1243, 212),
+            new DiagValve("CM24", 50, 1282,  32),
+            // Fire main tags, drawn as a labelled row at the bottom of the sheet.
+            new DiagValve("CM94", 51,  294, 452),  new DiagValve("CM95", 52,  333, 452),
+            new DiagValve("CM96", 53,  372, 452),  new DiagValve("CM97", 54,  411, 452),
         };
 
         // Draws the P&ID sheet + its live valve overlay inside an existing zone screen, replacing
@@ -722,7 +744,11 @@ namespace ValveDemoHmiBuilder
                 SetProp(hit, "HorizontalTextAlignment", "Center");
                 SetProp(hit, "VerticalTextAlignment", "Center");
                 SetFont(hit, SFont(11), true);
-                SetText(hit, "Text", "&#x22C8;");
+                // No bowtie glyph on the overlay. The artwork already draws its own valve symbol
+                // inside every box, so painting one on top just doubled it up and cluttered a
+                // 20-30px square. Removed on request 2026-08-18; the button stays fully functional
+                // as the click target, it simply has no text of its own.
+                SetText(hit, "Text", "");
                 try { hit.GetType().GetProperty("ShowFocusVisual").SetValue(hit, false, null); } catch {}
                 AddPopupScript(hit, vTag);
             }
@@ -986,7 +1012,7 @@ namespace ValveDemoHmiBuilder
             // same size, only its surrounding margins got tighter.
             // Real vessel artwork replaces the code-drawn mimic. "Full.png" is authored at exactly
             // 1888x584 — the same box the mimic occupied — so it drops in 1:1 with no rescaling.
-            BuildZoneDiagram(sc, 16, 174, 1888, 584, "Full", "VESSEL OVERVIEW", HOME_DIAGRAM, 20);
+            BuildZoneDiagram(sc, 16, 174, 1888, 584, "full", "BALLAST OVERVIEW", HOME_DIAGRAM, 20);
 
             int tY = 774, tH = 288, tW = 304, tStep = 316, tX0 = 16;
             // Left-to-right order matches the mimic's corrected zone order above it (AFT-ER-FWD).
@@ -1369,13 +1395,16 @@ namespace ValveDemoHmiBuilder
             int tableY = 174 + illustH + 24;          // 698, same on every zone
             int tableH = 1062 - tableY;                // all end on Home's 1062 bottom edge
 
-            // Bilge still has no artwork (yet to be designed), so it keeps the code-drawn mimic.
+            // All three zones have real artwork now (Bilge added 2026-08-18), so the code-drawn
+            // BuildZoneMimic fallback is no longer reachable from here.
+            // Graphic names must match EXACTLY what was imported into TIA. These were re-exported
+            // on 2026-08-18 and are not the earlier "AFT zone1"/"FWD Zone1" names.
             if (zonePrefix == "Aft")
-                BuildZoneDiagram(sc, 16, 174, 1888, 500, "AFT zone1", zoneLabel, AFT_DIAGRAM);
+                BuildZoneDiagram(sc, 16, 174, 1888, 500, "AFT zone", zoneLabel, AFT_DIAGRAM);
             else if (zonePrefix == "Fwd")
-                BuildZoneDiagram(sc, 16, 174, 1888, 500, "FWD Zone1", zoneLabel, FWD_DIAGRAM);
+                BuildZoneDiagram(sc, 16, 174, 1888, 500, "FWD Zone", zoneLabel, FWD_DIAGRAM);
             else
-                BuildZoneMimic(sc, 16, 174, 1888, 500, vStart, vEnd, mimicCols, 2, zoneLabel);
+                BuildZoneDiagram(sc, 16, 174, 1888, 500, "Bilge", zoneLabel, BILGE_DIAGRAM);
 
             // Table takes width back off the summary (1650 -> 1674): the summary only has to fit
             // six short label/number rows, whereas the table has six columns fighting for room.
@@ -1607,6 +1636,10 @@ namespace ValveDemoHmiBuilder
                     // button's own white background (see FILL_OPEN/FILL_CLOSE).
                     AddValueMap(DynTag(openBtn,  "BackColor", stateTag), FILL_OPEN_CODES,  FILL_OPEN);
                     AddValueMap(DynTag(closeBtn, "BackColor", stateTag), FILL_CLOSE_CODES, FILL_CLOSE);
+                    // Grey the label when the PLC will refuse the press (unconfigured / local).
+                    // Colour only — Authorization below and the PLC interlock are the real guards.
+                    AddValueMap(DynTag(openBtn,  "ForeColor", stateTag), LOCK_CODES, LOCK_OPEN_FORE);
+                    AddValueMap(DynTag(closeBtn, "ForeColor", stateTag), LOCK_CODES, LOCK_CLOSE_FORE);
                     // Set HERE, in the build path, not by the --finish-login-auth repair pass.
                     // These buttons bypass the popup entirely, so without it a logged-out user can
                     // stroke any valve straight from the list. The repair pass set it on the live

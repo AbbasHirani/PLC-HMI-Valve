@@ -463,7 +463,7 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     succeeded immediately on retry - TIA was still busy from the compile. A failed attach right
     after a long operation is worth simply retrying before investigating.
 
-24. **[pending — designed, deliberately not built 2026-08-17]** **Mimic fault flash, computed in the
+24. **[APPROVED 2026-08-18 — build at 0.25 Hz, pair with item 26]** **Mimic fault flash, computed in the
     PLC.** The mimic boxes currently show position as fill with a red fault border; the popup circle
     flashes red-to-position. Two visual languages for the same thing. Agreed target is to flash on
     the mimic too, but the flash must NOT be a script — 89 boxes re-evaluating on a 1Hz clock tick
@@ -490,6 +490,32 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
 
     Applies identically to Home, AFT and FWD. Optionally drive the popup circle from the same code
     for a single source of truth.
+
+    **DECIDED 2026-08-18 after the performance audit — build it, at 0.25 Hz (2 s on / 2 s off).**
+    The rate change matters twice over: a 2 s half-period needs only a ~1 s tag acquisition cycle, so
+    the aliasing risk below largely disappears, and it quarters the update traffic. Use a 2 s clock
+    (a `Clock_0Hz25` bit, or divide `Clock_1Hz` in the PLC) rather than `Clock_1Hz`.
+
+    **It is CHEAPER than what is built today, not more expensive** — this was the open question and
+    the audit answered it:
+    - The box currently carries **two** live bindings (fill on `_PosCode`, border on `_State`).
+      `DispCode` collapses that to **one**. On Home that is 89 fewer bindings, not more.
+    - Tag traffic scales with the number of FAULTS, not the number of valves. Healthy plant:
+      `DispCode` equals `PosCode`, never changes, **zero traffic**. All 89 faulted at 0.25 Hz:
+      ~44 updates/sec — still a quarter of what a scripted flash would cost *permanently while
+      everything is fine*.
+    - **Zero JavaScript executions.** A scripted flash would be ~178/sec regardless of plant state,
+      six times the load that already made the popup measurably slow before item 15.
+
+    Do it in the same `FB_ValveLoop` pass as item 26 — both are edits to that block, so one import
+    and one screen rebuild covers both. The screen rebuild IS required, because the box's BackColor
+    binding moves from `_PosCode` to `_DispCode`.
+
+    **Still unsettled, and it is a client question not a technical one:** convention (EEMUA 191,
+    ISA 18.2) reserves flashing for *unacknowledged* alarms, with steady meaning acknowledged-but-
+    active. Flashing on any fault spends that signal early. The mimic does not currently know
+    acknowledgement state, so wiring it properly is a bigger job than this item assumes. Raise it in
+    the fail-safe review (item 9) before anyone treats the flash as an alarm-management feature.
 
     **Watch when built:** 1Hz flashing needs the HMI tag acquisition cycle fast enough not to alias
     the square wave (0.5s high / 0.5s low). The popup's existing `Clock1Hz` flash proves the
@@ -529,6 +555,190 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     **API trap worth remembering:** `MakeLiveText` creates an **HmiButton** — it has no alignment
     property (the align argument is silently dropped, text is always centred) and its text property
     is `Text`, not `ProcessValue`. For left-aligned live text use `MakeTb` and bind `Text`.
+
+26. **[pending — PERFORMANCE, do before install]** **Gate the paged table-window rebuild.**
+    Found in the 2026-08-18 performance audit; **the single biggest contributor to PLC scan time,
+    and it is doing work nobody can read.** `FB_ValveLoop`'s four table-window loops (Aft 14, Er 14,
+    Fwd 14, Cfg 16 = 58 slots) copy roughly **350 STRINGS every scan** — `TblTag`, `TblName`,
+    `TblLoc`, `TblFunc`, `TblCmNo`, `TblVTag`, `TblStateTxt` per slot. String copies are the slowest
+    operation in the whole program; estimated **1-2 ms of a ~2-4 ms scan**.
+
+    The window contents only change when the page changes or a valve's state changes, and an
+    operator cannot read faster than that. Gate the four loops behind a page-change flag plus a
+    ~200 ms tick and roughly **half the scan time disappears** with no loss of responsiveness.
+    Independent of everything else, low risk, high value.
+
+27. **[pending — measure on real hardware]** **Confirm the audit's estimates against the actual CPU.**
+    Everything in item 26 is calculated, not measured. Once on hardware:
+    - TIA → *Online & diagnostics → Cycle time* for real scan time (estimate was 2-4 ms)
+    - TIA → *Program info* for real work-memory usage against the CPU 1214C's **100 KB** budget
+      (`Valve_Meta_DB` is string-heavy and is the block most likely to surprise)
+    - Watch the **Home screen** first if anything feels sluggish — 89 mimic overlays plus three
+      summary tables make it the heaviest page in the project.
+
+28. **[pending — the one genuine unknown]** **Screen object count.** Home and the zone screens carry
+    **230-250 screen objects each**. Siemens' published guidance for *classic* Comfort panels is a
+    500 hard limit with 80-100 "practical"; Unified Comfort is stated as at minimum double, in places
+    triple, but no per-screen object figure for Unified could be found. So this is above the
+    conservative floor and cannot be resolved from a datasheet — **only real hardware settles it.**
+    Mitigating factor: the bindings are native value maps, not scripts, which is roughly two orders
+    of magnitude cheaper per binding.
+
+29. **[settled 2026-08-18 — no action]** **Tag licensing is NOT a risk.** ~2,150 HMI tags, of which
+    about five are internal, so ~**2,145 PowerTags** against a panel ceiling of **8,192** (74% free;
+    still ~48% free even against the conservative 4,096 figure quoted for classic Comfort panels).
+    **Proof is already in hand: exceeding the tag limit is a COMPILE-TIME error in TIA, and the HMI
+    compiles with 0 errors.** The runtime licence is built into the panel hardware for Comfort and
+    Unified Comfort — nothing to buy, nothing to ask the supplier. Recorded so nobody re-opens it.
+
+30. **[verified good 2026-08-18 — do not regress]** **The HMI is already correctly optimised, and it
+    must stay that way.** The audit found:
+    - **All 27 trigger declarations are `AutomaticTags`. Zero polling anywhere in the project.**
+    - Only ~18 script dynamizations exist in the entire generator, and every one is on a
+      **single-instance** element (the popup, KPI counters) — never per-valve.
+    - The 28 command buttons per zone use *event* scripts, which run on tap and cost nothing at rest.
+    - Per-valve colour comes from **native value maps**, evaluated by the runtime's binding engine
+      rather than the JavaScript engine.
+
+    This is the thing that would normally cripple a panel of this size, and it was already fixed (see
+    items 15 and 20). **Any future change that introduces a per-valve script, or a `T500ms` trigger,
+    is a regression** — the popup was measurably slow with only ~14 polled scripts before item 15.
+
+31. **[pending — UNKNOWN CODE RUNNING EVERY SCAN, read before install]** **Three legacy blocks
+    execute in `Main [OB1]` and nobody has read them.** Found 2026-08-18 by exporting the live OB1 to
+    confirm scan order. Actual order is:
+
+    ```
+    1. FB_ValveControl      <- purpose unknown
+    2. FB_PlantSimulation   <- purpose unknown
+    3. FB_ValveLoop            (ours — all valve logic)
+    4. FB_HMI_MIirror       <- purpose unknown  (note the typo in the block name)
+    5. (empty network)
+    6. FC_PhysicalIoCopy       (ours)
+    7. FC_IoMapper             (ours)
+    ```
+
+    All three predate the current architecture and run **before** the main loop every scan. Specific
+    risks, none confirmed:
+    - `FB_PlantSimulation` — if it writes simulated values into `Valves_DB` it could fight real I/O.
+      The current design already had to add a real-channel guard inside `FB_ValveLoop` (item 6) for
+      exactly this class of problem.
+    - `FB_HMI_MIirror` — likely superseded by the selected-valve mirror now inside `FB_ValveLoop`
+      (item 15). If both write the same mirror members, last-writer-wins and OB1 order decides.
+    - Their scan-time cost is **not** included in the item 26/27 estimates, because they were never
+      read. If measured cycle time comes back well above the ~2-4 ms estimate, look here first.
+
+    They have caused no observed symptom — all 22 fault tests passed — but "no symptom yet" is not
+    "harmless" on a system going onto a ship. **Read all three, then either delete the calls or
+    document why they stay.** Note the OB1 export/patch/re-import route works fine (item 7), so
+    removing a call is straightforward if they turn out to be dead.
+
+32. **[pending — HMI REBUILD, agreed 2026-08-18. Do this ONE SCREEN AT A TIME.]**
+    **Screen structure changed: Bilge is its own section, not part of the vessel overview.**
+
+    **The decision and why.** Bilge is a genuinely separate system from ballast, not a region of it.
+    Drawing both on one vessel illustration crams it to the point of being unreadable. So the four
+    graphical screens are now:
+
+    | Screen | Illustration | Valves |
+    |---|---|---|
+    | Home | **full ballast only** | AFT 1-27 + FWD 55-89 (62) |
+    | Ballast Aft | AFT zone | 1-27 |
+    | Ballast Fwd | FWD zone | 55-89 |
+    | Bilge | **its own drawing (new)** | 28-54 |
+
+    **The parked Bilge grid on Home STAYS** (revised 2026-08-18, overriding the first draft of this
+    item). Home keeps the 27 Bilge valves in a grid at the bottom, exactly as item 21 built them —
+    they simply have no place on a ballast-only drawing. Rationale: Home is the whole-plant landing
+    page, and **every valve should be reachable from it** even when the artwork does not depict it.
+    So Home carries 62 ballast overlays positioned on the drawing PLUS 27 parked Bilge boxes below.
+    The Bilge SCREEN additionally gets its own proper drawing with the same 27 valves placed on it.
+    This does retire the code-drawn `BuildZoneMimic` fallback, since Bilge was its last user.
+
+    **New artwork, all four imported into TIA on their respective screen tabs (2026-08-18 22:25-22:27):**
+    ```
+    C:\hmi_graphics\full.png       C:\hmi_graphics\Bilge.png
+    C:\hmi_graphics\AFT zone.png   C:\hmi_graphics\FWD Zone.png
+    ```
+    **These are DIFFERENT FILENAMES from the previous round.** The code currently references
+    `"Full"`, `"AFT zone1"` and `"FWD Zone1"` — all three must be repointed to `"full"`,
+    `"AFT zone"`, `"FWD Zone"`, plus a new `"Bilge"`. Confirm the exact graphic names as imported in
+    TIA before building; a wrong name gives a blank background with the overlays still floating on it.
+
+    **Box sizes:** Home **20 x 20 px**, all other screens **30 x 30 px**. Measure the real positions
+    with `DetectBoxes.exe` — do not eyeball them (see item 21).
+
+    **Placement rule — this is new and important.** Only place a live overlay where the artwork has a
+    **real CM number printed above the box**. Boxes with no number, or reading `CM00`, are
+    **unconfirmed** — leave them bare. A wrong overlay is worse than a missing one: it would bind a
+    real valve's live state to the wrong symbol on a ballast system. Consequence to expect: the
+    overlay count per screen will be LESS than that zone's valve count, and those valves will be
+    operable from the valve list but absent from the mimic until the client confirms numbering
+    (item 3 / item 19).
+
+    **Also in this pass — valve list buttons must disable on UNCONFIGURED**, the same way they already
+    grey out when logged out (item 17). An unconfigured valve is skipped entirely by `FC_IoMapper`, so
+    pressing OPEN on it does nothing at all — currently with no explanation. The popup already handles
+    this (`!cfg` is in its lock condition, item 25); the zone list does not.
+
+    **Build order — ONE SCREEN AT A TIME, user verifies each before the next.** Agreed explicitly
+    because the last full rebuild was ~90 minutes and a mistake in the shared code would have been
+    repeated across every screen before anyone saw it. Suggested order: **Bilge** (all new, nothing to
+    regress) → **AFT** (its labels are already confirmed, so it is the best correctness check) →
+    **FWD** → **Home**. Use `--only=<Screen>` each time; note `Screen_Popup` is always rebuilt too.
+
+    **STATUS 2026-08-18/19 — all coordinate work DONE and verified; only the build remains.**
+
+    | Screen | Artwork | Boxes | Overlays | No overlay |
+    |---|---|---|---|---|
+    | Home | `full.png` 1888x584, 20px | 64 | 62 ballast + 27 parked Bilge | 2 x `CM00` |
+    | AFT | `AFT zone.png` 1888x500, 30px | 28 | 27 | 1 unlabelled `?` |
+    | FWD | `FWD Zone.png` 1888x500, 30px | 36 | 35 | 1 x `CM00` (forepeak) |
+    | Bilge | `Bilge.png` 1888x500, 30px | 31 | 27 | 4 x `CM00` |
+
+    Every CM number was read off 2.3-6.0x crops and matched to a `DetectBoxes.exe` centre — not
+    eyeballed. Verified programmatically: each table has the exact slot range, no duplicates, no
+    gaps, and every Home coordinate still lands on a box in the current file.
+
+    Done: all four tables written; graphic names repointed to `full` / `AFT zone` / `FWD Zone` /
+    `Bilge`; valve-list buttons grey on UNCONFIGURED and LOCAL; the bowtie glyph removed from every
+    overlay (the artwork draws its own symbol); `BuildZoneMimic` now unreachable.
+    **Screen_Bilge is already built** — but with the binary from before the button lock and the
+    symbol removal, so it needs the rebuild too.
+
+    **Remaining: one run of `--only=Home,Aft,Fwd,Bilge`.**
+
+    Two artwork findings resolved along the way, both worth not re-investigating:
+    - A duplicate **CM48** existed on BOTH `full.png` (top-right, 1851,56) and `FWD Zone.png`
+      (outside the hull, 1732,419). Neither was ever mapped — the arithmetic caught them, because
+      62 and 35 valves respectively were already accounted for. Both have since been removed from
+      the drawings by the user. Comments in the code record this so nobody re-opens it.
+    - The FWD forepeak `CM00` at (1735,242) is a **real valve the client's schedule does not
+      contain**. The forepeak run goes 11-056 (CM45), 11-057 (CM46), 11-058 (CM47) and stops, and
+      11-059 is absent from the schedule — so 11-059 is the likely tag, inferred from the numbering
+      gap, NOT read off the P&ID. If it is in scope the pool needs a 90th slot. Same family as the
+      seven other drawn-but-unscheduled valves in item 3.
+
+33. **[pending — DO THIS WITH OR BEFORE ITEM 24]** **The direction/limit fault has no alarm.**
+    Verified 2026-08-19: `CreateAlarms` generates **7** alarms per valve (Unhealthy, DoubleInd,
+    FailOpen, FailClose, LossPos, UnexpMove, Local) — 632 = 89 x 7 + 9. `W_DirFault` is packed by
+    `FB_ValveLoop` every scan but is referenced **zero** times in the alarm generator, so a direction
+    fault latches, drives StateCode to FAULT, colours the mimic and the popup — and produces nothing
+    in the alarm list. No timestamp, no acknowledgement, no history.
+
+    **Why the ordering matters:** once item 24 makes the box FLASH, a direction fault becomes the
+    loudest thing on the screen while still having no alarm behind it. Flashing implies "go read the
+    alarm list", and there would be nothing there. That is worse than the current quiet failure, so
+    the alarm must land with or before the flash — not after.
+
+    Fix is one line beside the other seven in `CreateAlarms`, bound to
+    `Valves_DB_W_DirFault_<w>` bit `(i-1)%16`, class `ValveWarning` (same tier as the travel
+    timeouts), text along the lines of "<CM> Direction / limit fault - check actuator and limit
+    switch wiring". It names both candidate causes, which is the point: the PLC cannot tell a
+    wrong-direction actuator from a stuck limit switch, and the technician can.
+
+    Cost: it rides the `--only=DiscreteAlarms` pass, which is slow (~45 min) but has to run anyway if
+    anything else about the alarm set changes. Do it in the same session as 24 and 26.
 
 ## 4. The valve count saga — read this before touching counts again
 
