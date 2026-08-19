@@ -106,6 +106,8 @@
     <Member Name="packWord" Datatype="Word" />
     <Member Name="simStepAtStart" Datatype="Int" />
     <Member Name="sel" Datatype="Int" />
+    <Member Name="winTick" Datatype="Bool" />
+    <Member Name="doWindows" Datatype="Bool" />
   </Section>
   <Section Name="Constant" />
 </Sections></Interface>
@@ -146,11 +148,32 @@
     #tempFwdOpen := 0;   #tempFwdClosed := 0;   #tempFwdTransit := 0;   #tempFwdFault := 0;   #tempFwdLocal := 0;   #tempFwdConfigured := 0;
     #tempAftOpen := 0;   #tempAftClosed := 0;   #tempAftTransit := 0;   #tempAftFault := 0;   #tempAftLocal := 0;   #tempAftConfigured := 0;
 
-    // 1Hz Flashing Clock Generator (Toggles every ~500ms)
-    &quot;Valves_DB&quot;.ClockCounter := &quot;Valves_DB&quot;.ClockCounter + 1;
-    IF &quot;Valves_DB&quot;.ClockCounter &gt;= 10 THEN
-        &quot;Valves_DB&quot;.Clock_1Hz := NOT &quot;Valves_DB&quot;.Clock_1Hz;
-        &quot;Valves_DB&quot;.ClockCounter := 0;
+            // Flash clocks — TIME based, not scan-count based.
+    // The old version incremented a counter and toggled at >= 10, i.e. every TEN SCANS. That is
+    // only 1 Hz if a scan takes 50 ms; the real scan is a few milliseconds, so it was toggling at
+    // roughly 16 Hz and the popup's &quot;1 Hz&quot; fault flash was actually a fast flicker. A TON runs on
+    // the CPU clock, so these are correct regardless of scan time.
+    &quot;Valves_DB&quot;.ClockCounter := 0;   // legacy scan counter, no longer used
+    &quot;Valves_DB&quot;.Clk1Tmr(IN := TRUE, PT := T#500MS);
+    IF &quot;Valves_DB&quot;.Clk1Tmr.Q THEN
+        &quot;Valves_DB&quot;.Clock_1Hz := NOT &quot;Valves_DB&quot;.Clock_1Hz;   // a genuine 1 Hz now
+        &quot;Valves_DB&quot;.Clk1Tmr(IN := FALSE, PT := T#500MS);   // reset NOW, same scan
+    END_IF;
+    &quot;Valves_DB&quot;.FlashTmr(IN := TRUE, PT := T#2S);
+    IF &quot;Valves_DB&quot;.FlashTmr.Q THEN
+        &quot;Valves_DB&quot;.Clock_Flash := NOT &quot;Valves_DB&quot;.Clock_Flash;   // 0.25 Hz: 2 s on, 2 s off
+        &quot;Valves_DB&quot;.FlashTmr(IN := FALSE, PT := T#2S);   // reset NOW, same scan
+    END_IF;
+    // Self-referencing IN (IN := NOT Q) looked correct but never produced an observable
+    // pulse: the moment the TON sets Q, the IN expression evaluates FALSE and the timer
+    // clears Q again before the following IF can read it. Observed live 2026-08-19 -
+    // Clock_Flash never went true (faulted valves showed steady position colour, no red
+    // flash) and the table windows only ever refreshed when a page button was pressed.
+    // Drive IN unconditionally TRUE and reset explicitly in the same scan instead.
+    &quot;Valves_DB&quot;.WinTmr(IN := TRUE, PT := T#200MS);
+    #winTick := &quot;Valves_DB&quot;.WinTmr.Q;   // latch before the reset clears it
+    IF #winTick THEN
+        &quot;Valves_DB&quot;.WinTmr(IN := FALSE, PT := T#200MS);
     END_IF;
 
     // Auto-initialize hardware health to TRUE (healthy until told otherwise) if all are FALSE at startup
@@ -459,6 +482,22 @@
                 &quot;Valves_DB&quot;.FaultCode[#i] := 0;
             END_IF;
 
+            // What the mimic box should show right now, flashing included. Computing the
+            // ALTERNATION here means the HMI binds one native value map and runs no scripts at all
+            // - 89 scripted boxes re-evaluating on every clock tick would be real load on the panel,
+            // and this project already learned that lesson with the popup.
+            // When nothing is faulted DispCode simply equals PosCode and never changes, so a healthy
+            // plant produces zero tag traffic. Cost scales with faults, not with valve count.
+            IF NOT &quot;Valves_DB&quot;.Valve[#i].Configured THEN
+                &quot;Valves_DB&quot;.DispCode[#i] := 0;
+            ELSIF &quot;Valves_DB&quot;.FaultCode[#i] &gt; 0 AND &quot;Valves_DB&quot;.Clock_Flash THEN
+                &quot;Valves_DB&quot;.DispCode[#i] := 1;                                  // red half of the flash
+            ELSIF &quot;Valves_DB&quot;.Valve[#i].LocalMode THEN
+                &quot;Valves_DB&quot;.DispCode[#i] := 2;                                  // amber, steady
+            ELSE
+                &quot;Valves_DB&quot;.DispCode[#i] := &quot;Valves_DB&quot;.PosCode[#i];        // position
+            END_IF;
+
             IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy OR (&quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB)
                OR &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] OR &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i]
                OR &quot;Valves_DB&quot;.UnexpMove[#i] OR &quot;Valves_DB&quot;.PosLostTmr[#i].Q
@@ -523,6 +562,7 @@
         ELSE
             &quot;Valves_DB&quot;.StateCode[#i] := 0;
             &quot;Valves_DB&quot;.PosCode[#i] := 0;
+            &quot;Valves_DB&quot;.DispCode[#i] := 0;
             &quot;Valves_DB&quot;.FaultCode[#i] := 0;
             &quot;Valves_DB&quot;.Valve[#i].OpenCmd := FALSE;
             &quot;Valves_DB&quot;.Valve[#i].CloseCmd := FALSE;
@@ -702,186 +742,208 @@
     // TblState = -1 marks a slot with no valve on this page (0 already means UNCONFIGURED).
     // 14 iterations x 3 zones per scan is negligible next to the 89-valve loop above.
 
-    // AFT BALLAST: valves 1..27 (2 pages)
-    #base := 1 + &quot;Valves_DB&quot;.AftPage * 14;
-    FOR #j := 1 TO 14 DO
-        #idx := #base + #j - 1;
-        IF #idx &lt;= 27 THEN
-            &quot;Valves_DB&quot;.AftTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
-            &quot;Valves_DB&quot;.AftTblNo[#j] := #idx;
-            // RIGHT() strips the leading sign-space INT_TO_STRING puts in front of a positive
-            // number: without it CONCAT yields 'CM- 29' rather than 'CM-29'.
-            IF #idx &lt; 10 THEN
-                &quot;Valves_DB&quot;.AftTblTag[#j] := CONCAT(IN1 := 'CM-0', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 1));
-            ELSE
-                &quot;Valves_DB&quot;.AftTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
-            END_IF;
-            &quot;Valve_Meta_DB&quot;.AftTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
-            &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
-            &quot;Valve_Meta_DB&quot;.AftTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
-            &quot;Valve_Meta_DB&quot;.AftTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
-            &quot;Valve_Meta_DB&quot;.AftTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
-            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
-                0: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'UNCONFIGURED';
-                1: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'FAULT';
-                2: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'LOCAL';
-                3: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'OPEN';
-                4: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'CLOSED';
-                6: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'OPENING';
-                7: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'CLOSING';
-                // 'NO POSITION', not 'MOVING'. Code 5 means neither limit switch is made, which is
-                // not the same as motion - 6 and 7 carry the genuine motion states now. Observed
-                // live 2026-08-16: after Reset Fault on a failed travel the valve sits perfectly
-                // still with no position for the 2s Loss-of-Position debounce, and the panel read
-                // MOVING. That is the one moment the operator most needs the truth.
-                ELSE &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'NO POSITION';
-            END_CASE;
-        ELSE
-            // 9, not 6: 6 became a real StateCode (OPENING) on 2026-08-16, and this
-            // empty-slot sentinel shares the same value map on the HMI. Leaving it at 6 painted
-            // every opening valve's status text transparent. 9 is outside the StateCode range.
-            &quot;Valves_DB&quot;.AftTblState[#j] := 9;
-            &quot;Valves_DB&quot;.AftTblNo[#j] := 0;
-            &quot;Valves_DB&quot;.AftTblTag[#j] := '';
-            &quot;Valves_DB&quot;.AftTblStateTxt[#j] := '';
-            &quot;Valve_Meta_DB&quot;.AftTblName[#j] := '';
-            &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := '';
-            &quot;Valve_Meta_DB&quot;.AftTblFunc[#j] := '';
-            &quot;Valve_Meta_DB&quot;.AftTblCmNo[#j] := '';
-            &quot;Valve_Meta_DB&quot;.AftTblVTag[#j] := '';
-        END_IF;
-    END_FOR;
+    // ── PAGED TABLE WINDOWS — gated, not rebuilt every scan ────────────────────────────
+    // These four loops copy ~350 STRINGS per scan (tag, name, location, function, CmNo, VTag,
+    // state text x 58 slots). String copies are the slowest thing in this program and were the
+    // single biggest contributor to scan time, all to produce data no operator can read faster
+    // than a few times a second.
+    // So: rebuild on a 200 ms tick, OR immediately when a page changes. The page test matters -
+    // waiting up to 200 ms after a page button would feel laggy, and paging is the one moment the
+    // window contents change wholesale.
+    #doWindows := #winTick
+        OR (&quot;Valves_DB&quot;.AftPage &lt;&gt; &quot;Valves_DB&quot;.PrevAftPage)
+        OR (&quot;Valves_DB&quot;.ErPage  &lt;&gt; &quot;Valves_DB&quot;.PrevErPage)
+        OR (&quot;Valves_DB&quot;.FwdPage &lt;&gt; &quot;Valves_DB&quot;.PrevFwdPage)
+        OR (&quot;Valves_DB&quot;.CfgPage &lt;&gt; &quot;Valves_DB&quot;.PrevCfgPage);
 
-    // BILGE / ER: valves 28..54 (2 pages)
-    #base := 28 + &quot;Valves_DB&quot;.ErPage * 14;
-    FOR #j := 1 TO 14 DO
-        #idx := #base + #j - 1;
-        IF #idx &lt;= 54 THEN
-            &quot;Valves_DB&quot;.ErTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
-            &quot;Valves_DB&quot;.ErTblNo[#j] := #idx - 27;
-            &quot;Valves_DB&quot;.ErTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
-            &quot;Valve_Meta_DB&quot;.ErTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
-            &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
-            &quot;Valve_Meta_DB&quot;.ErTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
-            &quot;Valve_Meta_DB&quot;.ErTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
-            &quot;Valve_Meta_DB&quot;.ErTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
-            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
-                0: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'UNCONFIGURED';
-                1: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'FAULT';
-                2: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'LOCAL';
-                3: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'OPEN';
-                4: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'CLOSED';
-                6: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'OPENING';
-                7: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'CLOSING';
-                ELSE &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'NO POSITION';
-            END_CASE;
-        ELSE
-            &quot;Valves_DB&quot;.ErTblState[#j] := 9;   // empty slot — see AftTblState note above
-            &quot;Valves_DB&quot;.ErTblNo[#j] := 0;
-            &quot;Valves_DB&quot;.ErTblTag[#j] := '';
-            &quot;Valves_DB&quot;.ErTblStateTxt[#j] := '';
-            &quot;Valve_Meta_DB&quot;.ErTblName[#j] := '';
-            &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := '';
-            &quot;Valve_Meta_DB&quot;.ErTblFunc[#j] := '';
-            &quot;Valve_Meta_DB&quot;.ErTblCmNo[#j] := '';
-            &quot;Valve_Meta_DB&quot;.ErTblVTag[#j] := '';
-        END_IF;
-    END_FOR;
+    IF #doWindows THEN
+        &quot;Valves_DB&quot;.PrevAftPage := &quot;Valves_DB&quot;.AftPage;
+        &quot;Valves_DB&quot;.PrevErPage  := &quot;Valves_DB&quot;.ErPage;
+        &quot;Valves_DB&quot;.PrevFwdPage := &quot;Valves_DB&quot;.FwdPage;
+        &quot;Valves_DB&quot;.PrevCfgPage := &quot;Valves_DB&quot;.CfgPage;
 
-    // FORWARD BALLAST: valves 55..89 (3 pages of 14, 35 slots exactly - the widest zone, holding
-    // the schedule's 35 FWD valves with no spare)
-    #base := 55 + &quot;Valves_DB&quot;.FwdPage * 14;
-    FOR #j := 1 TO 14 DO
-        #idx := #base + #j - 1;
-        IF #idx &lt;= 89 THEN
-            &quot;Valves_DB&quot;.FwdTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
-            &quot;Valves_DB&quot;.FwdTblNo[#j] := #idx - 54;
-            &quot;Valves_DB&quot;.FwdTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
-            &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
-            &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
-            &quot;Valve_Meta_DB&quot;.FwdTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
-            &quot;Valve_Meta_DB&quot;.FwdTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
-            &quot;Valve_Meta_DB&quot;.FwdTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
-            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
-                0: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'UNCONFIGURED';
-                1: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'FAULT';
-                2: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'LOCAL';
-                3: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'OPEN';
-                4: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'CLOSED';
-                6: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'OPENING';
-                7: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'CLOSING';
-                ELSE &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'NO POSITION';
-            END_CASE;
-        ELSE
-            &quot;Valves_DB&quot;.FwdTblState[#j] := 9;   // empty slot — see AftTblState note above
-            &quot;Valves_DB&quot;.FwdTblNo[#j] := 0;
-            &quot;Valves_DB&quot;.FwdTblTag[#j] := '';
-            &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := '';
-            &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := '';
-            &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := '';
-            &quot;Valve_Meta_DB&quot;.FwdTblFunc[#j] := '';
-            &quot;Valve_Meta_DB&quot;.FwdTblCmNo[#j] := '';
-            &quot;Valve_Meta_DB&quot;.FwdTblVTag[#j] := '';
-        END_IF;
-    END_FOR;
-
-    // CONFIGURATION SCREEN: all 89 slots in one global sequence (6 pages of 16, last one ragged
-    // at 9), not zone-scoped like the three windows above - this screen shows the whole fleet,
-    // so #idx IS the absolute valve number directly, no zone-start offset needed.
-    #base := 1 + &quot;Valves_DB&quot;.CfgPage * 16;
-    FOR #j := 1 TO 16 DO
-        #idx := #base + #j - 1;
-        IF #idx &lt;= 89 THEN
-            &quot;Valves_DB&quot;.CfgTblNo[#j] := #idx;
-            IF #idx &lt; 10 THEN
-                &quot;Valves_DB&quot;.CfgTblTag[#j] := CONCAT(IN1 := 'CM-0', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 1));
-            ELSE
-                &quot;Valves_DB&quot;.CfgTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
-            END_IF;
+        // AFT BALLAST: valves 1..27 (2 pages)
+        #base := 1 + &quot;Valves_DB&quot;.AftPage * 14;
+        FOR #j := 1 TO 14 DO
+            #idx := #base + #j - 1;
             IF #idx &lt;= 27 THEN
-                &quot;Valves_DB&quot;.CfgTblZone[#j] := 'AFT BALLAST';
-            ELSIF #idx &lt;= 54 THEN
-                &quot;Valves_DB&quot;.CfgTblZone[#j] := 'BILGE-ER';
+                &quot;Valves_DB&quot;.AftTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+                &quot;Valves_DB&quot;.AftTblNo[#j] := #idx;
+                // RIGHT() strips the leading sign-space INT_TO_STRING puts in front of a positive
+                // number: without it CONCAT yields 'CM- 29' rather than 'CM-29'.
+                IF #idx &lt; 10 THEN
+                    &quot;Valves_DB&quot;.AftTblTag[#j] := CONCAT(IN1 := 'CM-0', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 1));
+                ELSE
+                    &quot;Valves_DB&quot;.AftTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+                END_IF;
+                &quot;Valve_Meta_DB&quot;.AftTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+                &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+                &quot;Valve_Meta_DB&quot;.AftTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
+                &quot;Valve_Meta_DB&quot;.AftTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+                &quot;Valve_Meta_DB&quot;.AftTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
+                CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                    0: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'UNCONFIGURED';
+                    1: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'FAULT';
+                    2: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'LOCAL';
+                    3: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'OPEN';
+                    4: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'CLOSED';
+                    6: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'OPENING';
+                    7: &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'CLOSING';
+                    // 'NO POSITION', not 'MOVING'. Code 5 means neither limit switch is made, which is
+                    // not the same as motion - 6 and 7 carry the genuine motion states now. Observed
+                    // live 2026-08-16: after Reset Fault on a failed travel the valve sits perfectly
+                    // still with no position for the 2s Loss-of-Position debounce, and the panel read
+                    // MOVING. That is the one moment the operator most needs the truth.
+                    ELSE &quot;Valves_DB&quot;.AftTblStateTxt[#j] := 'NO POSITION';
+                END_CASE;
             ELSE
-                &quot;Valves_DB&quot;.CfgTblZone[#j] := 'BALLAST FWD';
+                // 9, not 6: 6 became a real StateCode (OPENING) on 2026-08-16, and this
+                // empty-slot sentinel shares the same value map on the HMI. Leaving it at 6 painted
+                // every opening valve's status text transparent. 9 is outside the StateCode range.
+                &quot;Valves_DB&quot;.AftTblState[#j] := 9;
+                &quot;Valves_DB&quot;.AftTblNo[#j] := 0;
+                &quot;Valves_DB&quot;.AftTblTag[#j] := '';
+                &quot;Valves_DB&quot;.AftTblStateTxt[#j] := '';
+                &quot;Valve_Meta_DB&quot;.AftTblName[#j] := '';
+                &quot;Valve_Meta_DB&quot;.AftTblLoc[#j] := '';
+                &quot;Valve_Meta_DB&quot;.AftTblFunc[#j] := '';
+                &quot;Valve_Meta_DB&quot;.AftTblCmNo[#j] := '';
+                &quot;Valve_Meta_DB&quot;.AftTblVTag[#j] := '';
             END_IF;
-            &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
-            &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
-            // Client-schedule identity columns. Displayed verbatim - no fallback to the
-            // computed CmNo/zone strings above, because a blank here is meaningful: it means
-            // that valve has not been entered from the confirmed schedule yet, and showing a
-            // derived 'CM-07' in its place would misrepresent unentered data as real.
-            &quot;Valve_Meta_DB&quot;.CfgTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
-            &quot;Valve_Meta_DB&quot;.CfgTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
-            &quot;Valve_Meta_DB&quot;.CfgTblSys[#j] := &quot;Valve_Meta_DB&quot;.SysName[#idx];
-            &quot;Valve_Meta_DB&quot;.CfgTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
-            &quot;Valves_DB&quot;.CfgTblConfigured[#j] := &quot;Valves_DB&quot;.Valve[#idx].Configured;
-            &quot;Valves_DB&quot;.CfgTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
-            CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
-                0: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'UNCONFIGURED';
-                1: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'FAULT';
-                2: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'LOCAL';
-                3: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'OPEN';
-                4: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'CLOSED';
-                6: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'OPENING';
-                7: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'CLOSING';
-                ELSE &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'NO POSITION';
-            END_CASE;
-        ELSE
-            &quot;Valves_DB&quot;.CfgTblNo[#j] := 0;
-            &quot;Valves_DB&quot;.CfgTblTag[#j] := '';
-            &quot;Valves_DB&quot;.CfgTblZone[#j] := '';
-            &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := '';
-            &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := '';
-            &quot;Valve_Meta_DB&quot;.CfgTblCmNo[#j] := '';
-            &quot;Valve_Meta_DB&quot;.CfgTblVTag[#j] := '';
-            &quot;Valve_Meta_DB&quot;.CfgTblSys[#j] := '';
-            &quot;Valve_Meta_DB&quot;.CfgTblFunc[#j] := '';
-            &quot;Valves_DB&quot;.CfgTblConfigured[#j] := FALSE;
-            &quot;Valves_DB&quot;.CfgTblState[#j] := 9;   // empty slot — see AftTblState note above
-            &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := '';
-        END_IF;
-    END_FOR;
+        END_FOR;
+
+        // BILGE / ER: valves 28..54 (2 pages)
+        #base := 28 + &quot;Valves_DB&quot;.ErPage * 14;
+        FOR #j := 1 TO 14 DO
+            #idx := #base + #j - 1;
+            IF #idx &lt;= 54 THEN
+                &quot;Valves_DB&quot;.ErTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+                &quot;Valves_DB&quot;.ErTblNo[#j] := #idx - 27;
+                &quot;Valves_DB&quot;.ErTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+                &quot;Valve_Meta_DB&quot;.ErTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+                &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+                &quot;Valve_Meta_DB&quot;.ErTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
+                &quot;Valve_Meta_DB&quot;.ErTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+                &quot;Valve_Meta_DB&quot;.ErTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
+                CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                    0: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'UNCONFIGURED';
+                    1: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'FAULT';
+                    2: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'LOCAL';
+                    3: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'OPEN';
+                    4: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'CLOSED';
+                    6: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'OPENING';
+                    7: &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'CLOSING';
+                    ELSE &quot;Valves_DB&quot;.ErTblStateTxt[#j] := 'NO POSITION';
+                END_CASE;
+            ELSE
+                &quot;Valves_DB&quot;.ErTblState[#j] := 9;   // empty slot — see AftTblState note above
+                &quot;Valves_DB&quot;.ErTblNo[#j] := 0;
+                &quot;Valves_DB&quot;.ErTblTag[#j] := '';
+                &quot;Valves_DB&quot;.ErTblStateTxt[#j] := '';
+                &quot;Valve_Meta_DB&quot;.ErTblName[#j] := '';
+                &quot;Valve_Meta_DB&quot;.ErTblLoc[#j] := '';
+                &quot;Valve_Meta_DB&quot;.ErTblFunc[#j] := '';
+                &quot;Valve_Meta_DB&quot;.ErTblCmNo[#j] := '';
+                &quot;Valve_Meta_DB&quot;.ErTblVTag[#j] := '';
+            END_IF;
+        END_FOR;
+
+        // FORWARD BALLAST: valves 55..89 (3 pages of 14, 35 slots exactly - the widest zone, holding
+        // the schedule's 35 FWD valves with no spare)
+        #base := 55 + &quot;Valves_DB&quot;.FwdPage * 14;
+        FOR #j := 1 TO 14 DO
+            #idx := #base + #j - 1;
+            IF #idx &lt;= 89 THEN
+                &quot;Valves_DB&quot;.FwdTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+                &quot;Valves_DB&quot;.FwdTblNo[#j] := #idx - 54;
+                &quot;Valves_DB&quot;.FwdTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+                &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+                &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+                &quot;Valve_Meta_DB&quot;.FwdTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
+                &quot;Valve_Meta_DB&quot;.FwdTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+                &quot;Valve_Meta_DB&quot;.FwdTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
+                CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                    0: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'UNCONFIGURED';
+                    1: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'FAULT';
+                    2: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'LOCAL';
+                    3: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'OPEN';
+                    4: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'CLOSED';
+                    6: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'OPENING';
+                    7: &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'CLOSING';
+                    ELSE &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := 'NO POSITION';
+                END_CASE;
+            ELSE
+                &quot;Valves_DB&quot;.FwdTblState[#j] := 9;   // empty slot — see AftTblState note above
+                &quot;Valves_DB&quot;.FwdTblNo[#j] := 0;
+                &quot;Valves_DB&quot;.FwdTblTag[#j] := '';
+                &quot;Valves_DB&quot;.FwdTblStateTxt[#j] := '';
+                &quot;Valve_Meta_DB&quot;.FwdTblName[#j] := '';
+                &quot;Valve_Meta_DB&quot;.FwdTblLoc[#j] := '';
+                &quot;Valve_Meta_DB&quot;.FwdTblFunc[#j] := '';
+                &quot;Valve_Meta_DB&quot;.FwdTblCmNo[#j] := '';
+                &quot;Valve_Meta_DB&quot;.FwdTblVTag[#j] := '';
+            END_IF;
+        END_FOR;
+
+        // CONFIGURATION SCREEN: all 89 slots in one global sequence (6 pages of 16, last one ragged
+        // at 9), not zone-scoped like the three windows above - this screen shows the whole fleet,
+        // so #idx IS the absolute valve number directly, no zone-start offset needed.
+        #base := 1 + &quot;Valves_DB&quot;.CfgPage * 16;
+        FOR #j := 1 TO 16 DO
+            #idx := #base + #j - 1;
+            IF #idx &lt;= 89 THEN
+                &quot;Valves_DB&quot;.CfgTblNo[#j] := #idx;
+                IF #idx &lt; 10 THEN
+                    &quot;Valves_DB&quot;.CfgTblTag[#j] := CONCAT(IN1 := 'CM-0', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 1));
+                ELSE
+                    &quot;Valves_DB&quot;.CfgTblTag[#j] := CONCAT(IN1 := 'CM-', IN2 := RIGHT(IN := INT_TO_STRING(#idx), L := 2));
+                END_IF;
+                IF #idx &lt;= 27 THEN
+                    &quot;Valves_DB&quot;.CfgTblZone[#j] := 'AFT BALLAST';
+                ELSIF #idx &lt;= 54 THEN
+                    &quot;Valves_DB&quot;.CfgTblZone[#j] := 'BILGE-ER';
+                ELSE
+                    &quot;Valves_DB&quot;.CfgTblZone[#j] := 'BALLAST FWD';
+                END_IF;
+                &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := &quot;Valve_Meta_DB&quot;.Name[#idx];
+                &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := &quot;Valve_Meta_DB&quot;.Location[#idx];
+                // Client-schedule identity columns. Displayed verbatim - no fallback to the
+                // computed CmNo/zone strings above, because a blank here is meaningful: it means
+                // that valve has not been entered from the confirmed schedule yet, and showing a
+                // derived 'CM-07' in its place would misrepresent unentered data as real.
+                &quot;Valve_Meta_DB&quot;.CfgTblCmNo[#j] := &quot;Valve_Meta_DB&quot;.CmNo[#idx];
+                &quot;Valve_Meta_DB&quot;.CfgTblVTag[#j] := &quot;Valve_Meta_DB&quot;.VTag[#idx];
+                &quot;Valve_Meta_DB&quot;.CfgTblSys[#j] := &quot;Valve_Meta_DB&quot;.SysName[#idx];
+                &quot;Valve_Meta_DB&quot;.CfgTblFunc[#j] := &quot;Valve_Meta_DB&quot;.FuncName[#idx];
+                &quot;Valves_DB&quot;.CfgTblConfigured[#j] := &quot;Valves_DB&quot;.Valve[#idx].Configured;
+                &quot;Valves_DB&quot;.CfgTblState[#j] := &quot;Valves_DB&quot;.StateCode[#idx];
+                CASE &quot;Valves_DB&quot;.StateCode[#idx] OF
+                    0: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'UNCONFIGURED';
+                    1: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'FAULT';
+                    2: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'LOCAL';
+                    3: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'OPEN';
+                    4: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'CLOSED';
+                    6: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'OPENING';
+                    7: &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'CLOSING';
+                    ELSE &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := 'NO POSITION';
+                END_CASE;
+            ELSE
+                &quot;Valves_DB&quot;.CfgTblNo[#j] := 0;
+                &quot;Valves_DB&quot;.CfgTblTag[#j] := '';
+                &quot;Valves_DB&quot;.CfgTblZone[#j] := '';
+                &quot;Valve_Meta_DB&quot;.CfgTblName[#j] := '';
+                &quot;Valve_Meta_DB&quot;.CfgTblLoc[#j] := '';
+                &quot;Valve_Meta_DB&quot;.CfgTblCmNo[#j] := '';
+                &quot;Valve_Meta_DB&quot;.CfgTblVTag[#j] := '';
+                &quot;Valve_Meta_DB&quot;.CfgTblSys[#j] := '';
+                &quot;Valve_Meta_DB&quot;.CfgTblFunc[#j] := '';
+                &quot;Valves_DB&quot;.CfgTblConfigured[#j] := FALSE;
+                &quot;Valves_DB&quot;.CfgTblState[#j] := 9;   // empty slot — see AftTblState note above
+                &quot;Valves_DB&quot;.CfgTblStateTxt[#j] := '';
+            END_IF;
+        END_FOR;
+    END_IF;
+
 
     // SELECTED-VALVE MIRROR for the control popup - same trick as the three paged table windows
     // above, applied to a window of exactly one valve. The HMI writes SelIdx when a valve badge is

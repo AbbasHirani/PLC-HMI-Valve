@@ -331,6 +331,24 @@ namespace ValveDemoHmiBuilder
         // Deliberately NOT a flashing script: 89 boxes re-evaluating on every 1Hz clock tick is
         // real load on the Home screen, and native value maps cost nothing at runtime. It also
         // keeps flashing available to mean "unacknowledged" later, which is the usual convention.
+        // Mimic box colour, flash included. Bound to <valve>_DispCode, which the PLC already
+        // alternates between 1 (red) and the position code at 0.25 Hz when a fault is latched.
+        // ONE native value map, ZERO scripts: 89 scripted boxes re-evaluating on a clock tick is
+        // real load, and this project already learned that with the popup (handoff item 15).
+        // When nothing is faulted DispCode equals PosCode and never changes, so a healthy plant
+        // costs nothing at all — the load scales with faults, not with valve count.
+        static readonly int[] DISP_CODES = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        static readonly object[] DISP_COLORS = {
+            Color.FromArgb(255, 154, 163, 176), // 0 UNCONFIGURED
+            Color.FromArgb(255, 235,  60,  48), // 1 FAULT — red half of the flash
+            Color.FromArgb(255, 226, 168,   0), // 2 LOCAL — steady amber, never flashes
+            Color.FromArgb(255,   0, 158,  74), // 3 OPEN
+            Color.FromArgb(255,  96, 106, 122), // 4 CLOSED
+            Color.FromArgb(255,   0, 162, 255), // 5 NO POSITION
+            Color.FromArgb(255,   0, 162, 255), // 6 OPENING
+            Color.FromArgb(255,   0, 162, 255)  // 7 CLOSING
+        };
+
         static readonly int[] POS_CODES = { 0, 3, 4, 5, 6, 7 };
         static readonly object[] POS_COLORS = {
             Color.FromArgb(255, 154, 163, 176), // 0 UNCONFIGURED
@@ -675,6 +693,60 @@ namespace ValveDemoHmiBuilder
         // boxPx: the artwork's own valve-square size. 30 on the zone sheets, 20 on Home's
         // whole-vessel sheet. Must match the drawing or the overlay leaves a grey fringe / spills
         // onto the pipe lines — measure with DetectBoxes.exe rather than guessing.
+        // -- Graphic name resolution ---------------------------------------------
+        // TIA NEVER overwrites a graphic on import - it appends _1, _2, _3 and keeps the original.
+        // So the artwork most recently imported is the highest-suffixed variant, and binding to the
+        // bare base name silently pins the screen to the FIRST import forever.
+        // Observed live 2026-08-19: Screen_Home still rendered 'Full' - the placeholder artwork with
+        // CM00 on every box - while the corrected drawing sat unused in the project as 'full_3'.
+        // Three earlier imports had all been ignored for the same reason.
+        static readonly List<string> s_graphicCatalog = new List<string>();
+
+        static void LoadGraphicCatalog(object project)
+        {
+            s_graphicCatalog.Clear();
+            try {
+                var gp = project.GetType().GetProperty("Graphics");
+                if (gp == null) { Console.WriteLine("  [Graphics] no Graphics collection on project."); return; }
+                var en = gp.GetValue(project, null) as IEnumerable;
+                if (en == null) return;
+                foreach (var o in en) {
+                    var np = o.GetType().GetProperty("Name");
+                    if (np == null) continue;
+                    var n = np.GetValue(o, null) as string;
+                    if (!string.IsNullOrEmpty(n)) s_graphicCatalog.Add(n);
+                }
+                Console.WriteLine("  [Graphics] catalog loaded: " + s_graphicCatalog.Count + " graphic(s).");
+            } catch (Exception ex) {
+                Console.WriteLine("  [Graphics] catalog unavailable: " + ex.Message);
+            }
+        }
+
+        // Returns the newest variant of baseName: 'full' -> 'full_3' when full, full_1..full_3 exist.
+        // Matches ONLY base and base_<int>, so 'AFT zone1' can never be mistaken for 'AFT zone'.
+        static string ResolveGraphic(string baseName)
+        {
+            string best = baseName;
+            int bestRank = -1;
+            foreach (var n in s_graphicCatalog) {
+                if (string.Equals(n, baseName, StringComparison.OrdinalIgnoreCase)) {
+                    if (bestRank < 0) { best = n; bestRank = 0; }
+                    continue;
+                }
+                if (n.Length <= baseName.Length + 1) continue;
+                if (!n.StartsWith(baseName, StringComparison.OrdinalIgnoreCase)) continue;
+                if (n[baseName.Length] != '_') continue;
+                int rank;
+                if (!int.TryParse(n.Substring(baseName.Length + 1), out rank)) continue;
+                if (rank > bestRank) { best = n; bestRank = rank; }
+            }
+            if (bestRank < 0)
+                Console.WriteLine("  [Graphics] '" + baseName + "' NOT FOUND in project - screen will render blank.");
+            else if (!string.Equals(best, baseName, StringComparison.Ordinal))
+                Console.WriteLine("  [Graphics] '" + baseName + "' -> '" + best + "' (newest import)");
+            return best;
+        }
+
         static void BuildZoneDiagram(HmiScreen sc, int px, int py, int pw, int ph,
                                       string graphicName, string zoneLabel, DiagValve[] valves,
                                       int boxPx = 30)
@@ -702,10 +774,11 @@ namespace ValveDemoHmiBuilder
             gv.BackColor = Color.Transparent;
             // Uniform: the box matches the artwork's own aspect, so nothing crops or distorts.
             SetPropEnumSafe(gv, "GraphicStretchMode", "Uniform");
-            try { gv.Graphic = graphicName; }
+            string resolvedGraphic = ResolveGraphic(graphicName);
+            try { gv.Graphic = resolvedGraphic; }
             catch (Exception ex) {
-                Console.WriteLine("  [WARN] Could not set Graphic='" + graphicName + "': " + ex.Message);
-                Console.WriteLine("         Import hmi_graphics/" + graphicName + ".svg into the HMI's");
+                Console.WriteLine("  [WARN] Could not set Graphic='" + resolvedGraphic + "': " + ex.Message);
+                Console.WriteLine("         Import hmi_graphics/" + graphicName + ".png into the HMI's");
                 Console.WriteLine("         Graphics collection in TIA, then re-run this build.");
             }
 
@@ -720,17 +793,19 @@ namespace ValveDemoHmiBuilder
                 // as 29-30px. Keep this equal to the artwork's real box size or the overlay either
                 // leaves a grey fringe or spills onto the pipe lines.
                 var box = MakeRect(sc, "Dg_" + v.Cm + "_st", cx - boxPx / 2, cy - boxPx / 2, boxPx, boxPx,
-                                   M_MUTED, Color.FromArgb(255, 17, 17, 17), 2);
+                                   M_MUTED, Color.FromArgb(255, 17, 17, 17), 1);
                 if (s_nativeBadgeOk) {
-                    if (!AddValueMap(DynTag(box, "BackColor", vTag + "_PosCode"), POS_CODES, POS_COLORS)) {
+                    if (!AddValueMap(DynTag(box, "BackColor", vTag + "_DispCode"), DISP_CODES, DISP_COLORS)) {
                         RemoveDyn(box, "BackColor");
                         s_nativeBadgeOk = false;
                         Console.WriteLine("  [Diagram] native colour mapping unavailable — falling back to script.");
                     }
                 }
                 if (!s_nativeBadgeOk) Dyn(box, "BackColor", ValveStateColorScript(vTag), "AutomaticTags");
-                // Fault/local outline, independent of the fill so both read at once.
-                if (s_nativeBadgeOk) AddValueMap(DynTag(box, "BorderColor", vTag + "_State"), BORDER_CODES, BORDER_COLORS);
+                // No fault BORDER any more. DispCode already carries fault (as the flash) and local
+                // (steady amber) in the fill, so a second binding saying the same thing was
+                // redundant — and dropping it halves the live bindings on this screen: 89 fewer on
+                // Home. The border is now plain definition only.
 
                 // Transparent hit target, deliberately larger than the 30px box so it is
                 // comfortably touchable; carries the bowtie so the symbol survives on top of the

@@ -521,6 +521,109 @@
     <Member Name="SelHealthy" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="SelLocalMode" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="SelConfigured" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
+    <!-- What the mimic box should show RIGHT NOW, flashing included. 0=unconfigured 1=red(fault half of
+         the flash) 2=local 3..7=position. The alternation is done HERE, in the PLC, so the HMI can bind
+         one native value map and run ZERO scripts - 89 scripted boxes re-evaluating on a clock tick is
+         real load on the panel. Key property: with nothing faulted DispCode equals PosCode and simply
+         never changes, so a healthy plant generates no tag traffic at all. Cost scales with the number
+         of faults, not the number of valves. -->
+    <Member Name="DispCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- 0.25 Hz (2 s on / 2 s off) flash clock for DispCode. Deliberately slower than Clock_1Hz: a 2 s
+         half-period needs only a ~1 s HMI acquisition cycle, so it cannot alias, and it quarters the
+         update traffic when many valves are faulted. -->
+    <Member Name="Clock_Flash" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- Self-resetting 2 s tick driving Clock_Flash. -->
+    <!-- Drives Clock_1Hz. Separate from FlashTmr because they run at different rates. -->
+    <Member Name="Clk1Tmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Sections>
+        <Section Name="None">
+          <Member Name="PT" Datatype="Time" />
+          <Member Name="ET" Datatype="Time" />
+          <Member Name="IN" Datatype="Bool" />
+          <Member Name="Q" Datatype="Bool" />
+        </Section>
+      </Sections>
+    </Member>
+    <Member Name="FlashTmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Sections>
+        <Section Name="None">
+          <Member Name="PT" Datatype="Time" />
+          <Member Name="ET" Datatype="Time" />
+          <Member Name="IN" Datatype="Bool" />
+          <Member Name="Q" Datatype="Bool" />
+        </Section>
+      </Sections>
+    </Member>
+    <!-- Self-resetting 200 ms tick that gates the paged table windows. Those four loops copy ~350
+         STRINGS every scan - the single biggest contributor to scan time - to build data no operator can
+         read faster than a few times a second. -->
+    <Member Name="WinTmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Sections>
+        <Section Name="None">
+          <Member Name="PT" Datatype="Time" />
+          <Member Name="ET" Datatype="Time" />
+          <Member Name="IN" Datatype="Bool" />
+          <Member Name="Q" Datatype="Bool" />
+        </Section>
+      </Sections>
+    </Member>
+    <!-- Page snapshots: the windows must also rebuild IMMEDIATELY on a page change, -->
+    <Member Name="PrevAftPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- not merely on the next 200 ms tick, or paging would feel laggy. -->
+    <Member Name="PrevErPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="PrevFwdPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="PrevCfgPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <Member Name="SelDirFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="SelCmdPos" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="SelPosCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />

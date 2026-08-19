@@ -277,6 +277,9 @@ namespace ValveDemoHmiBuilder
             // Create HMI Summary Tags with valid PLC Tag references
             CreateSummaryHmiTags(hmi);
 
+            // Read the real graphic names out of the project before drawing any mimic.
+            LoadGraphicCatalog(project);
+
             // STEP 1 – Rebuild screens for Marine UI Redesign
             Console.WriteLine("\n[STEP 1] Rebuilding Marine screens for 1920x1080 resolution...");
             
@@ -1608,8 +1611,16 @@ namespace ValveDemoHmiBuilder
                 CreateDiscreteAlarm(hmi, vId + "_LossPos", "ValveWarning", cm + " Loss of Position Feedback (idle, no limit switch made).", dbName + "_W_LossPos_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
                 CreateDiscreteAlarm(hmi, vId + "_UnexpMove", "ValveWarning", cm + " Unexpected Movement detected (uncommanded limit switch change).", dbName + "_W_UnexpMove_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
                 CreateDiscreteAlarm(hmi, vId + "_Local", "ValveEvent", cm + " switched to Local Control.", dbName + "_W_Local_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
+                // Direction / limit discrepancy (H). W_DirFault has been packed by FB_ValveLoop
+                // since 2026-08-16 but had NO alarm, so the fault latched, coloured the mimic and
+                // the popup, and produced nothing in the alarm list — no timestamp, no ack, no
+                // history. That gap gets worse once the box FLASHES, because flashing tells the
+                // operator to go read an alarm list that would have had nothing in it.
+                // Text names BOTH candidate causes on purpose: the PLC cannot tell a wrong-direction
+                // actuator from a stuck limit switch, but the technician with a multimeter can.
+                CreateDiscreteAlarm(hmi, vId + "_DirFault", "ValveWarning", cm + " Direction / limit fault - check actuator and limit switch wiring.", dbName + "_W_DirFault_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
             }
-            Console.WriteLine("  Created " + (VALVE_COUNT * 7 + 9) + " discrete alarms.");
+            Console.WriteLine("  Created " + (VALVE_COUNT * 8 + 9) + " discrete alarms.");
         }
 
         static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit, string origin, string area)
@@ -1687,7 +1698,7 @@ namespace ValveDemoHmiBuilder
                     CreateSummaryTag(hmi, "Valves_DB_" + zp + st, "Valves_DB." + zp + st, "Int", forceRefreshNewTags);
 
             // Add the word arrays for discrete alarms
-            string[] conditions = { "Unhealthy", "Conflict", "FailOpen", "FailClose", "LossPos", "UnexpMove", "Local" };
+            string[] conditions = { "Unhealthy", "Conflict", "FailOpen", "FailClose", "LossPos", "UnexpMove", "Local", "DirFault" };
             for (int w = 0; w < 6; w++) {
                 foreach (var cond in conditions) {
                     CreateSummaryTag(hmi, "Valves_DB_W_" + cond + "_" + w, "Valves_DB.W_" + cond + "[" + w + "]", "UInt");
@@ -1725,6 +1736,9 @@ namespace ValveDemoHmiBuilder
                 CreateSummaryTag(hmi, vTag + "_State",             "Valves_DB.StateCode[" + i + "]",         "Int",  forceRefreshNewTags);
                 // Position-only code for the mimic fill, so a faulted valve still shows where it is.
                 CreateSummaryTag(hmi, vTag + "_PosCode",           "Valves_DB.PosCode[" + i + "]",           "Int",  forceRefreshNewTags);
+                // Drives the mimic box colour INCLUDING the fault flash — the PLC does the
+                // alternating, so the box binds one native value map and runs no script.
+                CreateSummaryTag(hmi, vTag + "_DispCode",          "Valves_DB.DispCode[" + i + "]",          "Int",  forceRefreshNewTags);
                 // Manually-maintained reference data (Valve_Meta_DB) — not written by any
                 // script; an engineer fills these in by hand. Built for all 88 now so every
                 // future zone screen (not just Bilge/ER) can reuse them without another pass.
