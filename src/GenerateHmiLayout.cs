@@ -109,6 +109,7 @@ namespace ValveDemoHmiBuilder
             string dumpTag = null;
             string exportBlock = null;
             bool importOnly = false;
+            bool alarmColorsOnly = false;
             bool finishLoginAuth = false;
             string purgeAlarmSuffix = null;
             foreach (var a in args) {
@@ -120,6 +121,8 @@ namespace ValveDemoHmiBuilder
                     dumpTag = a.Substring(11);
                 } else if (a.StartsWith("--export-block=")) {
                     exportBlock = a.Substring(15);
+                } else if (a == "--alarm-colors") {
+                    alarmColorsOnly = true;
                 } else if (a == "--import-only") {
                     importOnly = true;
                 } else if (a == "--finish-login-auth") {
@@ -130,7 +133,7 @@ namespace ValveDemoHmiBuilder
             }
             if (finishLoginAuth) { try { RunFinishLoginAuth(); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); } Console.WriteLine("\nDone."); return; }
             if (purgeAlarmSuffix != null) { try { RunPurgeAlarms(purgeAlarmSuffix); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); } Console.WriteLine("\nDone."); return; }
-            try { Run(only, fixTags, dumpTag, exportBlock, importOnly); }
+            try { Run(only, fixTags, dumpTag, exportBlock, importOnly, alarmColorsOnly); }
             catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); }
             Console.WriteLine("\nDone."); 
         }
@@ -182,7 +185,7 @@ namespace ValveDemoHmiBuilder
             Console.WriteLine("  Deleted " + killed + " of " + doomed.Count + ".");
         }
 
-        static void Run(HashSet<string> only, bool fixTags = false, string dumpTag = null, string exportBlock = null, bool importOnly = false)
+        static void Run(HashSet<string> only, bool fixTags = false, string dumpTag = null, string exportBlock = null, bool importOnly = false, bool alarmColorsOnly = false)
         {
             var procs = TiaPortal.GetProcesses();
             Console.WriteLine("  [DEBUG] TiaPortal.GetProcesses() found " + procs.Count + " process(es).");
@@ -258,6 +261,19 @@ namespace ValveDemoHmiBuilder
                 block.Export(new FileInfo(outPath), ExportOptions.WithDefaults);
                 Console.WriteLine("\n[EXPORT-BLOCK] " + exportBlock + " -> " + outPath);
                 Console.WriteLine("\n=== Export-block complete! ===");
+                return;
+            }
+
+            // Recolour the four alarm classes and nothing else. Deliberately ahead of
+            // ImportPlcBlocks: this touches four objects, so it has no business spending a
+            // minute re-importing PLC blocks or regenerating 721 alarm definitions first.
+            if (alarmColorsOnly) {
+                Device acDev = FindDeviceByPartialName(project, "HMI");
+                if (acDev == null) { Console.WriteLine("[ERROR] HMI device not found."); return; }
+                HmiSoftware acHmi = FindHmiSoftware(acDev);
+                if (acHmi == null) { Console.WriteLine("[ERROR] HMI software not found."); return; }
+                ApplyAlarmClassColors(acHmi);
+                Console.WriteLine("\n=== Alarm colours applied! (no other changes) ===");
                 return;
             }
 
@@ -1538,6 +1554,87 @@ namespace ValveDemoHmiBuilder
             return _slotCm.TryGetValue(slot, out cm) ? cm : string.Format("V{0:D3}", slot);
         }
 
+        // ── Alarm colour coding (ISA-18.2 / EEMUA 191) ──────────────────────────
+        // Priority is carried by HUE, "needs attention" by FLASHING. Four states per class:
+        //   RaisedState              saturated hue + flashing - live and unacknowledged
+        //   AcknowledgedState        same hue, solid - still a live condition, operator has seen it
+        //   ClearedState             pale hue on white - condition gone but still needs acknowledging
+        //   AcknowledgedClearedState neutral grey - resolved, about to leave the list
+        // Amber takes DARK text; red/orange/blue take white. Straight white-on-amber fails contrast.
+        // Events never flash - a valve going to Local is information, not something to chase.
+        static void ApplyAlarmClassColors(HmiSoftware hmi)
+        {
+            Color neutralBg = Color.FromArgb(255, 240, 242, 245);
+            Color neutralTx = Color.FromArgb(255,  96, 106, 122);
+            Color white     = Color.FromArgb(255, 255, 255, 255);
+            Color dark      = Color.FromArgb(255,  22,  28,  38);
+
+            // name, raisedBg, raisedText, clearedBg, clearedText, flashWhenRaised
+            object[][] scheme = new object[][] {
+                new object[] { "ValveFault",   Color.FromArgb(255, 205,  32,  38), white,
+                                               Color.FromArgb(255, 255, 228, 228), Color.FromArgb(255, 168,  26,  31), true  },
+                new object[] { "System",       Color.FromArgb(255, 214,  93,  20), white,
+                                               Color.FromArgb(255, 255, 238, 224), Color.FromArgb(255, 168,  73,  16), true  },
+                new object[] { "ValveWarning", Color.FromArgb(255, 226, 168,   0), dark,
+                                               Color.FromArgb(255, 255, 248, 220), Color.FromArgb(255, 140, 104,   0), true  },
+                new object[] { "ValveEvent",   Color.FromArgb(255,   0, 120, 200), white,
+                                               Color.FromArgb(255, 226, 240, 252), Color.FromArgb(255,   0,  92, 154), false },
+            };
+
+            int done = 0, failed = 0;
+            foreach (var row in scheme) {
+                string name = (string)row[0];
+                var cls = hmi.AlarmClasses.Find(name);
+                if (cls == null) { Console.WriteLine("  [AlarmColor] class not found: " + name); failed++; continue; }
+                bool ok = true;
+                ok &= PaintAlarmState(name, "RaisedState",              cls, (Color)row[1], (Color)row[2], (bool)row[5]);
+                ok &= PaintAlarmState(name, "AcknowledgedState",        cls, (Color)row[1], (Color)row[2], false);
+                ok &= PaintAlarmState(name, "ClearedState",             cls, (Color)row[3], (Color)row[4], false);
+                ok &= PaintAlarmState(name, "AcknowledgedClearedState", cls, neutralBg,     neutralTx,     false);
+                if (ok) done++; else failed++;
+            }
+            Console.WriteLine("  [AlarmColor] " + done + "/" + scheme.Length + " classes coloured" +
+                              (failed > 0 ? "  (" + failed + " with problems)" : ""));
+        }
+
+        // Reflection rather than direct typed access: the state objects live in a deep
+        // HmiAlarmCommon namespace and a rename between V20 updates would otherwise break the
+        // build outright. Failures are REPORTED, not swallowed - a silent catch here is exactly
+        // what let the "PLC tag is invalid" bug hide for weeks.
+        static bool PaintAlarmState(string clsName, string stateName, object cls,
+                                     Color back, Color text, bool flashing)
+        {
+            object st = null;
+            try {
+                var sp = cls.GetType().GetProperty(stateName);
+                if (sp != null) st = sp.GetValue(cls, null);
+            } catch (Exception ex) {
+                Console.WriteLine("  [AlarmColor] " + clsName + "." + stateName + ": " + Root(ex)); return false;
+            }
+            if (st == null) { Console.WriteLine("  [AlarmColor] " + clsName + "." + stateName + ": missing"); return false; }
+            bool ok = true;
+            ok &= PaintOne(clsName, stateName, st, "BackColor", back);
+            ok &= PaintOne(clsName, stateName, st, "TextColor", text);
+            ok &= PaintOne(clsName, stateName, st, "Flashing",  flashing);
+            return ok;
+        }
+
+        static bool PaintOne(string clsName, string stateName, object st, string prop, object val)
+        {
+            try {
+                var pi = st.GetType().GetProperty(prop);
+                if (pi == null || !pi.CanWrite) {
+                    Console.WriteLine("  [AlarmColor] " + clsName + "." + stateName + "." + prop + ": not writable");
+                    return false;
+                }
+                pi.SetValue(st, val, null);
+                return true;
+            } catch (Exception ex) {
+                Console.WriteLine("  [AlarmColor] " + clsName + "." + stateName + "." + prop + ": " + Root(ex));
+                return false;
+            }
+        }
+
         static void CreateAlarms(HmiSoftware hmi, string dbName = "Valves_DB")
         {
             Console.WriteLine("\n[STEP 3] Generating Discrete Alarms...");
@@ -1560,6 +1657,7 @@ namespace ValveDemoHmiBuilder
                 if (cls == null) { try { cls = hmi.AlarmClasses.Create(kvp.Key); } catch {} }
                 if (cls != null) { try { cls.Priority = kvp.Value; } catch {} }
             }
+            ApplyAlarmClassColors(hmi);
             // Setting the class's Priority does NOT flow through to alarms already assigned to it -
             // confirmed live: after setting ValveFault.Priority = 14, V001_Unhealthy.Priority (its
             // own, separate property) still read 0. Each alarm instance carries its own Priority

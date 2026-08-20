@@ -521,6 +521,14 @@ namespace ValveDemoHmiBuilder
         // about live state. Each overlay below covers its box with a state-coloured square and
         // a transparent hit target wired to the same popup every other valve control opens.
         // ARTWORK COORDINATES BELOW MUST STAY IN SYNC WITH hmi_graphics/ballast_*.svg.
+        // Home layout, design space (1920x1080 canvas, scaled to the 1366x768 panel by SX/SY).
+        const int HOME_BAL_X = 16,   HOME_BAL_Y = 174, HOME_BAL_W = 1792, HOME_BAL_H = 554;
+        const int HOME_BLG_X = 16,   HOME_BLG_Y = 744, HOME_BLG_W = 1208, HOME_BLG_H = 320;
+        const int HOME_ALM_X = 1240, HOME_ALM_Y = 744, HOME_ALM_W = 664,  HOME_ALM_H = 320;
+        // AFT valves occupy artwork x 92..898 and FWD x 946..1565 - a clean 48px gap between the
+        // two groups. The touch split sits at its midpoint.
+        const int HOME_SPLIT_AX = 922;
+
         struct DiagValve
         {
             public string Cm;    // client CM number, for the item name only
@@ -528,6 +536,52 @@ namespace ValveDemoHmiBuilder
             public int Ax, Ay;   // centre of this valve's box, in ARTWORK coordinates
             public DiagValve(string cm, int slot, int ax, int ay) { Cm = cm; Slot = slot; Ax = ax; Ay = ay; }
         }
+
+        // ── HOME SCREEN artwork, re-measured 2026-08-20 ────────────────────────
+        // Home was split into two drawings. "Ballast Home.png" (1792x554) holds the 27 AFT +
+        // 35 FWD ballast valves; "Bilge home.png" (1208x320) holds the 27 bilge/ER valves that
+        // used to sit in a meaningless parked grid in the corner of the old full.png.
+        // Both are authored at exactly the box they are drawn into, so these coordinates map 1:1.
+        // Every CM number was read off 6x crops of the artwork and cross-checked against the
+        // zone tables: all 27 AFT valves land at x 92..898 and all 35 FWD at x 946..1565, with no
+        // interleaving - a single misread label would have put a valve in the wrong group.
+        // The two CM00 boxes in the drawing get no overlay, by design.
+        static readonly DiagValve[] HOME_BALLAST_DIAGRAM = {
+            new DiagValve("CM25",  1,  592, 212), new DiagValve("CM26",  2,  592, 324), new DiagValve("CM50",  3,   92, 395),
+            new DiagValve("CM51",  4,   92, 268), new DiagValve("CM52",  5,   92, 146), new DiagValve("CM53",  6,   92, 216),
+            new DiagValve("CM54",  7,   92, 327), new DiagValve("CM55",  8,  792, 146), new DiagValve("CM56",  9,  792, 392),
+            new DiagValve("CM57", 10,  870, 329), new DiagValve("CM58", 11,  898, 198), new DiagValve("CM59", 12,  713, 392),
+            new DiagValve("CM60", 13,  740, 146), new DiagValve("CM67", 14,  244, 157), new DiagValve("CM68", 15,  184, 217),
+            new DiagValve("CM69", 16,  244, 403), new DiagValve("CM70", 17,  184, 403), new DiagValve("CM71", 18,  214, 129),
+            new DiagValve("CM72", 19,  214, 379), new DiagValve("CM78", 20,  319, 157), new DiagValve("CM79", 21,  377, 157),
+            new DiagValve("CM80", 22,  421, 228), new DiagValve("CM81", 23,  319, 403), new DiagValve("CM82", 24,  380, 403),
+            new DiagValve("CM83", 25,  377, 112), new DiagValve("CM84", 26,  380, 452), new DiagValve("CM85", 27,  132, 485),
+            new DiagValve("CM27", 55,  946, 198), new DiagValve("CM28", 56,  946, 339), new DiagValve("CM29", 57,  988, 267),
+            new DiagValve("CM30", 58, 1011, 267), new DiagValve("CM31", 59, 1037, 207), new DiagValve("CM32", 60, 1037, 326),
+            new DiagValve("CM33", 61, 1070, 207), new DiagValve("CM34", 62, 1070, 326), new DiagValve("CM35", 63, 1351, 212),
+            new DiagValve("CM36", 64, 1351, 326), new DiagValve("CM37", 65, 1399, 259), new DiagValve("CM38", 66, 1375, 278),
+            new DiagValve("CM39", 67, 1468, 215), new DiagValve("CM40", 68, 1565, 241), new DiagValve("CM41", 69, 1491, 278),
+            new DiagValve("CM42", 70, 1423, 259), new DiagValve("CM43", 71, 1446, 277), new DiagValve("CM44", 72, 1515, 259),
+            new DiagValve("CM45", 73, 1565, 301), new DiagValve("CM46", 74, 1468, 326), new DiagValve("CM47", 75, 1565, 271),
+            new DiagValve("CM48", 76, 1246, 215), new DiagValve("CM49", 77, 1246, 326), new DiagValve("CM61", 78, 1189, 382),
+            new DiagValve("CM62", 79, 1223, 149), new DiagValve("CM63", 80, 1197, 149), new DiagValve("CM64", 81, 1217, 382),
+            new DiagValve("CM65", 82, 1332, 370), new DiagValve("CM66", 83, 1313, 158), new DiagValve("CM77", 84, 1539, 259),
+            new DiagValve("CM86", 85, 1104, 382), new DiagValve("CM87", 86, 1133, 382), new DiagValve("CM88", 87, 1161, 382),
+            new DiagValve("CM89", 88, 1270, 369), new DiagValve("CM90", 89, 1293, 393),
+        };
+
+        static readonly DiagValve[] HOME_BILGE_DIAGRAM = {
+            new DiagValve("CM01", 28, 1127, 169), new DiagValve("CM02", 29,  656, 133), new DiagValve("CM03", 30,  656, 175),
+            new DiagValve("CM04", 31,  741, 135), new DiagValve("CM05", 32,  741, 177), new DiagValve("CM06", 33,   92, 154),
+            new DiagValve("CM07", 34,  382, 121), new DiagValve("CM08", 35,  382, 183), new DiagValve("CM09", 36,  158, 113),
+            new DiagValve("CM10", 37,  237,  68), new DiagValve("CM11", 38,  897, 135), new DiagValve("CM12", 39,  897, 175),
+            new DiagValve("CM13", 40, 1055, 173), new DiagValve("CM14", 41, 1066, 135), new DiagValve("CM15", 42,  178, 208),
+            new DiagValve("CM16", 43,  201, 170), new DiagValve("CM17", 44,  255, 207), new DiagValve("CM18", 45,  140,  20),
+            new DiagValve("CM19", 46,  540, 175), new DiagValve("CM20", 47,  456, 132), new DiagValve("CM21", 48,  461, 175),
+            new DiagValve("CM23", 49,  789, 136), new DiagValve("CM24", 50,  815,  20), new DiagValve("CM94", 51,  289, 274),
+            new DiagValve("CM95", 52,  314, 274), new DiagValve("CM96", 53,  339, 274), new DiagValve("CM97", 54,  365, 274),
+        };
+
 
         // AFT zone, slots 1..27, in "AFT zone.png"'s own 1888x500 coordinates (re-exported
         // 2026-08-18 — NOT the earlier "AFT zone1" artwork; the graphic name changed too).
@@ -747,14 +801,19 @@ namespace ValveDemoHmiBuilder
             return best;
         }
 
+        // prefix: item-name namespace. Home now carries TWO diagrams, and both would otherwise
+        // try to create "Dg_BG"/"Dg_Sheet" and collide.
+        // viewOnly: skip the per-valve transparent hit buttons entirely. Home is an overview -
+        // the client asked for no valve control there - so it gets zone navigation instead, and
+        // not creating 89 buttons is also the single biggest object saving on that screen.
         static void BuildZoneDiagram(HmiScreen sc, int px, int py, int pw, int ph,
                                       string graphicName, string zoneLabel, DiagValve[] valves,
-                                      int boxPx = 30)
+                                      int boxPx = 30, string prefix = "Dg", bool viewOnly = false)
         {
             Console.WriteLine("  Drawing P&ID mimic '" + graphicName + "' (" + zoneLabel + ", " +
                               valves.Length + " live valve overlays)...");
 
-            MakePanel(sc, "Dg_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
+            MakePanel(sc, prefix + "_BG", px, py, pw, ph, M_BOX, M_BORDER, 1);
             // No title bar: same reasoning as the Home mimic and the other zone mimics — the
             // active nav tab already says which zone this is, so a repeated "AFT BALLAST —
             // SYSTEM DIAGRAM" band would just be more of the same wasted space. Removing it
@@ -768,7 +827,7 @@ namespace ValveDemoHmiBuilder
             int drawX = px, drawY = py;
             int drawW = pw, drawH = ph;
 
-            var gv = sc.ScreenItems.Create<HmiGraphicView>("Dg_Sheet");
+            var gv = sc.ScreenItems.Create<HmiGraphicView>(prefix + "_Sheet");
             gv.Left = SX(drawX); gv.Top = SY(drawY);
             gv.Width = (uint)SX(drawW); gv.Height = (uint)SY(drawH);
             gv.BackColor = Color.Transparent;
@@ -792,7 +851,7 @@ namespace ValveDemoHmiBuilder
                 // artwork actually measures - DetectBoxes.exe reports every box in both zone PNGs
                 // as 29-30px. Keep this equal to the artwork's real box size or the overlay either
                 // leaves a grey fringe or spills onto the pipe lines.
-                var box = MakeRect(sc, "Dg_" + v.Cm + "_st", cx - boxPx / 2, cy - boxPx / 2, boxPx, boxPx,
+                var box = MakeRect(sc, prefix + "_" + v.Cm + "_st", cx - boxPx / 2, cy - boxPx / 2, boxPx, boxPx,
                                    M_MUTED, Color.FromArgb(255, 17, 17, 17), 1);
                 if (s_nativeBadgeOk) {
                     if (!AddValueMap(DynTag(box, "BackColor", vTag + "_DispCode"), DISP_CODES, DISP_COLORS)) {
@@ -810,8 +869,9 @@ namespace ValveDemoHmiBuilder
                 // Transparent hit target, deliberately larger than the 30px box so it is
                 // comfortably touchable; carries the bowtie so the symbol survives on top of the
                 // live colour, and opens the same SBO popup as every other valve control.
+                if (viewOnly) continue;
                 int hitPx = boxPx + 10;
-                var hit = sc.ScreenItems.Create<HmiButton>("Dg_" + v.Cm + "_hit");
+                var hit = sc.ScreenItems.Create<HmiButton>(prefix + "_" + v.Cm + "_hit");
                 hit.Left = SX(cx - hitPx / 2); hit.Top = SY(cy - hitPx / 2);
                 hit.Width = (uint)SX(hitPx); hit.Height = (uint)SY(hitPx);
                 hit.BackColor = M_TRANS; hit.ForeColor = Color.White;
@@ -1070,7 +1130,7 @@ namespace ValveDemoHmiBuilder
         // ── HOME SCREEN ─────────────────────────────────────────────────
         static void BuildScreenHome(HmiScreen sc)
         {
-            Console.WriteLine("  Drawing Home Screen (v4 - 89-slot mimic, tables in one row below)...");
+            Console.WriteLine("  Drawing Home Screen (v5 - view only, ballast + bilge, zone touch areas)...");
 
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
@@ -1078,25 +1138,69 @@ namespace ValveDemoHmiBuilder
             BuildHomeHeader(sc);
             BuildNav(sc, "Screen_Home");
 
-            // Illustration gets max width and max height per the client's request; the 6
-            // table panels move below it into a single row, sized to their own minimum
-            // legible width rather than the previous 3-column stack.
-            // 198 + 560 + 16 + 288 = 1062 (18px bottom margin, matching the previous layout).
-            // Mimic panel height was trimmed from 678 to make room for the taller KPI row below
-            // (bigger text) and the taller shared header above — the badge grid itself is the
-            // same size, only its surrounding margins got tighter.
-            // Real vessel artwork replaces the code-drawn mimic. "Full.png" is authored at exactly
-            // 1888x584 — the same box the mimic occupied — so it drops in 1:1 with no rescaling.
-            BuildZoneDiagram(sc, 16, 174, 1888, 584, "full", "BALLAST OVERVIEW", HOME_DIAGRAM, 20);
+            // Two drawings, stacked. Both are authored at exactly the box they occupy, so the
+            // overlay coordinates map 1:1 and nothing is rescaled at runtime.
+            // Full width for both was arithmetically impossible: 584 + 500 = 1084px of artwork
+            // into 890px of screen. The ballast drawing was re-exported 5% smaller (1792x554)
+            // instead, which is the point where the two artworks' different printed box sizes
+            // (20px and 30px) both land on 19px - so ballast and bilge squares match on the glass.
+            BuildZoneDiagram(sc, HOME_BAL_X, HOME_BAL_Y, HOME_BAL_W, HOME_BAL_H,
+                             "Ballast Home", "BALLAST OVERVIEW", HOME_BALLAST_DIAGRAM, 19, "Dg", true);
+            BuildZoneDiagram(sc, HOME_BLG_X, HOME_BLG_Y, HOME_BLG_W, HOME_BLG_H,
+                             "Bilge home", "BILGE OVERVIEW", HOME_BILGE_DIAGRAM, 19, "Bg", true);
 
-            int tY = 774, tH = 288, tW = 304, tStep = 316, tX0 = 16;
-            // Left-to-right order matches the mimic's corrected zone order above it (AFT-ER-FWD).
-            BuildKpiBox(sc, "AFT BALLAST",      1, 27, "Aft", tX0 + 0 * tStep, tY, tW, tH);
-            BuildKpiBox(sc, "BILGE / ER",      28, 54, "Er",  tX0 + 1 * tStep, tY, tW, tH);
-            BuildKpiBox(sc, "FORWARD BALLAST", 55, 89, "Fwd", tX0 + 2 * tStep, tY, tW, tH);
-            BuildSysStatus(sc,                       tX0 + 3 * tStep, tY, tW, tH);
-            BuildPlantSummary(sc,                    tX0 + 4 * tStep, tY, tW, tH);
-            BuildAlarmPanel(sc,                      tX0 + 5 * tStep, tY, tW, tH);
+            // The five KPI cards came off on request - the bilge drawing occupies that row now.
+            // The one figure per zone worth keeping is the fault count, which moves into a strip
+            // under the alarm card rather than being lost entirely.
+            BuildAlarmPanel(sc, HOME_ALM_X, HOME_ALM_Y, HOME_ALM_W, HOME_ALM_H - 74);
+            BuildZoneFaultStrip(sc, HOME_ALM_X, HOME_ALM_Y + HOME_ALM_H - 66, HOME_ALM_W, 66);
+
+            // The artwork carries no divider of its own, so without these there is nothing telling
+            // the operator that the ballast picture is two separate touch areas.
+            int divX = HOME_BAL_X + HOME_SPLIT_AX;
+            MakeRect(sc, "Home_Div", divX - 1, HOME_BAL_Y + 6, 2, HOME_BAL_H - 12, M_MUTED, M_MUTED, 0);
+            MakeTb(sc, "Home_LblAft", divX - 210, HOME_BAL_Y + 6, 200, 24,
+                   "◄ AFT BALLAST", M_TRANS, M_MUTED, 0, "Right", 15, true);
+            MakeTb(sc, "Home_LblFwd", divX + 10, HOME_BAL_Y + 6, 240, 24,
+                   "FORWARD BALLAST ►", M_TRANS, M_MUTED, 0, "Left", 15, true);
+            MakeTb(sc, "Home_LblBlg", HOME_BLG_X + 10, HOME_BLG_Y + HOME_BLG_H - 32, 240, 24,
+                   "BILGE / ER ►", M_TRANS, M_MUTED, 0, "Left", 15, true);
+
+            // Created LAST so they sit above both the artwork and the status squares: a tap
+            // anywhere in a half - including straight on a valve box - navigates to that zone.
+            MakeZoneTouch(sc, "Home_HitAft", HOME_BAL_X, HOME_BAL_Y, HOME_SPLIT_AX, HOME_BAL_H, "Screen_AftBallast");
+            MakeZoneTouch(sc, "Home_HitFwd", divX, HOME_BAL_Y, HOME_BAL_W - HOME_SPLIT_AX, HOME_BAL_H, "Screen_FwdBallast");
+            MakeZoneTouch(sc, "Home_HitBlg", HOME_BLG_X, HOME_BLG_Y, HOME_BLG_W, HOME_BLG_H, "Screen_Bilge");
+        }
+
+        // Full-bleed transparent navigation target.
+        static void MakeZoneTouch(HmiScreen sc, string name, int x, int y, int w, int h, string target)
+        {
+            var b = sc.ScreenItems.Create<HmiButton>(name);
+            b.Left = SX(x); b.Top = SY(y);
+            b.Width = (uint)SX(w); b.Height = (uint)SY(h);
+            b.BackColor = M_TRANS; b.ForeColor = M_TRANS;
+            b.BorderColor = M_TRANS; b.BorderWidth = 0;
+            SetText(b, "Text", "");
+            try { b.GetType().GetProperty("ShowFocusVisual").SetValue(b, false, null); } catch {}
+            AddNavClick(b, target);
+        }
+
+        // Fault count per zone - the one number kept from the five KPI cards that were removed.
+        static void BuildZoneFaultStrip(HmiScreen sc, int x, int y, int w, int h)
+        {
+            MakePanel(sc, "Zs_BG", x, y, w, h, M_BOX, M_BORDER, 1);
+            string[] lbl = { "AFT", "BILGE / ER", "FWD" };
+            string[] pfx = { "Aft", "Er", "Fwd" };
+            int cw = w / 3;
+            for (int i = 0; i < 3; i++) {
+                int cx = x + i * cw;
+                if (i > 0) MakeRect(sc, "Zs_Sep" + i, cx, y + 12, 1, h - 24, M_LINE, M_LINE, 0);
+                MakeDot(sc, "Zs_Dot" + i, cx + 20, y + h / 2, 7, 7, M_TRANS, M_RED, 2);
+                MakeTb(sc, "Zs_Lbl" + i, cx + 34, y + 10, cw - 90, h - 20, lbl[i], M_TRANS, M_MUTED, 0, "Left", 14, false);
+                var v = MakeLiveText(sc, "Zs_Val" + i, cx + cw - 74, y + 10, 62, h - 20, M_RED, "Right", 24, true);
+                DynTag(v, "Text", "Valves_DB_" + pfx[i] + "Fault");
+            }
         }
 
         static void BuildHomeHeader(HmiScreen sc)
