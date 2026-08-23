@@ -97,86 +97,140 @@ archived before purge. Raising the 365 days only moves the cliff.
 
 ### 5.1 Storage is on the SD card
 
-Run `SetAuditStorage.exe` before downloading to the panel. It sets:
+Everything below is a **delivery-time** setting. None of it is applied during
+development, and section 5.1a explains why in detail: with backup on, neither
+log records anything in simulation.
 
-| Setting | Value | What it is |
+One run of `SetAuditStorage.exe` with TIA open on the project sets all of it:
+
+| | Audit trail | Alarm log |
 |---|---|---|
-| `StorageDevice` | `SDX51` | the SD card |
-| `BackupMode` | `PrimaryPath` | archive segments as they close |
-| `PrimaryPath` | `/media/simatic/X51/AuditBackup` | where the copies go |
+| `StorageDevice` | `SDX51` | `SDX51` |
+| `StorageFolder` | `/auditLogLive` | `/alarmLogLive` |
+| `BackupMode` | `PrimaryPath` | `PrimaryPath` |
+| `PrimaryPath` | `/media/simatic/X51/auditLogBackup` | `/media/simatic/X51/alarmLogBackup` |
+| Retention | 365 days | 7 days |
 
-And for the alarm log:
+Which lays the card out like this:
 
-| Setting | Value | What it is |
-|---|---|---|
-| `StorageDevice` | `USBX61` | **stays on USB - see below** |
-| `BackupMode` | `PrimaryPath` | archive segments as they close |
-| `PrimaryPath` | `/media/simatic/X51/AlarmBackup` | where the copies go |
+```
+SD card (X51)
+|-- auditLogLive/       audit trail, rolling 365 days
+|-- auditLogBackup/     each audit segment archived as it closes
+|-- alarmLogLive/       alarm history, rolling 7 days
+`-- alarmLogBackup/     each alarm segment archived as it closes
+```
 
-The alarm log cannot be moved to the card. The write is refused: "Database of
-the log must be on the same medium as the main database for alarm logging",
-and that main-database medium is not reachable through Openness - nothing in
-HmiUnified exposes it, only per-log `StorageDevice`. Change it in TIA's UI if
-it matters.
+Note the two notations. The live log takes a *device* plus a folder relative
+to it, so `/auditLogLive` means the card's own root. The backup takes a *full
+filesystem path*, so the same place is written `/media/simatic/X51/...`. They
+are siblings on one card, not two different media.
 
-Backup is unaffected, and the split is arguably better than putting both on
-the card: alarm log lives on the USB stick, its archives on the SD card, so
-one piece of media failing does not take both copies. Alarm segments are 1
-day, so each day is archived as it closes and the history outlives the 7-day
-live window - which is the real fix, since 7 days is short next to the audit
-trail's 365.
+**An SD card must be fitted in the X51 slot.** No card means no logs at all,
+and nothing warns you except an alarm on the Alarms screen.
 
-`StorageFolder` is **not** set on either log. The API marks it writable but
-the engineering layer refuses the write ("Unable to set PropertyValue"),
-presumably because WinCC owns the layout on card and stick devices. The live
-logs land wherever WinCC puts them; only the backup paths are ours to choose.
+#### The alarm log needs one setting changed in the TIA UI first
 
-Two named folders on the card, live log and backups kept apart, so whoever
-services the panel can find them. Without `StorageFolder` WinCC picks its own
-base folder and the layout is whatever it decides.
+`StorageDevice = SDX51` on the alarm log is refused by Openness on its own:
 
-Note the live log and the backup are configured differently: the live log
-takes a *device* plus an optional subfolder and WinCC builds the rest of the
-path itself, while the backup takes a *full path*. On this PC WinCC chose
-`C:\UnifiedArchive\AUTDB\HMI_RT_1-SIM_AUT3838\` on its own. The equivalent
-base folder on the panel has not been seen and should be confirmed there.
+```
+Database of the log must be on the same medium as the main
+database for alarm logging.
+```
 
-An SD card must be fitted in the X51 slot. No card means no audit log, and
-nothing warns you.
+That main-database medium is a real setting, it is simply not exposed to
+Openness. It lives in the TIA UI at:
 
-This does **not** work in simulation - a PC has no X51 slot, so the log cannot
-open its storage and records nothing. That is expected, not a fault. To test
-in simulation, run `SetAuditStorage.exe --revert` (back to USBX61), and run
-`SetAuditStorage.exe` again before downloading to the panel.
+```
+HMI_1 > Runtime settings > Storage system
+      > Main database location for alarm logging > Storage medium
+```
 
-**Changing StorageDevice discards the existing log.** 142 records were lost
+Set that to **SD-X51** and the Openness write is accepted. Verified
+2026-08-24. An earlier version of this document said the alarm log could not
+leave USB at all - that was wrong. It could not leave USB *from Openness*,
+which is not the same claim.
+
+The constraint is symmetric, so once the main database is on the card the
+alarm log cannot be pulled back to USB either. To return to the development
+configuration, change that dropdown back to USB-X61 *first*, then run
+`SetAuditStorage.exe --revert`. Run in the other order, `--revert` reports
+that it could not move the device and leaves it on the card.
+
+#### Folder names need a leading forward slash
+
+`StorageFolder` is writable, but the format is strict and the error message
+does not say so:
+
+```
+alarmLogLive        refused - "Unable to set PropertyValue"
+/alarmLogLive       accepted
+backslash form      refused - invalid storage folder
+```
+
+An earlier version of this document recorded the property as unsettable. It
+is settable; only the format was wrong.
+
+### 5.1a Backup stops both logs recording in simulation
+
+**Do not turn backup on during development.** Established by direct test on
+2026-08-24, not inferred.
+
+The test isolated backup from every other variable: audit trail left on
+`USBX61`, where it had been recording normally, and only `BackupMode` changed
+to `PrimaryPath` (`SetAuditStorage.exe --backup-only`). The runtime then
+raised, within one second of starting:
+
+```
+RemovableStorage   Storage medium not available. Tag: SD-X51
+RemovableStorage   Storage medium not available. Tag: USB-X61
+StorageSystem      Host1: AuditTrail: Backup of a segment ... failed
+StorageSystem      Host1: AlarmLogging: Backup of a segment ... failed
+ServiceManager     Manager (AlarmLoggingManager) is not connected
+SystemService      Service (AlarmLogging) is not being executed
+SystemService      Service (AuditTrail) is not being executed
+```
+
+Both logging services stopped. The audit trail wrote one sign-out row as the
+runtime came up and nothing after it; a valve was then operated a full minute
+later and no row appeared. Alarm history recorded nothing.
+
+The mechanism appears to be that without backup, WinCC tolerates the missing
+removable media and falls back to a local path - on this PC it chose
+`C:\UnifiedArchive\AUTDB\HMI_RT_1-SIM_AUT3838\` by itself. With backup on it
+has to resolve the physical medium, cannot, and takes the whole logging
+service down rather than degrading.
+
+This also revises an earlier conclusion. `StorageDevice = SDX51` was recorded
+as the thing that stopped the trail in simulation, but the two had only ever
+been switched on together. Backup alone is now proven sufficient to stop it;
+whether `SDX51` alone would also do so was never separately tested. Both are
+delivery-only either way, so the distinction does not change what gets done -
+only what this document is entitled to claim.
+
+Alarm *annunciation* is unaffected: CM79's direction fault appeared on the
+Alarms screen and acknowledged normally throughout. Only logging died.
+
+**Changing `StorageDevice` discards the existing log.** 142 records were lost
 this way on 2026-08-23 when the device was switched. Never change it on a
 panel carrying history that matters - export first.
 
-### 5.1b Previous note (kept for context)
+#### Checking whether the logs are alive
 
-Storage was previously `USBX61`. **This is deliberate and must not be changed
-during development.** Setting `SDX51` stopped the audit trail recording
-completely in simulation — the simulator has no X51 slot, so the log could
-not open its storage and never started. No error, no rows, not even a login
-entry, while alarm logging on USB kept working normally.
-
-Apply it as a delivery step, with TIA open on the project:
+`check_logs.py` counts rows on disk before and after a runtime session:
 
 ```
-SetAuditStorage.exe            # StorageDevice -> SDX51, backup -> /media/simatic/X51/AuditBackup
-SetAuditStorage.exe --report   # confirm
-SetAuditStorage.exe --revert   # undo, back to USBX61 + NoBackup
+python check_logs.py --save     take a baseline
+python check_logs.py            compare against it
 ```
 
-Then compile and download to the panel.
-
-**An SD card must be fitted in the X51 slot.** No card means no audit log,
-and nothing warns you.
+It reads a copy of each database *with its WAL*. The runtime holds the live
+files open and recent writes sit in the `-wal` until it checkpoints, so
+copying the `.db3` alone under-reports and can make a working log look dead.
 
 ### 5.2 Verify the backup path
 
-`/media/simatic/X51/AuditBackup` is **inferred, not verified**. Siemens
+`/media/simatic/X51/auditLogBackup` is **inferred, not verified**. Siemens
 documents the panel format as `/media/simatic/<device>/<subfolder>`, and X51
 is reported to mount at `/media/simatic/X51/`, but this has not been seen on
 a panel. After the panel has run a while, confirm files actually appear
