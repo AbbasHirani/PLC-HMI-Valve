@@ -84,6 +84,7 @@ class Program {
                 // so it is never cleared here - a stale path is inert while backup is off anyway.
                 at.Settings.StorageDevice = DeviceNode.USBX61;
                 TrySetFolder(at.Settings, "");
+                RestorePath(at.Backup, SD_BACKUP_PATH);
                 at.Backup.BackupMode      = HmiBackupMode.NoBackup;
                 SetSegment(at, SEG_AUDIT_DAYS, 0);
             } else if (backupLocal) {
@@ -128,6 +129,7 @@ class Program {
                     Console.WriteLine("           HMI_1 > Runtime settings > Storage system.");
                 }
                 TrySetFolder(al.Settings, "");
+                RestorePath(al.Backup, SD_ALARM_BACKUP_PATH);
                 al.Backup.BackupMode      = HmiBackupMode.NoBackup;
                 SetSegment(al, SEG_ALARM_DAYS, 0);
             } else if (backupLocal) {
@@ -172,6 +174,23 @@ class Program {
             string m = ex.Message.Replace('\r', ' ').Replace('\n', ' ');
             if (m.Length > 130) m = m.Substring(0, 130);
             Console.WriteLine("  [path] REFUSED '" + path + "': " + m);
+        }
+    }
+
+    // PrimaryPath turns read-only the moment BackupMode is NoBackup, so a path left behind by
+    // --backup-local cannot simply be overwritten on the way out. Backup is switched on just long
+    // enough to put the panel path back, then the caller switches it off again. Without this the
+    // project ships carrying a path off somebody's laptop, which is confusing to whoever reads
+    // the settings at commissioning.
+    static void RestorePath(dynamic backup, string shipped) {
+        if ((string)backup.PrimaryPath == shipped) return;
+        try {
+            backup.BackupMode  = HmiBackupMode.PrimaryPath;
+            backup.PrimaryPath = shipped;
+            Console.WriteLine("  [path] restored to " + shipped);
+        } catch (Exception ex) {
+            while (ex.InnerException != null) ex = ex.InnerException;
+            Console.WriteLine("  [path] could not restore: " + ex.Message);
         }
     }
 
