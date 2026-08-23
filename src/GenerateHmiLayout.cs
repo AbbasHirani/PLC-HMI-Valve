@@ -379,11 +379,11 @@ namespace ValveDemoHmiBuilder
 
             if (Want(only, "Login")) {
                 HmiScreen scLogin = RecreateScreen(hmi, "Screen_Login");
-                if (scLogin != null) BuildLoginScreen(scLogin);
+                if (scLogin != null) BuildAuditLogScreen(scLogin);
             } else Console.WriteLine("  Skipping Screen_Login (not in --only)...");
 
             Console.WriteLine("\n=== Complete! ===");
-            Console.WriteLine("Screens: Screen_Home, Screen_Popup, Screen_Alarms, Screen_Bilge, Screen_FwdBallast, Screen_AftBallast, Screen_Diagnostics, Screen_Login");
+            Console.WriteLine("Screens: Screen_Home, Screen_Popup, Screen_Alarms, Screen_Bilge, Screen_FwdBallast, Screen_AftBallast, Screen_Diagnostics, Screen_Login (AUDIT LOG)");
             Console.WriteLine("All 7 nav bar buttons now target real screens.");
             Console.WriteLine("\nPress Enter to exit...");
         }
@@ -2108,8 +2108,8 @@ namespace ValveDemoHmiBuilder
                 }
                 itemsToDelete.Clear();
                 try {
-                    BuildLoginScreen(scLogin);
-                    Console.WriteLine("  Screen_Login rebuilt with real LOGIN/LOGOUT content.");
+                    BuildAuditLogScreen(scLogin);
+                    Console.WriteLine("  Screen_Login rebuilt as the AUDIT LOG screen.");
                 } catch (Exception ex) { Console.WriteLine("  [ERROR] BuildLoginScreen failed: " + Root(ex)); }
             }
 

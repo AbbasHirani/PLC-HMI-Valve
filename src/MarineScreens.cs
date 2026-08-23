@@ -1266,22 +1266,43 @@ namespace ValveDemoHmiBuilder
                    "Use HOME for the full overview.", M_TRANS, M_MUTED, 0, "Center", 13, false);
         }
 
-        public static void BuildLoginScreen(HmiScreen sc)
+        // Screen_Login now hosts the AUDIT LOG. The screen keeps its original project name so the
+        // --only=Login key, the nav target list and the dormant --finish-login-auth fixup all stay
+        // valid; only its content and nav label changed.
+        //
+        // A dedicated login screen is redundant in WinCC Unified - runtime raises its own login
+        // dialog as soon as an Authorization-protected control is touched. LOGOUT is deliberately
+        // kept: audit attribution depends on it. Leave a user logged in across a watch change and
+        // the next person's valve commands are recorded against the previous operator's name.
+        public static void BuildAuditLogScreen(HmiScreen sc)
         {
             sc.BackColor = M_BG;
             MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
             BuildHomeHeader(sc);
             BuildNav(sc, "Screen_Login");
 
-            int px = 760, py = 340, pw = 400;
-            MakeRect(sc, "Panel_BG", px, py, pw, 400, M_BOX, M_BORDER, 1);
-            MakeTb(sc, "Panel_Title", px, py + 50, pw, 50, "USER ACCESS CONTROL", M_TRANS, M_TEXT, 0, "Center", 24, true);
-            MakeTb(sc, "Panel_Sub", px, py + 100, pw, 40, "Login to unlock restricted functions", M_TRANS, M_MUTED, 0, "Center", 16, false);
+            MakeTb(sc, "Audit_Title", 20, 168, 1000, 34,
+                   "AUDIT LOG  ·  OPERATOR ACTION HISTORY", M_TRANS, M_TEXT, 0, "Left", 22, true);
 
-            var btnLogin = MakeBtn(sc, "Btn_Login", px + 50, py + 180, 300, 60, "LOGIN", M_ACCENT, M_BG, M_BORDER, 1, 20, true);
-            AddScriptEvent(btnLogin, "HMIRuntime.UI.UserManagement.SysFct.ShowLoginDialog();\n");
+            // Siemens' own Audit Viewer, shipped with TIA V20 as a custom web control and already
+            // registered in runtime (UAAuditViewerExtension / AuditDL). Its manifest declares
+            // class "PC, Comfort", so a Unified Comfort Panel like this MTP1500 can render it.
+            //
+            // "Siemens.AuditViewer" is the ONLY accepted ContainedType: TIA normalises it to
+            // {4727C505-0E12-46AB-BF7B-42ECD1E66FD2} and rejects every guid spelling outright with
+            // "No control exists for given contained type value" - checked on a scratch screen
+            // 2026-08-23 rather than guessed.
+            //
+            // This reads the Audit Trail itself, which is why it beats rebuilding operator actions
+            // as alarms: the real 365-day record instead of a 7-day copy, plus filtering and the
+            // integrity-checked CSV export an auditor actually asks for.
+            var av = sc.ScreenItems.Create<HmiCustomWebControlContainer>("AuditViewer_1", "Siemens.AuditViewer");
+            av.Left  = SX(20);   av.Top    = SY(210);
+            av.Width = (uint)SX(1880); av.Height = (uint)SY(800);
+            av.Authorization = "Operate";
 
-            var btnLogout = MakeBtn(sc, "Btn_Logout", px + 50, py + 260, 300, 60, "LOGOUT", M_MUTED, M_BG, M_BORDER, 1, 20, true);
+            var btnLogout = MakeBtn(sc, "Btn_Logout", 1640, 1022, 260, 44, "LOGOUT",
+                                    M_MUTED, M_BG, M_BORDER, 1, 18, true);
             AddScriptEvent(btnLogout, "HMIRuntime.UI.SysFct.LogOff();\n");
         }
 
@@ -1296,7 +1317,7 @@ namespace ValveDemoHmiBuilder
             // Zone buttons run in valve-number order (AFT slots 1-27, BILGE/ER slots 28-54,
             // FWD slots 55-89), which is also stern->bow, matching the mimic's zone order.
             string[] labels  = { "&#x2302;  HOME", "&#x2693;  BALLAST AFT", "&#x1F4A7;  BILGE / ER",
-                                 "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x1F4C8;  CONFIG", "&#x1F464;  LOGIN" };
+                                 "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x1F4C8;  CONFIG", "&#x1F4CB;  AUDIT LOG" };
             string[] targets = { "Screen_Home", "Screen_AftBallast", "Screen_Bilge", "Screen_FwdBallast",
                                  "Screen_Alarms", "Screen_Diagnostics", "Screen_Login" };
 
