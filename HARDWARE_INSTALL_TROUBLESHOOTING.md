@@ -15,6 +15,15 @@ fixes it, STOP and don't force it (see the last section).
       paper doesn't)
 - [ ] This file is either printed or saved somewhere you can open without TIA/internet (e.g. a
       phone photo of each page, or a second device)
+- [ ] **SD card for slot X51 in your bag**, with all four log folders already created on it:
+      `auditLogLive` `auditLogBackup` `alarmLogLive` `alarmLogBackup`. No card means no audit
+      trail and no alarm history, and nothing warns you except an alarm on the ALARMS screen
+- [ ] Read `README.md` section **Panel installation** before touching the panel — the storage
+      settings are staged, not applied, and there is one setting in the TIA UI that has to be
+      changed *before* the tool will run
+- [ ] After first boot, go to the **ALARMS** screen before operating anything. `RemovableStorage`
+      or `SystemService` alarms there mean logging is dead — the system otherwise looks perfectly
+      normal, valves operate and alarms annunciate, but nothing is being recorded
 - [ ] Know your PLC's static IP / device name and each ET200SP station's device name — write them
       down separately from the laptop in case the laptop itself has problems
 
