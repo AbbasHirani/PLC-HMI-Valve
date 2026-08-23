@@ -41,6 +41,20 @@ class Program {
     const string SD_ALARM_BACKUP_PATH = "/media/simatic/X51/alarmLogBackup";
     const string ALARM_LIVE_FOLDER    = "/alarmLogLive";
 
+    // --backup-local only. Backup has never actually been tested: it has only ever been pointed
+    // at /media/simatic/X51/..., a path on the panel's Linux filesystem that cannot resolve on a
+    // Windows simulation. So "backup stops logging" may be nothing more than "that path does not
+    // exist here". PrimaryPath is free text, so a local folder settles which of the two it is.
+    const string LOCAL_AUDIT_BACKUP = @"C:\UnifiedArchive\TestBackup\audit";
+    const string LOCAL_ALARM_BACKUP = @"C:\UnifiedArchive\TestBackup\alarm";
+
+    // Backup fires when a SEGMENT closes, not when a row is written. Shipped periods are 30 days
+    // for the trail and 1 day for alarms, so a test would show nothing for a month. Shortened to
+    // a minute for the duration of the test, restored by --revert.
+    const int SEG_TEST_MINUTES = 1;
+    const int SEG_AUDIT_DAYS   = 30;   // shipped value, restored on revert
+    const int SEG_ALARM_DAYS   = 1;    // shipped value, restored on revert
+
     static void Main(string[] args) {
         bool revert = args.Any(a => a == "--revert");
         bool deviceUsbOnly = args.Any(a => a == "--device-usb");
@@ -48,7 +62,8 @@ class Program {
         // stops we know it was the backup and not the move to the SD card. Backup has only ever
         // been switched on together with StorageDevice = SDX51, and SDX51 alone is known to stop
         // the trail in simulation, so backup has been carrying blame it may not deserve.
-        bool backupOnly = args.Any(a => a == "--backup-only");
+        bool backupOnly  = args.Any(a => a == "--backup-only");
+        bool backupLocal = args.Any(a => a == "--backup-local");
         bool report = args.Any(a => a == "--report");
 
         var procs = TiaPortal.GetProcesses();
@@ -70,6 +85,11 @@ class Program {
                 at.Settings.StorageDevice = DeviceNode.USBX61;
                 TrySetFolder(at.Settings, "");
                 at.Backup.BackupMode      = HmiBackupMode.NoBackup;
+                SetSegment(at, SEG_AUDIT_DAYS, 0);
+            } else if (backupLocal) {
+                at.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
+                TrySetPath(at.Backup, LOCAL_AUDIT_BACKUP);
+                SetSegment(at, 0, SEG_TEST_MINUTES);
             } else if (backupOnly) {
                 at.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
                 at.Backup.PrimaryPath = SD_BACKUP_PATH;
@@ -109,6 +129,11 @@ class Program {
                 }
                 TrySetFolder(al.Settings, "");
                 al.Backup.BackupMode      = HmiBackupMode.NoBackup;
+                SetSegment(al, SEG_ALARM_DAYS, 0);
+            } else if (backupLocal) {
+                al.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
+                TrySetPath(al.Backup, LOCAL_ALARM_BACKUP);
+                SetSegment(al, 0, SEG_TEST_MINUTES);
             } else if (backupOnly) {
                 al.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
                 al.Backup.PrimaryPath = SD_ALARM_BACKUP_PATH;
@@ -138,6 +163,30 @@ class Program {
         }
     }
 
+    // PrimaryPath normally holds a panel path. A Windows path may be rejected by the engineering
+    // layer's validation - if it is, that is the answer and the test stops there.
+    static void TrySetPath(dynamic backup, string path) {
+        try { backup.PrimaryPath = path; Console.WriteLine("  [path] accepted: " + path); }
+        catch (Exception ex) {
+            while (ex.InnerException != null) ex = ex.InnerException;
+            string m = ex.Message.Replace('\r', ' ').Replace('\n', ' ');
+            if (m.Length > 130) m = m.Substring(0, 130);
+            Console.WriteLine("  [path] REFUSED '" + path + "': " + m);
+        }
+    }
+
+    static void SetSegment(dynamic log, int days, int minutes) {
+        try {
+            // The period fields are uint, and dynamic binding will not widen an int for them.
+            log.Segment.SegmentTimePeriod.Days    = (uint)days;
+            log.Segment.SegmentTimePeriod.Hours   = (uint)0;
+            log.Segment.SegmentTimePeriod.Minutes = (uint)minutes;
+        } catch (Exception ex) {
+            while (ex.InnerException != null) ex = ex.InnerException;
+            Console.WriteLine("  [segment] could not set period: " + ex.Message);
+        }
+    }
+
     static void TrySetFolder(dynamic settings, string folder) {
         try { settings.StorageFolder = folder; }
         catch (Exception ex) {
@@ -156,6 +205,16 @@ class Program {
                         + "  PrimaryPath=" + (string.IsNullOrEmpty((string)at.Backup.PrimaryPath) ? "(empty)" : at.Backup.PrimaryPath)
                         + "  Folder=" + (string.IsNullOrEmpty((string)at.Settings.StorageFolder) ? "(default)" : at.Settings.StorageFolder)
                         + "  Retention=" + at.Settings.LogTimePeriod.Days + "d");
+        // Backup only fires when a SEGMENT closes, not when a row is written, so the segment
+        // period decides how long a backup test has to run before there is anything to see.
+        try {
+            var seg = at.Segment;
+            Console.WriteLine("          segment closes every "
+                            + seg.SegmentTimePeriod.Days + "d "
+                            + seg.SegmentTimePeriod.Hours + "h "
+                            + seg.SegmentTimePeriod.Minutes + "m"
+                            + "  or at " + seg.SegmentMaxSize + " MB");
+        } catch { Console.WriteLine("          (no segment settings on this log)"); }
     }
 
     static HmiSoftware FindHmiSoftware(Device device)
