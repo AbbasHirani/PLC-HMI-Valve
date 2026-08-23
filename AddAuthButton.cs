@@ -16,6 +16,8 @@ using Siemens.Engineering.SW;
 using Siemens.Engineering.HmiUnified;
 using Siemens.Engineering.HmiUnified.UI.Screens;
 using Siemens.Engineering.HmiUnified.UI.Widgets;
+using Siemens.Engineering.HmiUnified.UI.Dynamization;
+using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 
 class Program {
     // Same geometry and colours BuildHomeHeader uses, so the patched screens match the rebuilt ones.
@@ -41,6 +43,7 @@ class Program {
 
     static void Main(string[] args) {
         bool report = args.Any(a => a == "--report");
+        bool redo   = args.Any(a => a == "--redo");
         var procs = TiaPortal.GetProcesses();
         if (procs.Count == 0) { Console.WriteLine("[ERROR] TIA Portal not running."); return; }
         var proj = procs[0].Attach().Projects[0];
@@ -69,6 +72,10 @@ class Program {
             bool hasHeader = sc.ScreenItems.Any(i => i.Name == "Hdr_User");
             if (!hasHeader) { Console.WriteLine(string.Format("  {0,-24} no header - skipped", sc.Name)); skipped++; continue; }
             var existing = sc.ScreenItems.FirstOrDefault(i => i.Name == "Hdr_AuthBtn") as HmiButton;
+            if (existing != null && redo && !report) {
+                try { existing.Delete(); existing = null; Console.WriteLine(string.Format("  {0,-24} old button deleted", sc.Name)); }
+                catch (Exception ex) { Console.WriteLine(string.Format("  {0,-24} delete failed: {1}", sc.Name, Root(ex))); }
+            }
             if (existing != null) {
                 if (report) { Console.WriteLine(string.Format("  {0,-24} already has button", sc.Name)); already++; continue; }
                 // A button added before the type-loading fix has a static caption and never
@@ -164,33 +171,28 @@ class Program {
         } catch (Exception ex) { Console.WriteLine("     [SetText] " + ex.Message); }
     }
 
+    // Mirrors the builder's own Dyn() exactly. The first version set "Script" and Trigger.Name;
+    // the real members are ScriptCode and Trigger.Type, so it produced a dynamization with neither
+    // a script nor a trigger - which the compiler reports as "The configured tag is invalid".
     static void AddScriptDyn(object item, string propName, string js) {
         try {
             var dp = item.GetType().GetProperty("Dynamizations");
-            var dyns = dp.GetValue(item, null);
+            if (dp == null) { Console.WriteLine("     [Dyn] no Dynamizations property"); return; }
+            object dyns = dp.GetValue(item, null);
+            if (dyns == null) return;
+
             MethodInfo create = null;
             foreach (var m in dyns.GetType().GetMethods()) {
-                if (m.Name != "CreateDynamization" && m.Name != "Create") continue;
-                if (m.IsGenericMethodDefinition) { create = m; break; }
+                if (m.Name != "Create" || !m.IsGenericMethodDefinition) continue;
+                var ps = m.GetParameters();
+                if (ps.Length == 1 && ps[0].ParameterType == typeof(string)) { create = m; break; }
             }
-            if (create == null) { Console.WriteLine("     [Dyn] no create method"); return; }
-            Type[] asmT;
-            try { asmT = item.GetType().Assembly.GetTypes(); }
-            catch (ReflectionTypeLoadException rex) { asmT = rex.Types.Where(t => t != null).ToArray(); }
-            var scriptType = asmT.FirstOrDefault(t => { try { return t.Name == "ScriptDynamization"; } catch { return false; } });
-            if (scriptType == null) { Console.WriteLine("     [Dyn] ScriptDynamization type not found"); return; }
-            var g = create.MakeGenericMethod(scriptType);
-            var ps = g.GetParameters();
-            object dyn = ps.Length == 1 ? g.Invoke(dyns, new object[] { propName })
-                                        : g.Invoke(dyns, new object[] { propName, null });
-            var sp = dyn.GetType().GetProperty("Script");
-            if (sp != null && sp.CanWrite) sp.SetValue(dyn, js, null);
-            var tp = dyn.GetType().GetProperty("Trigger");
-            if (tp != null) {
-                var trig = tp.GetValue(dyn, null);
-                var tn = trig != null ? trig.GetType().GetProperty("Name") : null;
-                if (tn != null && tn.CanWrite) tn.SetValue(trig, "AutomaticTags", null);
-            }
+            if (create == null) { Console.WriteLine("     [Dyn] no Create<T>(string)"); return; }
+
+            object d = create.MakeGenericMethod(typeof(ScriptDynamization)).Invoke(dyns, new object[] { propName });
+            var sd = (ScriptDynamization)d;
+            sd.ScriptCode = js;
+            sd.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "AutomaticTags");
         } catch (Exception ex) { Console.WriteLine("     [Dyn] " + Root(ex)); }
     }
 
