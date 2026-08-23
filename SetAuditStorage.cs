@@ -19,23 +19,27 @@ class Program {
     // panel example is "/media/simatic/data-storage/My_Archives/TagLogs", i.e.
     // /media/simatic/<device>/<subfolder>. VERIFY ON REAL HARDWARE before relying on it:
     // a bad path means the backup silently writes nowhere.
-    const string SD_BACKUP_PATH = "/media/simatic/X51/AuditBackup";
+    const string SD_BACKUP_PATH    = "/media/simatic/X51/auditLogBackup";
+    const string AUDIT_LIVE_FOLDER = "/auditLogLive";
 
     // Live log subfolder on the card. Without this WinCC picks its own base folder and the layout
     // is whatever it decides - fine until someone has to service the panel and go looking for it.
     // Naming it puts the live log and the backups in two obvious, separate folders on the card.
-    // StorageFolder is NOT set. The API marks it writable, but the engineering layer refuses
-    // the write - "Error when calling method 'set_StorageFolder' ... Unable to set
-    // PropertyValue" - most likely because for card and stick devices WinCC owns the layout
-    // and a custom subfolder is not allowed. The live log therefore lands wherever WinCC
-    // puts it on the card; only the backup path is ours to choose.
+    // StorageFolder needs a LEADING FORWARD SLASH. Without one the engineering layer refuses
+    // it with a bare "Unable to set PropertyValue"; a backslash is rejected as an invalid
+    // storage folder. An earlier version of this tool concluded the property could not be
+    // set at all - it can, the format was simply wrong:
+    //     "alarmLogLive"     refused
+    //     "/alarmLogLive"    accepted
+    //     backslash form     refused, invalid storage folder
 
     // The alarm log gets the same treatment, and it matters more than it looks: alarm
     // history keeps only 7 days against the audit trail's 365, so a fault from three weeks
     // ago leaves the operator actions on record with no sign of the alarm itself. Its
     // segments are 1 day, so with backup on every day is archived as it closes and the
     // history outlives the 7-day window.
-    const string SD_ALARM_BACKUP_PATH = "/media/simatic/X51/AlarmBackup";
+    const string SD_ALARM_BACKUP_PATH = "/media/simatic/X51/alarmLogBackup";
+    const string ALARM_LIVE_FOLDER    = "/alarmLogLive";
 
     static void Main(string[] args) {
         bool revert = args.Any(a => a == "--revert");
@@ -59,6 +63,7 @@ class Program {
                 // Order matters: PrimaryPath turns read-only the moment BackupMode is NoBackup,
                 // so it is never cleared here - a stale path is inert while backup is off anyway.
                 at.Settings.StorageDevice = DeviceNode.USBX61;
+                TrySetFolder(at.Settings, "");
                 at.Backup.BackupMode      = HmiBackupMode.NoBackup;
             } else if (deviceUsbOnly) {
                 // Isolation step: put the live log back on USB but KEEP segment backup on, to find
@@ -67,6 +72,7 @@ class Program {
             } else {
                 // Live log onto the SD card...
                 at.Settings.StorageDevice = DeviceNode.SDX51;
+                TrySetFolder(at.Settings, AUDIT_LIVE_FOLDER);
                 // ...and archive each closed segment so ageing out of the 365-day window
                 // no longer means losing the records.
                 at.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
@@ -83,6 +89,7 @@ class Program {
             if (report) continue;
 
             if (revert) {
+                TrySetFolder(al.Settings, "");
                 al.Backup.BackupMode      = HmiBackupMode.NoBackup;
             } else if (deviceUsbOnly) {
                 // nothing to do - the alarm log never leaves USB
@@ -96,6 +103,7 @@ class Program {
                 // for: live log on the USB stick, archives on the SD card, so a single piece of
                 // media failing does not take both copies. Alarm segments are 1 day, so each day
                 // is archived as it closes and history survives the 7-day live window.
+                TrySetFolder(al.Settings, ALARM_LIVE_FOLDER);
                 al.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
                 al.Backup.PrimaryPath = SD_ALARM_BACKUP_PATH;
             }
@@ -106,6 +114,18 @@ class Program {
             Console.WriteLine("\nSaving project...");
             proj.Save();
             Console.WriteLine("Saved.");
+        }
+    }
+
+    static void TrySetFolder(dynamic settings, string folder) {
+        try { settings.StorageFolder = folder; }
+        catch (Exception ex) {
+            while (ex.InnerException != null) ex = ex.InnerException;
+            string m = ex.Message;
+            int nl = m.IndexOfAny(new char[] { (char)13, (char)10 });
+            if (nl > 0) m = m.Substring(0, nl);
+            if (m.Length > 110) m = m.Substring(0, 110);
+            Console.WriteLine("  [folder] '" + folder + "' refused: " + m);
         }
     }
 
