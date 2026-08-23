@@ -8,10 +8,13 @@ login and audit-start entries. All correct, none of it readable by a client or a
 surveyor. This produces "CM79  DISABLED  by USER" instead.
 
 What it does:
-  - keeps only Scripting rows, which are the operator's own actions. The Event Manager
-    row paired with each one is the system's reaction, not a second action - that pairing
-    is what looks like duplication in the viewer.
-  - drops login/logout and audit-log-start entries
+  - keeps Scripting rows, which are the operator's own actions. The Event Manager row
+    paired with each one is the system's reaction, not a second action - that pairing is
+    what looks like duplication in the viewer.
+  - keeps User Management rows as SIGNED IN / SIGNED OUT. An action is only attributable
+    if the session behind it is known, so an inspection log needs both. --no-logins drops
+    them for a purely operational read.
+  - drops audit-log-start entries
   - drops writes that did not change anything (false -> false)
   - translates V021 to CM79 via AUDIT_TAG_MAP.csv, because the CM number is project data
     and is not derivable from the tag name
@@ -24,6 +27,7 @@ Usage:
   python audit_report.py --csv out.csv      also write a CSV
   python audit_report.py --days 7           only the last 7 days
   python audit_report.py --db <path.db3>    a specific segment
+  python audit_report.py --no-logins        valve actions only
 """
 
 import argparse, csv, datetime, glob, os, shutil, sqlite3, sys, tempfile
@@ -76,8 +80,9 @@ def read_rows(db_path):
     con = sqlite3.connect(tmp)
     try:
         return con.execute(
-            "SELECT pk_timestamp, ObjectName, User, OldValue, NewValue "
-            "FROM AuditTrail WHERE AuditProvider = 'Scripting' ORDER BY pk_timestamp"
+            "SELECT pk_timestamp, ObjectName, User, OldValue, NewValue, AuditProvider "
+            "FROM AuditTrail WHERE AuditProvider IN ('Scripting','User Management') "
+            "ORDER BY pk_timestamp"
         ).fetchall()
     finally:
         con.close()
@@ -87,7 +92,7 @@ def truthy(v):
     return str(v).strip().lower() in ("1", "true")
 
 
-def build(rows, tagmap, since=None):
+def build(rows, tagmap, since=None, include_logins=True):
     events, pending_reset = [], OrderedDict()
 
     def flush_resets():
@@ -96,13 +101,26 @@ def build(rows, tagmap, since=None):
             events.append((sec, cm[0], cm[1], cm[2], "FAULT RESET", user))
             del pending_reset[(sec, user, prefix)]
 
-    for ticks, obj, user, old, new in rows:
+    for ticks, obj, user, old, new, provider in rows:
         ts = to_local(ticks)
         if since and ts < since:
             continue
+
+        # Session events. An inspector wants to know who was signed in and when, not just what
+        # they touched - an action is only attributable if the session behind it is known.
+        if provider == "User Management":
+            if not include_logins:
+                continue
+            a, b = (old or "").strip(), (new or "").strip()
+            if b and b != a:
+                events.append((ts, "", "", "", "SIGNED IN", b))
+            elif a and not b:
+                events.append((ts, "", "", "", "SIGNED OUT", a))
+            continue
+
         name = (obj or "").replace("HMI_RT_1::", "")
         if not name.startswith("V") or "_" not in name:
-            continue                                  # login / audit-start rows
+            continue                                  # audit-start and other non-valve rows
         prefix, suffix = name[:4], name[4:]
         if truthy(old) == truthy(new):
             continue                                  # write that changed nothing
@@ -131,6 +149,8 @@ def main():
     ap.add_argument("--db")
     ap.add_argument("--csv")
     ap.add_argument("--days", type=int)
+    ap.add_argument("--no-logins", action="store_true",
+                    help="omit sign in / sign out rows")
     a = ap.parse_args()
 
     db = a.db or newest_segment()
@@ -139,7 +159,7 @@ def main():
         since = datetime.datetime.now() - datetime.timedelta(days=a.days)
 
     tagmap = load_map(MAP_CSV)
-    events = build(read_rows(db), tagmap, since)
+    events = build(read_rows(db), tagmap, since, include_logins=not a.no_logins)
 
     print("MV WESTERLY  -  VALVE OPERATOR ACTION LOG")
     print("source : %s" % os.path.basename(db))
