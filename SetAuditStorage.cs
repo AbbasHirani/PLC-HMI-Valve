@@ -24,7 +24,18 @@ class Program {
     // Live log subfolder on the card. Without this WinCC picks its own base folder and the layout
     // is whatever it decides - fine until someone has to service the panel and go looking for it.
     // Naming it puts the live log and the backups in two obvious, separate folders on the card.
-    const string SD_LIVE_FOLDER = "AuditLive";
+    // StorageFolder is NOT set. The API marks it writable, but the engineering layer refuses
+    // the write - "Error when calling method 'set_StorageFolder' ... Unable to set
+    // PropertyValue" - most likely because for card and stick devices WinCC owns the layout
+    // and a custom subfolder is not allowed. The live log therefore lands wherever WinCC
+    // puts it on the card; only the backup path is ours to choose.
+
+    // The alarm log gets the same treatment, and it matters more than it looks: alarm
+    // history keeps only 7 days against the audit trail's 365, so a fault from three weeks
+    // ago leaves the operator actions on record with no sign of the alarm itself. Its
+    // segments are 1 day, so with backup on every day is archived as it closes and the
+    // history outlives the 7-day window.
+    const string SD_ALARM_BACKUP_PATH = "/media/simatic/X51/AlarmBackup";
 
     static void Main(string[] args) {
         bool revert = args.Any(a => a == "--revert");
@@ -42,13 +53,12 @@ class Program {
         foreach (var at in hmi.AuditTrails) {
             Console.WriteLine("=== " + at.Name + " ===");
             Show("BEFORE", at);
-            if (report) return;
+            if (report) break;
 
             if (revert) {
                 // Order matters: PrimaryPath turns read-only the moment BackupMode is NoBackup,
                 // so it is never cleared here - a stale path is inert while backup is off anyway.
                 at.Settings.StorageDevice = DeviceNode.USBX61;
-                at.Settings.StorageFolder = "";
                 at.Backup.BackupMode      = HmiBackupMode.NoBackup;
             } else if (deviceUsbOnly) {
                 // Isolation step: put the live log back on USB but KEEP segment backup on, to find
@@ -59,17 +69,44 @@ class Program {
                 at.Settings.StorageDevice = DeviceNode.SDX51;
                 // ...and archive each closed segment so ageing out of the 365-day window
                 // no longer means losing the records.
-                at.Settings.StorageFolder = SD_LIVE_FOLDER;
                 at.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
                 at.Backup.PrimaryPath = SD_BACKUP_PATH;
             }
             Show("AFTER ", at);
+            break; // this project has exactly one trail
+        }
+
+        Console.WriteLine();
+        foreach (var al in hmi.AlarmLogs) {
+            Console.WriteLine("=== " + al.Name + " (alarm log) ===");
+            Show("BEFORE", al);
+            if (report) continue;
+
+            if (revert) {
+                al.Backup.BackupMode      = HmiBackupMode.NoBackup;
+            } else if (deviceUsbOnly) {
+                // nothing to do - the alarm log never leaves USB
+            } else {
+                // The alarm log stays on USB. Moving it is refused outright: "Database of the log
+                // must be on the same medium as the main database for alarm logging", and that
+                // main-database medium is not exposed through Openness - no property anywhere in
+                // HmiUnified controls it, only per-log StorageDevice.
+                //
+                // Backup is unaffected, and putting it on the card is better than what was asked
+                // for: live log on the USB stick, archives on the SD card, so a single piece of
+                // media failing does not take both copies. Alarm segments are 1 day, so each day
+                // is archived as it closes and history survives the 7-day live window.
+                al.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
+                al.Backup.PrimaryPath = SD_ALARM_BACKUP_PATH;
+            }
+            Show("AFTER ", al);
+        }
+
+        if (!report) {
             Console.WriteLine("\nSaving project...");
             proj.Save();
             Console.WriteLine("Saved.");
-            return; // this project has exactly one trail
         }
-        Console.WriteLine("[ERROR] No audit trail found.");
     }
 
     static void Show(string label, dynamic at) {

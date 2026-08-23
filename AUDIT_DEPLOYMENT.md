@@ -102,9 +102,34 @@ Run `SetAuditStorage.exe` before downloading to the panel. It sets:
 | Setting | Value | What it is |
 |---|---|---|
 | `StorageDevice` | `SDX51` | the SD card |
-| `StorageFolder` | `AuditLive` | live log folder on the card |
 | `BackupMode` | `PrimaryPath` | archive segments as they close |
 | `PrimaryPath` | `/media/simatic/X51/AuditBackup` | where the copies go |
+
+And for the alarm log:
+
+| Setting | Value | What it is |
+|---|---|---|
+| `StorageDevice` | `USBX61` | **stays on USB - see below** |
+| `BackupMode` | `PrimaryPath` | archive segments as they close |
+| `PrimaryPath` | `/media/simatic/X51/AlarmBackup` | where the copies go |
+
+The alarm log cannot be moved to the card. The write is refused: "Database of
+the log must be on the same medium as the main database for alarm logging",
+and that main-database medium is not reachable through Openness - nothing in
+HmiUnified exposes it, only per-log `StorageDevice`. Change it in TIA's UI if
+it matters.
+
+Backup is unaffected, and the split is arguably better than putting both on
+the card: alarm log lives on the USB stick, its archives on the SD card, so
+one piece of media failing does not take both copies. Alarm segments are 1
+day, so each day is archived as it closes and the history outlives the 7-day
+live window - which is the real fix, since 7 days is short next to the audit
+trail's 365.
+
+`StorageFolder` is **not** set on either log. The API marks it writable but
+the engineering layer refuses the write ("Unable to set PropertyValue"),
+presumably because WinCC owns the layout on card and stick devices. The live
+logs land wherever WinCC puts them; only the backup paths are ours to choose.
 
 Two named folders on the card, live log and backups kept apart, so whoever
 services the panel can find them. Without `StorageFolder` WinCC picks its own
