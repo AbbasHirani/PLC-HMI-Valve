@@ -1,4 +1,4 @@
-// Points the Audit Trail at the panel's SD card and turns segment backup on.
+﻿// Points the Audit Trail at the panel's SD card and turns segment backup on.
 //
 // Why this matters: the trail keeps a rolling 365 days, and with BackupMode = NoBackup a segment
 // that ages out is purged with no copy kept. Backup archives each segment as it closes, so the
@@ -23,6 +23,7 @@ class Program {
 
     static void Main(string[] args) {
         bool revert = args.Any(a => a == "--revert");
+        bool deviceUsbOnly = args.Any(a => a == "--device-usb");
         bool report = args.Any(a => a == "--report");
 
         var procs = TiaPortal.GetProcesses();
@@ -39,8 +40,13 @@ class Program {
             if (report) return;
 
             if (revert) {
+                // Order matters: PrimaryPath turns read-only the moment BackupMode is NoBackup,
+                // so it is never cleared here - a stale path is inert while backup is off anyway.
+                at.Settings.StorageDevice = DeviceNode.USBX61;
                 at.Backup.BackupMode      = HmiBackupMode.NoBackup;
-                at.Backup.PrimaryPath     = "";
+            } else if (deviceUsbOnly) {
+                // Isolation step: put the live log back on USB but KEEP segment backup on, to find
+                // out which of the two changes stopped the trail recording in simulation.
                 at.Settings.StorageDevice = DeviceNode.USBX61;
             } else {
                 // Live log onto the SD card...
