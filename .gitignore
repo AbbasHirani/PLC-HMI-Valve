@@ -4,4 +4,4 @@
 /System/
 /XRef/
 *.tmp
-*.bak
+*.bak.log_baseline.json

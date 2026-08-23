@@ -44,6 +44,11 @@ class Program {
     static void Main(string[] args) {
         bool revert = args.Any(a => a == "--revert");
         bool deviceUsbOnly = args.Any(a => a == "--device-usb");
+        // Isolation test: turn segment backup on and touch NOTHING else, so that if logging
+        // stops we know it was the backup and not the move to the SD card. Backup has only ever
+        // been switched on together with StorageDevice = SDX51, and SDX51 alone is known to stop
+        // the trail in simulation, so backup has been carrying blame it may not deserve.
+        bool backupOnly = args.Any(a => a == "--backup-only");
         bool report = args.Any(a => a == "--report");
 
         var procs = TiaPortal.GetProcesses();
@@ -65,6 +70,9 @@ class Program {
                 at.Settings.StorageDevice = DeviceNode.USBX61;
                 TrySetFolder(at.Settings, "");
                 at.Backup.BackupMode      = HmiBackupMode.NoBackup;
+            } else if (backupOnly) {
+                at.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
+                at.Backup.PrimaryPath = SD_BACKUP_PATH;
             } else if (deviceUsbOnly) {
                 // Isolation step: put the live log back on USB but KEEP segment backup on, to find
                 // out which of the two changes stopped the trail recording in simulation.
@@ -101,6 +109,9 @@ class Program {
                 }
                 TrySetFolder(al.Settings, "");
                 al.Backup.BackupMode      = HmiBackupMode.NoBackup;
+            } else if (backupOnly) {
+                al.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
+                al.Backup.PrimaryPath = SD_ALARM_BACKUP_PATH;
             } else if (deviceUsbOnly) {
                 // nothing to do - the alarm log never leaves USB
             } else {
