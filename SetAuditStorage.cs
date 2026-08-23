@@ -21,6 +21,11 @@ class Program {
     // a bad path means the backup silently writes nowhere.
     const string SD_BACKUP_PATH = "/media/simatic/X51/AuditBackup";
 
+    // Live log subfolder on the card. Without this WinCC picks its own base folder and the layout
+    // is whatever it decides - fine until someone has to service the panel and go looking for it.
+    // Naming it puts the live log and the backups in two obvious, separate folders on the card.
+    const string SD_LIVE_FOLDER = "AuditLive";
+
     static void Main(string[] args) {
         bool revert = args.Any(a => a == "--revert");
         bool deviceUsbOnly = args.Any(a => a == "--device-usb");
@@ -43,6 +48,7 @@ class Program {
                 // Order matters: PrimaryPath turns read-only the moment BackupMode is NoBackup,
                 // so it is never cleared here - a stale path is inert while backup is off anyway.
                 at.Settings.StorageDevice = DeviceNode.USBX61;
+                at.Settings.StorageFolder = "";
                 at.Backup.BackupMode      = HmiBackupMode.NoBackup;
             } else if (deviceUsbOnly) {
                 // Isolation step: put the live log back on USB but KEEP segment backup on, to find
@@ -53,6 +59,7 @@ class Program {
                 at.Settings.StorageDevice = DeviceNode.SDX51;
                 // ...and archive each closed segment so ageing out of the 365-day window
                 // no longer means losing the records.
+                at.Settings.StorageFolder = SD_LIVE_FOLDER;
                 at.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
                 at.Backup.PrimaryPath = SD_BACKUP_PATH;
             }
@@ -69,6 +76,7 @@ class Program {
         Console.WriteLine("  " + label + ": StorageDevice=" + at.Settings.StorageDevice
                         + "  BackupMode=" + at.Backup.BackupMode
                         + "  PrimaryPath=" + (string.IsNullOrEmpty((string)at.Backup.PrimaryPath) ? "(empty)" : at.Backup.PrimaryPath)
+                        + "  Folder=" + (string.IsNullOrEmpty((string)at.Settings.StorageFolder) ? "(default)" : at.Settings.StorageFolder)
                         + "  Retention=" + at.Settings.LogTimePeriod.Days + "d");
     }
 
