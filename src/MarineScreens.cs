@@ -468,7 +468,8 @@ namespace ValveDemoHmiBuilder
                     "var cfg=r(Tags(vTag+\"_Configured\").Read());\n" +
                     "if(!cfg) return;\n" +
                     "Tags(vTag+\"" + clrSuf + "\").Write(false);\n" +
-                    "Tags(vTag+\"" + setSuf + "\").Write(true);";
+                    "Tags(vTag+\"" + setSuf + "\").Write(true);\n" +
+                    AuditLogJs("vTag", isOpen ? "OPEN" : "CLOSE");
                 scp.SetValue(script, js, null);
             } catch (Exception ex) { Console.WriteLine("  [SlotCmd ERR] " + ex.Message); }
         }
@@ -2071,6 +2072,7 @@ namespace ValveDemoHmiBuilder
                 "if(!cur) {\n" +
                 "  Tags(vTag+\"_Configured\").Write(true);\n" +
                 "  Tags(vTag+\"_Healthy\").Write(true);\n" +
+                AuditLogJs("vTag", "ENABLED") +
                 "  return;\n" +
                 "}\n" +
                 "let st=r(Tags(\"Cfg_TblState_" + slot + "\").Read());\n" +
@@ -2079,7 +2081,8 @@ namespace ValveDemoHmiBuilder
                 "  HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
                 "  return;\n" +
                 "}\n" +
-                "Tags(vTag+\"_Configured\").Write(false);";
+                "Tags(vTag+\"_Configured\").Write(false);\n" +
+                AuditLogJs("vTag", "DISABLED");
         }
 
         // ── CONFIRM DISABLE popup — shown when un-configuring an OPEN/MOVING valve ──────────────
@@ -2123,6 +2126,7 @@ namespace ValveDemoHmiBuilder
                 "if(!idx) return;\n" +
                 "let vTag=\"V\"+(\"000\"+idx).slice(-3);\n" +
                 "Tags(vTag+\"_Configured\").Write(false);\n" +
+                AuditLogJs("vTag", "DISABLED (was open/moving)") +
                 "HMIRuntime.UI.SysFct[\"CloseScreenInPopup\"](\"Popup_ConfirmDisable\");");
 
             var noBtn = MakeBtn(sc, "Confirm_No", 240, 150, 160, 46, "CANCEL", Color.FromArgb(255, 55, 65, 81), Color.White, Color.FromArgb(255, 107, 114, 128), 2, 14, true);

@@ -450,7 +450,7 @@ namespace ValveDemoHmiBuilder
             //         fault row 164..196 | mode row 198..224 | open/close 236..288
             //         reset/service 300..348 | 32px bottom margin.
             SetPropUInt(sc, "Width", (uint)SX(460));
-            SetPropUInt(sc, "Height", (uint)SY(380));
+            SetPropUInt(sc, "Height", (uint)SY(404));
             sc.BackColor = BG_DARK;
 
             // Outer canvas
@@ -671,6 +671,18 @@ namespace ValveDemoHmiBuilder
             // handler are left in place, unused and inert, so simulated-valve testing still works
             // from a watch table if it is ever needed again.
 
+            // TEMP DIAGNOSTIC (2026-08-22): InsertElectronicRecord compiles clean and produces zero
+            // rows twice now, no visible reason why. Surfaces whatever error it actually throws
+            // instead of letting AuditLogJs's catch swallow it silently - remove once resolved.
+            var dbgLbl = sc.ScreenItems.Create<HmiTextBox>("Dbg_AuditLabel");
+            dbgLbl.Left = SX(10); dbgLbl.Top = SY(352); dbgLbl.Width = (uint)SX(440); dbgLbl.Height = (uint)SY(44);
+            dbgLbl.BackColor = Color.FromArgb(255, 30, 30, 30); dbgLbl.ForeColor = Color.Yellow; dbgLbl.BorderWidth = 0;
+            SetFont(dbgLbl, SFont(10), false);
+            Dyn(dbgLbl, "Text",
+                "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                "return \"AUDIT: \" + (readTag(Tags(\"AuditDebug\").Read()) || \"(none yet)\");",
+                "AutomaticTags");
+
             Console.WriteLine("  Screen_Popup built: Direct PLC tag reading for live status, bracket-notation close button.");
         }
 
@@ -716,7 +728,12 @@ namespace ValveDemoHmiBuilder
 
             // ALARM HISTORY — navy panel header colour
             var btnHist = MakeBtn(sc, "Btn_AlarmHistory", 216, 230, 190, 46, "ALARM HISTORY", M_HDR, M_HDRTXT, M_BORDER, 1, 14, false);
-            AddScriptEvent(btnHist, "Screen.Items(\"AlarmView\").AlarmSourceType = 2;");
+            // LoggedAlarms (2) is a one-shot static snapshot query, not a live view - confirmed via
+            // the HmiAlarmSourceType enum in the installed DLL. Clicking it re-queries once at that
+            // instant; if the query lands before the log's WAL has flushed, it silently returns a
+            // partial read that then never updates - the "sometimes shows everything, sometimes
+            // shows one row" symptom. LoggedAlarmsUpdated (3) is the continuously-refreshing variant.
+            AddScriptEvent(btnHist, "Screen.Items(\"AlarmView\").AlarmSourceType = 3;");
 
             // ACKNOWLEDGE ALL — warning yellow, right-aligned to the widened alarm view edge
             // (16 + 1888 = 1904, the same 1920-16px right margin every other screen uses; 1904-300=1604)
@@ -1061,7 +1078,8 @@ namespace ValveDemoHmiBuilder
                         "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                         "if (!cfg) return;\n" +
                         "Tags(vTag + \"_CloseCmd\").Write(false);\n" +
-                        "Tags(vTag + \"_OpenCmd\").Write(true);";
+                        "Tags(vTag + \"_OpenCmd\").Write(true);\n" +
+                        AuditLogJs("vTag", "OPEN");
                 } else if (action == "CloseCmd") {
                     scriptBody =
                         helper +
@@ -1070,7 +1088,8 @@ namespace ValveDemoHmiBuilder
                         "let cfg = readTag(Tags(vTag + \"_Configured\").Read());\n" +
                         "if (!cfg) return;\n" +
                         "Tags(vTag + \"_OpenCmd\").Write(false);\n" +
-                        "Tags(vTag + \"_CloseCmd\").Write(true);";
+                        "Tags(vTag + \"_CloseCmd\").Write(true);\n" +
+                        AuditLogJs("vTag", "CLOSE");
                 } else if (action == "ResetFault") {
                     // Clears the LATCHED alarms only. It must never write OpenFB/ClosedFB/Healthy:
                     // those four feedbacks (plus LocalMode) are valve-owned signals - the valve
@@ -1101,7 +1120,8 @@ namespace ValveDemoHmiBuilder
                         // clears the same way. If the wiring really is crossed it re-latches within
                         // the 5s grace on the next command - correct, and the same self-re-trip
                         // behaviour double-indication and Loss of Position already have.
-                        "Tags(vTag + \"_DirFault\").Write(false);";
+                        "Tags(vTag + \"_DirFault\").Write(false);\n" +
+                        AuditLogJs("vTag", "FAULT RESET");
                 } else if (action == "ToggleService") {
                     // SERVICE and CONFIGURED are the same underlying flag (this toggle just flips
                     // vTag+"_Configured", same as the Config screen's toggle) - reusing the exact
@@ -1116,6 +1136,7 @@ namespace ValveDemoHmiBuilder
                         "if (!cur) {\n" +
                         "  Tags(vTag + \"_Configured\").Write(true);\n" +
                         "  Tags(vTag + \"_Healthy\").Write(true);\n" +
+                        AuditLogJs("vTag", "ENABLED") +
                         "} else {\n" +
                         "  let st = readTag(Tags(vTag + \"_State\").Read());\n" +
                         "  if (st === 3 || st === 5) {\n" +
@@ -1123,6 +1144,7 @@ namespace ValveDemoHmiBuilder
                         "    HMIRuntime.UI.SysFct.OpenScreenInPopup(\"Popup_ConfirmDisable\", \"Screen_ConfirmDisable\", false, \" \", " + SX(730) + ", " + SY(430) + ", false);\n" +
                         "  } else {\n" +
                         "    Tags(vTag + \"_Configured\").Write(false);\n" +
+                        AuditLogJs("vTag", "DISABLED") +
                         "  }\n" +
                         "}";
                 } else if (action == "ToggleStuck") {
@@ -1755,6 +1777,7 @@ namespace ValveDemoHmiBuilder
             // internal only, no PLC binding, same pattern as SelectedValve.
             CreateInternalTag(hmi, "BilgePage", "Int");
             CreateInternalTag(hmi, "Internal_PrevFaultCount", "Int");
+            CreateInternalTag(hmi, "AuditDebug", "String");
             CreateSummaryTag(hmi, "Valves_DB_TotalOpen",   "Valves_DB.TotalOpen",   "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalClosed", "Valves_DB.TotalClosed", "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalTransit","Valves_DB.TotalTransit","Int");
@@ -1955,6 +1978,41 @@ namespace ValveDemoHmiBuilder
         }
 
         // Creates an INTERNAL HMI tag - no PLC connection (just stores values locally on HMI)
+        // Shared by every operator-action script (valve Open/Close, Configure enable/disable) that
+        // needs to write a permanent "who did this and when" record. Requires GMPEnabled=true and
+        // StartAuditLog() to have been called (Screen_Home's Loaded event) or this silently no-ops -
+        // same InsertElectronicRecord API proven to compile clean 2026-08-04, username baked directly
+        // into ObjectName rather than trusting any auto-capture (Reason needs a real HMITextList, not
+        // a plain string, so it can't carry free text - confirmed 2026-08-04, breaks compile).
+        static string AuditLogJs(string vTagExpr, string actionLabel)
+        {
+            // ObjectName must be the plain, unadorned tag - matches the exact format proven to
+            // compile AND actually write a record on 2026-08-04 (InsertElectronicRecord(vTag, ...)).
+            // A first attempt concatenated "vTag + OPEN | BY user" into ObjectName; the write
+            // compiled clean but silently produced zero rows (confirmed live via direct SQLite read
+            // of the AuditTrail table - only WinCC's own native login/StartAuditLog events appeared,
+            // none of ours), while that same read showed the native User column DOES auto-capture
+            // the real logged-in user correctly on its own. So: no manual user decoration needed,
+            // and the action distinction goes in Category (a literal, not a runtime concatenation)
+            // instead of ObjectName.
+            // IS a genuine Promise at runtime - confirmed 2026-08-22 via TIA's own IntelliSense
+            // tooltip (Promise InsertElectronicRecord(...)) AND via a real `await` inside an async
+            // IIFE, which resolved cleanly (no throw) - ruling out the earlier ".then is not a
+            // function" as a calling-convention problem. It resolves WITH an error code (2147483648
+            // / 0x80000000, a classic Int32.MinValue-style sentinel) rather than rejecting, meaning
+            // WinCC is unhappy with an argument, not with how we're calling it. Current hypothesis
+            // being tested live: ObjectName must reference something that actually exists (every
+            // native audit row we've seen uses a real qualified object, e.g. "HMI_RT_1::Audit
+            // trail_1"), not an arbitrary label like bare "V021" - so ObjectName is now a real tag.
+            return
+                "(async () => {\n" +
+                "  try {\n" +
+                "    let r = await HMIRuntime.Audit.SysFct.InsertElectronicRecord(" + vTagExpr + " + \"_Configured\", \"Valve" + actionLabel + "\", \"Update\", false, true, \"None\");\n" +
+                "    try { Tags(\"AuditDebug\").Write(\"OK \" + " + vTagExpr + " + \" [" + actionLabel + "] -> \" + String(r)); } catch(e3){}\n" +
+                "  } catch(e2) { try { Tags(\"AuditDebug\").Write(\"ERR [" + actionLabel + "]: \" + (e2 && e2.message ? e2.message : String(e2))); } catch(e3){} }\n" +
+                "})();\n";
+        }
+
         static void CreateInternalTag(HmiSoftware hmi, string tagName, string dataType = "Int")
         {
             try {
