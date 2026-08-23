@@ -1281,8 +1281,15 @@ namespace ValveDemoHmiBuilder
             BuildHomeHeader(sc);
             BuildNav(sc, "Screen_Login");
 
-            MakeTb(sc, "Audit_Title", 20, 168, 1000, 34,
+            MakeTb(sc, "Audit_Title", 20, 166, 1000, 32,
                    "AUDIT LOG  ·  OPERATOR ACTION HISTORY", M_TRANS, M_TEXT, 0, "Left", 22, true);
+
+            // LOGOUT sits on the title row, not in a strip along the bottom. That strip cost
+            // the viewer ~60px of height it needs far more: the grid pages at 10 rows by
+            // default, so every pixel is another row visible without paging.
+            var btnLogout = MakeBtn(sc, "Btn_Logout", 1650, 162, 250, 40, "LOGOUT",
+                                    M_MUTED, M_BG, M_BORDER, 1, 17, true);
+            AddScriptEvent(btnLogout, "HMIRuntime.UI.SysFct.LogOff();\n");
 
             // Siemens' own Audit Viewer, shipped with TIA V20 as a custom web control and already
             // registered in runtime (UAAuditViewerExtension / AuditDL). Its manifest declares
@@ -1297,13 +1304,14 @@ namespace ValveDemoHmiBuilder
             // as alarms: the real 365-day record instead of a 7-day copy, plus filtering and the
             // integrity-checked CSV export an auditor actually asks for.
             var av = sc.ScreenItems.Create<HmiCustomWebControlContainer>("AuditViewer_1", "Siemens.AuditViewer");
-            av.Left  = SX(20);   av.Top    = SY(210);
-            av.Width = (uint)SX(1880); av.Height = (uint)SY(800);
+            // Placed large deliberately. There is no "open maximised" option - HmiWindowFlag
+            // offers CanMaximize, which is permission to maximise, not a starting state - so
+            // the only way to stop the operator maximising it by hand every time is to give
+            // it the room up front.
+            av.Left  = SX(12);   av.Top    = SY(206);
+            av.Width = (uint)SX(1896); av.Height = (uint)SY(862);
             av.Authorization = "Operate";
 
-            var btnLogout = MakeBtn(sc, "Btn_Logout", 1640, 1022, 260, 44, "LOGOUT",
-                                    M_MUTED, M_BG, M_BORDER, 1, 18, true);
-            AddScriptEvent(btnLogout, "HMIRuntime.UI.SysFct.LogOff();\n");
         }
 
         // Shared by every screen — all 7 targets now exist (Screen_Home, Screen_Bilge,
