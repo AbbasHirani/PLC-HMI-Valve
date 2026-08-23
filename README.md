@@ -144,6 +144,11 @@ delivered configuration.
 logging.** Measured on 2026-08-24: when backup cannot reach its target, WinCC
 does not degrade, it shuts the logging services down completely.
 
+It is specifically the *unreachable path* that does this, not backup itself.
+Backup pointed at a path that exists runs perfectly happily — see
+[Testing backup](#testing-backup). That is why the path is the thing to check
+first when nothing is recording.
+
 ```
 RemovableStorage   Storage medium not available. Tag: SD-X51
 RemovableStorage   Storage medium not available. Tag: USB-X61
@@ -182,13 +187,52 @@ work here and must not be left applied.
 | | Development | Delivered |
 |---|---|---|
 | Storage device | `USBX61` | `SDX51` |
-| Backup | **off** | on |
+| Backup | off | on |
+| Backup path | n/a | `/media/simatic/X51/...` |
 | Where logs actually land | `C:\UnifiedArchive\` on the hard disk | the SD card |
 
-With backup off, WinCC tolerates the missing media and quietly falls back to
-a local path, which is why development works at all. **Turning backup on
-during development stops both logs recording** — same failure as a wrong path
-on the panel, same silent symptom. It is off deliberately.
+With no card fitted, WinCC tolerates the missing media and quietly falls back
+to a local path, which is why development works at all.
+
+Backup is off here only because its delivered path is a panel path and cannot
+resolve on Windows. Backup itself works fine in simulation if you give it a
+path that exists.
+
+### Testing backup
+
+```
+SetAuditStorage.exe --backup-local    backup on, into C:\UnifiedArchive\TestBackup\
+SetAuditStorage.exe --revert          back to development config
+```
+
+`--backup-local` changes two things. It points `PrimaryPath` at a local
+Windows folder, which the engineering layer accepts without complaint — the
+field is free text and is not validated against the panel's filesystem. And
+it shortens `SegmentTimePeriod` to one minute, because **backup fires when a
+segment closes, not when a row is written**, and the shipped periods are 30
+days for the trail and 1 day for alarms. Without that second change a test
+shows nothing for a month. `--revert` restores both.
+
+Result of that test on 2026-08-24, over a four-minute run:
+
+- **Both logs kept recording normally** — 122 new audit rows, 12 new alarm
+  rows, with backup enabled throughout
+- Segments rolled every minute as configured, 9 new audit and 5 new alarm
+- One backup file was written, named
+  `<log>_<segment start>_<segment end>.bak`
+
+That single backup file is worth understanding before you read too much into
+a short test on the panel. It was written seconds after startup, and it was
+for a segment that had closed *before* the test began — a catch-up sweep of
+the one closed, unarchived segment that existed. **None of the segments that
+closed during the four minutes were archived in that window.**
+
+So archiving is evidently not immediate on segment close. Whether it is on a
+timer, or waits until a segment is no longer the most recent closed one, was
+not established — four minutes was too short to tell. Plan for it on the
+panel: an empty backup folder shortly after commissioning is not proof of
+failure. The alarm on the ALARMS screen is the reliable signal, not the
+folder.
 
 ### Is logging alive?
 

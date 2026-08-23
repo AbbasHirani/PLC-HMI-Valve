@@ -171,15 +171,15 @@ backslash form      refused - invalid storage folder
 An earlier version of this document recorded the property as unsettable. It
 is settable; only the format was wrong.
 
-### 5.1a Backup stops both logs recording in simulation
+### 5.1a An unreachable backup path stops both logs recording
 
-**Do not turn backup on during development.** Established by direct test on
-2026-08-24, not inferred.
+**Do not turn backup on during development without also changing its path.**
+Established by two tests on 2026-08-24.
 
-The test isolated backup from every other variable: audit trail left on
-`USBX61`, where it had been recording normally, and only `BackupMode` changed
-to `PrimaryPath` (`SetAuditStorage.exe --backup-only`). The runtime then
-raised, within one second of starting:
+The first test changed only `BackupMode`, leaving the path at
+`/media/simatic/X51/auditLogBackup` and the audit trail on `USBX61` where it
+had been recording normally (`SetAuditStorage.exe --backup-only`). The
+runtime raised, within one second of starting:
 
 ```
 RemovableStorage   Storage medium not available. Tag: SD-X51
@@ -201,12 +201,41 @@ removable media and falls back to a local path - on this PC it chose
 has to resolve the physical medium, cannot, and takes the whole logging
 service down rather than degrading.
 
-This also revises an earlier conclusion. `StorageDevice = SDX51` was recorded
-as the thing that stopped the trail in simulation, but the two had only ever
-been switched on together. Backup alone is now proven sufficient to stop it;
-whether `SDX51` alone would also do so was never separately tested. Both are
-delivery-only either way, so the distinction does not change what gets done -
-only what this document is entitled to claim.
+The second test kept backup on but pointed it somewhere that exists -
+`C:\UnifiedArchive\TestBackup` (`SetAuditStorage.exe --backup-local`). Both
+logs recorded normally throughout: 122 new audit rows and 12 new alarm rows
+over four minutes, with backup enabled the whole time, and a `.bak` file
+written.
+
+So the cause is the **unreachable path**, not backup. `/media/simatic/X51/`
+is a path on the panel's Linux filesystem and cannot resolve on a Windows
+simulation. `PrimaryPath` is free text and is not validated against the
+target filesystem, so nothing refuses it at engineering time - it fails at
+runtime, by taking the logging services down.
+
+This matters for the panel, not just for development. If the mount point is
+wrong there, the symptom will be identical: no logging, everything else
+apparently normal.
+
+Two further notes from that test:
+
+**Backup fires when a segment closes, not when a row is written.** Shipped
+segment periods are 30 days for the trail and 1 day for alarms, so a short
+test shows nothing at all. `--backup-local` shortens the period to a minute
+and `--revert` restores it.
+
+**Archiving is not immediate on segment close.** Over four minutes, 9 audit
+and 5 alarm segments closed and none were archived. The single `.bak` that
+appeared was written at startup, for a segment closed before the test began -
+a catch-up sweep. Whether archiving runs on a timer or waits until a segment
+is no longer the most recent closed one was not established. An empty backup
+folder shortly after commissioning is therefore not proof of failure; the
+alarm on the ALARMS screen is the reliable signal.
+
+An earlier conclusion is also revised here. `StorageDevice = SDX51` was
+recorded as the thing that stopped the trail in simulation, but the two had
+only ever been switched on together. Neither is now the culprit - the path
+is.
 
 Alarm *annunciation* is unaffected: CM79's direction fault appeared on the
 Alarms screen and acknowledged normally throughout. Only logging died.
