@@ -1228,11 +1228,31 @@ namespace ValveDemoHmiBuilder
             // @UserName is a real WinCC Unified system tag, confirmed live in TIA Portal's own
             // tag browser (Show all + search "user") — not guessed. No obfuscation needed since
             // it's a genuine tag the compiler's static Tags() analyzer will happily validate.
-            var userText = MakeLiveText(sc, "Hdr_User", 1500, 8, 400, 30, M_HDRTXT, "Right", 19, false);
+            var userText = MakeLiveText(sc, "Hdr_User", 1290, 8, 400, 30, M_HDRTXT, "Right", 19, false);
             Dyn(userText, "Text",
                 "var u = \"\"; try { u = Tags(\"@UserName\").Read(); } catch(e){}\n" +
                 "if (!u) u = \"GUEST\";\n" +
                 "return \"\\uD83D\\uDC64  USER: \" + u.toUpperCase();", "AutomaticTags");
+
+            // One button, not two. Which action it performs is decided at click time from
+            // @UserName, and its caption follows the same test - so it reads LOGIN while nobody is
+            // signed in and LOGOUT once someone is. Living in the header means it is on every
+            // screen, which matters for audit: a user left signed in across a watch change has the
+            // next person's valve commands recorded against their name, and the way to prevent
+            // that is to make signing out reachable from wherever the operator happens to be.
+            var authBtn = MakeBtn(sc, "Hdr_AuthBtn", 1700, 8, 200, 30, "LOGIN",
+                                  M_ACCENT, Color.White, M_ACCENT, 0, 16, true);
+            Dyn(authBtn, "Text",
+                "var u = \"\"; try { u = Tags(\"@UserName\").Read(); } catch(e){}\n" +
+                "if (!u || String(u).toUpperCase() === \"DEFAULTUSER\") return \"LOGIN\";\n" +
+                "return \"LOGOUT\";", "AutomaticTags");
+            AddScriptEvent(authBtn,
+                "var u = \"\"; try { u = Tags(\"@UserName\").Read(); } catch(e){}\n" +
+                "if (!u || String(u).toUpperCase() === \"DEFAULTUSER\") {\n" +
+                "  HMIRuntime.UI.UserManagement.SysFct.ShowLoginDialog();\n" +
+                "} else {\n" +
+                "  HMIRuntime.UI.SysFct.LogOff();\n" +
+                "}\n");
 
             // Title band.
             MakeRect(sc, "Title_Rule", 0, 46, 1920, 4, M_ACCENT, M_ACCENT, 0);
@@ -1284,12 +1304,6 @@ namespace ValveDemoHmiBuilder
             MakeTb(sc, "Audit_Title", 20, 166, 1000, 32,
                    "AUDIT LOG  ·  OPERATOR ACTION HISTORY", M_TRANS, M_TEXT, 0, "Left", 22, true);
 
-            // LOGOUT sits on the title row, not in a strip along the bottom. That strip cost
-            // the viewer ~60px of height it needs far more: the grid pages at 10 rows by
-            // default, so every pixel is another row visible without paging.
-            var btnLogout = MakeBtn(sc, "Btn_Logout", 1650, 162, 250, 40, "LOGOUT",
-                                    M_MUTED, M_BG, M_BORDER, 1, 17, true);
-            AddScriptEvent(btnLogout, "HMIRuntime.UI.SysFct.LogOff();\n");
 
             // Siemens' own Audit Viewer, shipped with TIA V20 as a custom web control and already
             // registered in runtime (UAAuditViewerExtension / AuditDL). Its manifest declares
