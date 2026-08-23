@@ -1,4 +1,4 @@
-# Audit Trail — how it works, and what to do before delivery
+﻿# Audit Trail — how it works, and what to do before delivery
 
 Operator actions on the HMI are recorded permanently: who did it, what changed,
 and when. This note covers what is already configured, what must be changed at
@@ -95,9 +95,26 @@ archived before purge. Raising the 365 days only moves the cliff.
 
 ## 5. Before delivery — do these on the real panel
 
-### 5.1 Switch storage to the SD card
+### 5.1 Storage is on the SD card
 
-Storage is currently `USBX61`. **This is deliberate and must not be changed
+**Applied 2026-08-23.** `StorageDevice = SDX51`, `BackupMode = PrimaryPath`,
+`PrimaryPath = /media/simatic/X51/AuditBackup`.
+
+An SD card must be fitted in the X51 slot. No card means no audit log, and
+nothing warns you.
+
+This does **not** work in simulation - a PC has no X51 slot, so the log cannot
+open its storage and records nothing. That is expected, not a fault. To test
+in simulation, run `SetAuditStorage.exe --revert` (back to USBX61), and run
+`SetAuditStorage.exe` again before downloading to the panel.
+
+**Changing StorageDevice discards the existing log.** 142 records were lost
+this way on 2026-08-23 when the device was switched. Never change it on a
+panel carrying history that matters - export first.
+
+### 5.1b Previous note (kept for context)
+
+Storage was previously `USBX61`. **This is deliberate and must not be changed
 during development.** Setting `SDX51` stopped the audit trail recording
 completely in simulation — the simulator has no X51 slot, so the log could
 not open its storage and never started. No error, no rows, not even a login
