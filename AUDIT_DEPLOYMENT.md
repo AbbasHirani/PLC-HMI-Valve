@@ -97,8 +97,24 @@ archived before purge. Raising the 365 days only moves the cliff.
 
 ### 5.1 Storage is on the SD card
 
-**Applied 2026-08-23.** `StorageDevice = SDX51`, `BackupMode = PrimaryPath`,
-`PrimaryPath = /media/simatic/X51/AuditBackup`.
+Run `SetAuditStorage.exe` before downloading to the panel. It sets:
+
+| Setting | Value | What it is |
+|---|---|---|
+| `StorageDevice` | `SDX51` | the SD card |
+| `StorageFolder` | `AuditLive` | live log folder on the card |
+| `BackupMode` | `PrimaryPath` | archive segments as they close |
+| `PrimaryPath` | `/media/simatic/X51/AuditBackup` | where the copies go |
+
+Two named folders on the card, live log and backups kept apart, so whoever
+services the panel can find them. Without `StorageFolder` WinCC picks its own
+base folder and the layout is whatever it decides.
+
+Note the live log and the backup are configured differently: the live log
+takes a *device* plus an optional subfolder and WinCC builds the rest of the
+path itself, while the backup takes a *full path*. On this PC WinCC chose
+`C:\UnifiedArchive\AUTDB\HMI_RT_1-SIM_AUT3838\` on its own. The equivalent
+base folder on the panel has not been seen and should be confirmed there.
 
 An SD card must be fitted in the X51 slot. No card means no audit log, and
 nothing warns you.
