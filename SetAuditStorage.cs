@@ -89,20 +89,30 @@ class Program {
             if (report) continue;
 
             if (revert) {
+                // The alarm log's medium is locked to whatever the TIA UI has set as the main
+                // database location for alarm logging, so this only succeeds once that dropdown
+                // is back on USB-X61. Reported rather than thrown - the rest of the revert should
+                // still run.
+                try { al.Settings.StorageDevice = DeviceNode.USBX61; }
+                catch {
+                    Console.WriteLine("  [device] cannot leave SD: the main database location for");
+                    Console.WriteLine("           alarm logging is still SD-X51. Change it first in");
+                    Console.WriteLine("           HMI_1 > Runtime settings > Storage system.");
+                }
                 TrySetFolder(al.Settings, "");
                 al.Backup.BackupMode      = HmiBackupMode.NoBackup;
             } else if (deviceUsbOnly) {
                 // nothing to do - the alarm log never leaves USB
             } else {
-                // The alarm log stays on USB. Moving it is refused outright: "Database of the log
-                // must be on the same medium as the main database for alarm logging", and that
-                // main-database medium is not exposed through Openness - no property anywhere in
-                // HmiUnified controls it, only per-log StorageDevice.
-                //
-                // Backup is unaffected, and putting it on the card is better than what was asked
-                // for: live log on the USB stick, archives on the SD card, so a single piece of
-                // media failing does not take both copies. Alarm segments are 1 day, so each day
-                // is archived as it closes and history survives the 7-day live window.
+                // The alarm log CAN go on the SD card. Openness refuses the move on its own -
+                // "Database of the log must be on the same medium as the main database for alarm
+                // logging" - because the main-database medium is a separate setting that Openness
+                // does not expose. It lives in the TIA UI at:
+                //     HMI_1 > Runtime settings > Storage system
+                //           > Main database location for alarm logging > Storage medium
+                // With that set to SD-X51, the write below is accepted. An earlier version of this
+                // tool recorded the move as impossible; it was only impossible from Openness alone.
+                al.Settings.StorageDevice = DeviceNode.SDX51;
                 TrySetFolder(al.Settings, ALARM_LIVE_FOLDER);
                 al.Backup.BackupMode  = HmiBackupMode.PrimaryPath;
                 al.Backup.PrimaryPath = SD_ALARM_BACKUP_PATH;
