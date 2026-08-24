@@ -10,6 +10,7 @@ using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Tag;
 using Siemens.Engineering.HmiUnified.UI.Base;
+using Siemens.Engineering.HmiUnified.UI.Controls;
 
 namespace ValveDemoHmiBuilder
 {
@@ -1881,6 +1882,91 @@ namespace ValveDemoHmiBuilder
             }
         }
 
+        // ── SYSTEM DIAGNOSTICS SCREEN ────────────────────────────────────────────────────
+        // Which of the connected components is healthy: the PLC, the panel, and the three
+        // ET200SP stations with their 36 I/O modules.
+        //
+        // None of that is drawn by hand. HmiSystemDiagnosisControl is a Siemens control that
+        // builds itself from the hardware configuration, so adding a module in TIA shows up here
+        // with no HMI work at all - as against roughly 45 status bits, a diagnostics DB for the
+        // PLC to write them into, and a tile per device to keep in step with the rack by hand.
+        //
+        // Two view types exist, and the property is design-time, so the screen carries one
+        // control of each and toggles Visible between them. (The alarm screen switches its own
+        // view by writing AlarmSourceType at runtime; SystemDiagnosisViewType is not known to be
+        // writable from runtime script, and two controls need no such assumption.)
+        //
+        //   Matrix     - grid of devices and their modules, coloured by status. The "what is
+        //                connected and is it alive" view, and the reason this screen exists.
+        //   Diagnosis  - the PLC's own diagnostic buffer as an event list, with timestamps.
+        //                Says what happened and when, once the matrix has said what is wrong.
+        //
+        // NOT TESTABLE IN SIMULATION - there are no stations to unplug. It compiles, downloads,
+        // and draws, but whether an S7-1200 populates the matrix as richly as an S7-1500 is a
+        // real-panel question. See README, "System diagnostics".
+        static void BuildSysDiagScreen(HmiScreen sc)
+        {
+            Console.WriteLine("  Drawing Screen_SysDiag (system diagnostics)...");
+            sc.BackColor = M_BG;
+            MakeRect(sc, "BG", 0, 0, 1920, 1080, M_BG, M_BG, 0);
+            BuildHomeHeader(sc);
+            // No nav button targets this screen, so nothing matches and all seven stay live.
+            BuildNav(sc, "Screen_SysDiag");
+
+            MakeTb(sc, "SD_Ttl", 16, 174, 900, 30, "SYSTEM DIAGNOSTICS &#x2014; PLC, PANEL AND REMOTE I/O",
+                   M_TRANS, M_TEXT, 0, "Left", 20, true);
+
+            // Same two-tab shape as the alarm screen, so the interaction is already familiar.
+            var btnMatrix = MakeBtn(sc, "SD_TabMatrix", 16, 214, 220, 46, "MODULE MATRIX",
+                                    M_ACCENT, M_HDRTXT, M_BORDER, 1, 14, true);
+            var btnBuffer = MakeBtn(sc, "SD_TabBuffer", 246, 214, 220, 46, "DIAGNOSTIC BUFFER",
+                                    M_HDR, M_HDRTXT, M_BORDER, 1, 14, false);
+
+            // Each tab shows one control, hides the other, and repaints both buttons so the
+            // active one is obvious. Written out rather than shared because the two differ only
+            // in which way round the colours and Visible flags go.
+            AddScriptEvent(btnMatrix,
+                "Screen.Items(\"SD_Matrix\").Visible = true;\n" +
+                "Screen.Items(\"SD_Buffer\").Visible = false;\n" +
+                "Screen.Items(\"SD_TabMatrix\").BackColor = 0xFF0074BA;\n" +
+                "Screen.Items(\"SD_TabBuffer\").BackColor = 0xFF263242;");
+            AddScriptEvent(btnBuffer,
+                "Screen.Items(\"SD_Matrix\").Visible = false;\n" +
+                "Screen.Items(\"SD_Buffer\").Visible = true;\n" +
+                "Screen.Items(\"SD_TabMatrix\").BackColor = 0xFF263242;\n" +
+                "Screen.Items(\"SD_TabBuffer\").BackColor = 0xFF0074BA;");
+
+            MakeTb(sc, "SD_Hint", 486, 226, 1418, 24,
+                   "Red or amber here means the station or module below it - walk to the rack and count along the slots.",
+                   M_TRANS, M_MUTED, 0, "Left", 13, false);
+
+            // ── Controls placed LAST ──────────────────────────────────────────────────────
+            // HmiAlarmControl deadlocks the Openness API if anything is created after it (see
+            // BuildAlarmScreen). This control is from the same family, so it gets the same
+            // treatment rather than finding out the hard way on a 40-minute rebuild.
+            const int cx = 16, cy = 270, cw = 1888, ch = 790;
+            try {
+                Console.WriteLine("  [DEBUG] Placing system diagnosis controls (may take a while)...");
+                Console.Out.Flush();
+
+                var matrix = sc.ScreenItems.Create<HmiSystemDiagnosisControl>("SD_Matrix");
+                matrix.Left = SX(cx); matrix.Top = SY(cy);
+                matrix.Width = (uint)SX(cw); matrix.Height = (uint)SY(ch);
+                SetPropEnum(matrix, "SystemDiagnosisViewType", "Matrix");
+                matrix.Visible = true;
+
+                var buffer = sc.ScreenItems.Create<HmiSystemDiagnosisControl>("SD_Buffer");
+                buffer.Left = SX(cx); buffer.Top = SY(cy);
+                buffer.Width = (uint)SX(cw); buffer.Height = (uint)SY(ch);
+                SetPropEnum(buffer, "SystemDiagnosisViewType", "Diagnosis");
+                buffer.Visible = false;
+
+                Console.WriteLine("  [DEBUG] Both diagnosis controls placed.");
+            } catch (Exception ex) {
+                Console.WriteLine("  [WARN] SystemDiagnosisControl creation failed: " + Root(ex));
+            }
+        }
+
         // ── CONFIGURATION SCREEN — all 89 slots, one global paged table ───────────────────
         // Replaces the old Screen_Diagnostics placeholder. Shows every valve's Name/Location/live
         // Status plus an Enable/Disable toggle - the same Configured flag that gates whether
@@ -1960,6 +2046,15 @@ namespace ValveDemoHmiBuilder
             var fwdBtn = MakeBtn(sc, "Cfg_BulkFwd", bulkX + 320, pbY2, 150, 34, "BALLAST FWD", M_HDR, M_HDRTXT, M_BORDER, 1, 13, true);
             SetStr(fwdBtn, "Authorization", "Operate");
             AddScriptEvent(fwdBtn, ZoneConfigureAllScript(55, 89));
+
+            // Way in to system diagnostics. It lives here rather than in the nav bar because the
+            // nav is full at seven buttons and an eighth would mean narrowing all of them on
+            // every screen - a full rebuild for a screen an operator has no reason to open.
+            // Config is already the engineering screen, which is who this is for. Set apart from
+            // the CONFIGURE ALL group so it does not read as a fourth bulk action.
+            var sysBtn = MakeBtn(sc, "Cfg_SysDiag", bulkX + 530, pbY2, 240, 34,
+                                 "&#x2699;  SYSTEM DIAGNOSTICS", M_ACCENT, Color.White, M_ACCENT, 1, 13, true);
+            AddNavClick(sysBtn, "Screen_SysDiag");
         }
 
         // One-time cost on tap only (not recurring per-scan work) - loops the zone's fixed valve

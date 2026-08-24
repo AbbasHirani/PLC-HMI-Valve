@@ -280,6 +280,64 @@ instance rather than opening the file itself.
 
 ---
 
+## System diagnostics
+
+Reached from **CONFIG → ⚙ SYSTEM DIAGNOSTICS**, bottom row. Not in the nav bar:
+the nav is full at seven buttons and an eighth would mean narrowing all of them
+on every screen — a full rebuild for a screen an operator has no reason to
+open. CONFIG is already the engineering screen.
+
+Two tabs, the same shape as the ALARMS screen:
+
+| Tab | Shows |
+|---|---|
+| **MODULE MATRIX** | Grid of the PLC, the panel and the three ET200SP stations with all 36 I/O modules, coloured by status |
+| **DIAGNOSTIC BUFFER** | The PLC's own diagnostic buffer as an event list with timestamps |
+
+Both are `HmiSystemDiagnosisControl`, a Siemens control that builds itself from
+the hardware configuration. Add a module in TIA and it appears here with no HMI
+work — as against roughly 45 status bits, a diagnostics DB for the PLC to write
+them into, and a tile per device to keep in step with the rack by hand.
+
+Rebuild with `HmiBuilder.exe --only=SysDiag`. It has its own key because the
+diagnosis controls are slow to place and CONFIG does not need rebuilding to
+change this screen.
+
+### Two things still outstanding
+
+**1. Tick "S7 diagnostic alarms"** — `Runtime settings → Alarms → System
+events`. This is the one that matters. It turns PLC diagnostic events into
+alarms on the ALARMS screen, where operators already look. Without it a station
+can drop off PROFINET and **nothing says a word** — the valves on it simply
+stop responding. The diagnostics screen tells you which module; the alarm tells
+you something happened at all.
+
+**2. Add OB 86** on the PLC. Siemens' V20 documentation is explicit that the
+S7-1200 supports it:
+
+> "The S7-1200 CPU operating system calls the OB 86 in the following cases: The
+> failure of a DP master system or of a PROFINET IO system is detected... The
+> failure of a DP slave or of an IO device is detected"
+
+An earlier note in this project said the S7-1200 had no station-failure OB.
+That was wrong. There is also a polling alternative if it is wanted in ladder
+instead — `DeviceStates` with `MODE := 4` returns a bit array where bit *n* is
+device *n* having a communication error.
+
+### Not testable in simulation
+
+There are no stations to unplug. The screen compiles, downloads and draws, but
+the real questions are panel-only:
+
+- Does an S7-1200 populate the matrix as richly as an S7-1500? The 1200 has
+  thinner built-in diagnostics and may show less.
+- Does the control need a licence beyond base runtime?
+
+Expect the matrix to look empty or sparse in simulation. What can be checked
+here is only that the button navigates, the tabs switch, and the layout holds.
+
+---
+
 ## Still open
 
 - Backup path `/media/simatic/X51/` unverified on hardware — see above
@@ -291,3 +349,9 @@ instance rather than opening the file itself.
   timestamp is true
 - Alarm retention is 7 days; raising it is possible (`LogTimePeriod.Days` is
   writable) if the client expects to browse older alarms on the panel itself
+- **"S7 diagnostic alarms" is not yet enabled** — a lost ET200SP station
+  currently raises no alarm at all. One checkbox, see [System
+  diagnostics](#system-diagnostics)
+- **OB 86 not present** on the PLC, so station failures are not handled
+- Whether the system diagnostics matrix populates usefully on an S7-1200 —
+  panel-only question
