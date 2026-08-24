@@ -1160,12 +1160,24 @@ namespace ValveDemoHmiBuilder
             // the operator that the ballast picture is two separate touch areas.
             int divX = HOME_BAL_X + HOME_SPLIT_AX;
             MakeRect(sc, "Home_Div", divX - 1, HOME_BAL_Y + 6, 2, HOME_BAL_H - 12, M_MUTED, M_MUTED, 0);
-            MakeTb(sc, "Home_LblAft", divX - 210, HOME_BAL_Y + 6, 200, 24,
-                   "◄ AFT BALLAST", M_TRANS, M_MUTED, 0, "Right", 15, true);
-            MakeTb(sc, "Home_LblFwd", divX + 10, HOME_BAL_Y + 6, 240, 24,
-                   "FORWARD BALLAST ►", M_TRANS, M_MUTED, 0, "Left", 15, true);
-            MakeTb(sc, "Home_LblBlg", HOME_BLG_X + 10, HOME_BLG_Y + HOME_BLG_H - 32, 240, 24,
-                   "BILGE / ER ►", M_TRANS, M_MUTED, 0, "Left", 15, true);
+            // Zone hints sit at the FOOT of the ballast drawing, not the head. At the top they
+            // landed on the heeling water tanks and the forward ballast tank labels; the bottom
+            // strip either side of frame 88 is empty artwork, so nothing is covered. Shortened to
+            // AFT and FWD - the arrows carry the navigation, and "BALLAST" is now said once by
+            // the drawing's own title rather than twice across two labels.
+            MakeTb(sc, "Home_LblAft", divX - 110, HOME_BAL_Y + HOME_BAL_H - 30, 100, 24,
+                   "◄ AFT", M_TRANS, M_MUTED, 0, "Right", 15, true);
+            MakeTb(sc, "Home_LblFwd", divX + 10, HOME_BAL_Y + HOME_BAL_H - 30, 100, 24,
+                   "FWD ►", M_TRANS, M_MUTED, 0, "Left", 15, true);
+
+            // Each drawing names itself in its own top-right corner, which is empty on both
+            // artworks. The bilge drawing previously carried its name at bottom left, over the
+            // frame markings; there is no hint left in its place because the whole panel is one
+            // touch area, so there is no boundary for an arrow to point across.
+            MakeTb(sc, "Home_TtlBal", HOME_BAL_X + HOME_BAL_W - 252, HOME_BAL_Y + 22, 240, 34,
+                   "BALLAST", M_TRANS, M_TEXT, 0, "Right", 22, true);
+            MakeTb(sc, "Home_TtlBlg", HOME_BLG_X + HOME_BLG_W - 160, HOME_BLG_Y + 14, 148, 34,
+                   "BILGE", M_TRANS, M_TEXT, 0, "Right", 22, true);
 
             // Created LAST so they sit above both the artwork and the status squares: a tap
             // anywhere in a half - including straight on a valve box - navigates to that zone.
