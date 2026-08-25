@@ -770,10 +770,26 @@ namespace ValveDemoHmiBuilder
                 alarmCtrl.Top = SY(286);
                 alarmCtrl.Width = (uint)SX(1888); // full width now that the System Status side panel is gone
                 alarmCtrl.Height = (uint)SY(762);
-                // Without this, native WinCC runtime system alarms (PlcInStopAlarm,
-                // PlcDisconnectedAlarm, PhysicalMemorySpace, etc.) show up mixed in with our own
-                // valve/system alarms - confirmed live via reflection that Filter defaults to "".
-                alarmCtrl.Filter = "AlarmClassName=\"ValveFault\" OR AlarmClassName=\"ValveWarning\" OR AlarmClassName=\"ValveEvent\" OR AlarmClassName=\"System\"";
+                // NO FILTER, deliberately. This previously excluded everything except
+                // ValveFault, ValveWarning, ValveEvent and System, to keep native WinCC runtime
+                // alarms out of the operator's list. That judgement was wrong twice over.
+                //
+                // Wrong on names: controller diagnostics arrive in Siemens' built-in classes -
+                // SystemAlarm, SystemWarning, SystemInformation, SystemNotification and the two
+                // WithoutClearEvent variants. Our custom class is called plain "System", which
+                // matches none of them. So the filter would have dropped every station-failure
+                // alarm, silently, including the ones the newly enabled "System diagnostics"
+                // setting exists to produce.
+                //
+                // Wrong on intent: the alarms it excluded are ones a ship's operator needs.
+                // PlcDisconnectedAlarm means the valves have stopped answering. The storage
+                // alarms are what revealed, on 2026-08-24, that both logs had stopped recording
+                // while everything else looked normal - nothing else reported that at all.
+                //
+                // Left empty rather than listing every class, because an empty filter cannot
+                // hide anything by accident and a misspelt class name silently can. If the list
+                // ever needs narrowing, exclude named classes rather than allow-listing.
+                alarmCtrl.Filter = "";
                 Console.WriteLine("  [DEBUG] HmiAlarmControl placed. Configuring columns...");
                 Console.Out.Flush();
                 ConfigureAlarmColumns(alarmCtrl);

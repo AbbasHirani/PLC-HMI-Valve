@@ -1965,18 +1965,82 @@ namespace ValveDemoHmiBuilder
                 matrix.Left = SX(cx); matrix.Top = SY(cy);
                 matrix.Width = (uint)SX(cw); matrix.Height = (uint)SY(ch);
                 SetPropEnum(matrix, "SystemDiagnosisViewType", "Matrix");
+                StripChrome(matrix);
+                SizeDiagColumns(matrix);
                 matrix.Visible = true;
 
                 var buffer = sc.ScreenItems.Create<HmiSystemDiagnosisControl>("SD_Buffer");
                 buffer.Left = SX(cx); buffer.Top = SY(cy);
                 buffer.Width = (uint)SX(cw); buffer.Height = (uint)SY(ch);
                 SetPropEnum(buffer, "SystemDiagnosisViewType", "Diagnosis");
+                StripChrome(buffer);
+                SizeDiagColumns(buffer);
                 buffer.Visible = false;
 
                 Console.WriteLine("  [DEBUG] Both diagnosis controls placed.");
             } catch (Exception ex) {
                 Console.WriteLine("  [WARN] SystemDiagnosisControl creation failed: " + Root(ex));
             }
+        }
+
+        // The control ships with five columns totalling 440px inside a control 1888px wide, which
+        // leaves both icon headers truncated to "Ever", the timestamp cut off mid-value, and the
+        // event text - the only column anyone actually reads - as narrow as the event number.
+        // Widths are keyed off SystemDiagnosisControlBlock rather than the display name, since
+        // the name is language-dependent and the block is not.
+        //
+        // Applied to both controls. The matrix one draws tiles rather than this grid, so it has
+        // no effect there today, but it costs nothing and keeps the two consistent if the view
+        // type is ever switched.
+        static readonly Dictionary<string, int> DIAG_COL_WIDTHS = new Dictionary<string, int> {
+            { "Number",       110 },   // event number, 4 digits at most
+            { "EventState",    90 },   // icon plus its header
+            { "EventType",     90 },   // icon plus its header
+            { "DateTime",     230 },   // "8/24/2026 2:31:22 AM" needs every pixel of this
+            { "EventMessage", 1290 },  // the rest; this is the column that matters
+        };
+
+        static void SizeDiagColumns(object ctl)
+        {
+            try {
+                var view = ctl.GetType().GetProperty("SystemDiagnosisView").GetValue(ctl, null);
+                var cols = view.GetType().GetProperty("Columns").GetValue(view, null) as IEnumerable;
+                if (cols == null) { Console.WriteLine("  [WARN] no Columns on diagnosis view"); return; }
+                int applied = 0;
+                foreach (var c in cols) {
+                    var blkProp = c.GetType().GetProperty("SystemDiagnosisControlBlock");
+                    if (blkProp == null) continue;
+                    string blk = "" + blkProp.GetValue(c, null);
+                    int w;
+                    if (!DIAG_COL_WIDTHS.TryGetValue(blk, out w)) continue;
+                    var wp = c.GetType().GetProperty("Width");
+                    if (wp == null || !wp.CanWrite) continue;
+                    wp.SetValue(c, Convert.ChangeType(w, wp.PropertyType), null);
+                    applied++;
+                }
+                Console.WriteLine("  [DEBUG] diagnosis columns sized: " + applied
+                                + " of " + DIAG_COL_WIDTHS.Count);
+            } catch (Exception ex) {
+                Console.WriteLine("  [WARN] could not size diagnosis columns: " + Root(ex));
+            }
+        }
+
+        // The control ships as a window: caption bar, close box, and draggable/resizable frame.
+        // On a touch panel that is a trap - one tap on the X leaves the operator looking at an
+        // empty screen with no way to bring it back except navigating away and returning, and a
+        // stray drag moves it off its position permanently. This is an embedded view, not a
+        // window, so everything but the border comes off.
+        //
+        // Reads the value back rather than trusting the write: SetPropEnum swallows failures,
+        // and a silently-ignored flag here looks identical to a correct one until it is on the
+        // panel in front of the client.
+        static void StripChrome(object ctl)
+        {
+            SetPropEnum(ctl, "WindowFlags", "ShowBorder");
+            try {
+                var got = ctl.GetType().GetProperty("WindowFlags").GetValue(ctl, null);
+                Console.WriteLine("  [DEBUG] WindowFlags now: " + got);
+            } catch { Console.WriteLine("  [WARN] could not read WindowFlags back"); }
         }
 
         // ── CONFIGURATION SCREEN — all 89 slots, one global paged table ───────────────────

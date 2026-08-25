@@ -303,14 +303,31 @@ Rebuild with `HmiBuilder.exe --only=SysDiag`. It has its own key because the
 diagnosis controls are slow to place and CONFIG does not need rebuilding to
 change this screen.
 
-### Two things still outstanding
+### Controller alarms are enabled — and the alarm filter had to go with them
 
-**1. Tick "S7 diagnostic alarms"** — `Runtime settings → Alarms → System
-events`. This is the one that matters. It turns PLC diagnostic events into
-alarms on the ALARMS screen, where operators already look. Without it a station
-can drop off PROFINET and **nothing says a word** — the valves on it simply
-stop responding. The diagnostics screen tells you which module; the alarm tells
-you something happened at all.
+`Runtime settings → Alarms → Controller alarms and diagnostics` now has
+**System diagnostics** and **Security events** ticked on `HMI_Connection_1`.
+That turns PLC diagnostic events into alarms on the ALARMS screen, where
+operators already look. Without it a station can drop off PROFINET and nothing
+says a word — the valves on it simply stop responding.
+
+Enabling it exposed a trap in the alarm control. Its filter allow-listed four
+classes: `ValveFault`, `ValveWarning`, `ValveEvent` and `System`. But controller
+diagnostics arrive in Siemens' **built-in** classes — `SystemAlarm`,
+`SystemWarning`, `SystemInformation`, `SystemNotification` and two
+`WithoutClearEvent` variants. Our custom class is called plain `System`, which
+matches none of them, so every station-failure alarm would have been dropped
+silently.
+
+The filter is now empty on purpose. The alarms it excluded are ones a ship's
+operator needs: `PlcDisconnectedAlarm` means the valves have stopped answering,
+and the storage alarms are what revealed on 2026-08-24 that both logs had
+stopped recording while everything else looked normal. It is left empty rather
+than allow-listing every class, because an empty filter cannot hide anything by
+accident and a misspelt class name silently can. If it ever needs narrowing,
+exclude named classes rather than allow-list them.
+
+### Still outstanding
 
 **2. Add OB 86** on the PLC. Siemens' V20 documentation is explicit that the
 S7-1200 supports it:
@@ -323,6 +340,27 @@ An earlier note in this project said the S7-1200 had no station-failure OB.
 That was wrong. There is also a polling alternative if it is wanted in ladder
 instead — `DeviceStates` with `MODE := 4` returns a bit array where bit *n* is
 device *n* having a communication error.
+
+### The diagnostic buffer shows "##Text missing##"
+
+Every row of the buffer view arrives with its event number, timestamp and event
+class, and `##Text missing##` where the text should be. So the control is
+reading the buffer; only the text resolution fails.
+
+Siemens' documented cause is access: the control reads the text out of the PLC,
+and an unentitled connection gets headers without text. **That is not the cause
+here.** `PLC_1 → Protection & Security` reads *Full access (no protection)*
+with HMI, Read and Write all granted and no password, checked 2026-08-25.
+
+Nor is it language, which the compile warning invites you to assume. Project
+active languages are `en-US` alone and the HMI runtime language is
+`English (United States)`.
+
+The remaining likely explanation is PLCSIM — a simulated CPU may not carry the
+text resources a real one does; all thirteen events present were simulator
+startup entries. Treat it as a first-boot check on the panel: if real events
+show real text there, it was simulation all along. If they do not, the compile
+warning about the PLC language configuration is the next thread to pull.
 
 ### Not testable in simulation
 
@@ -349,9 +387,11 @@ here is only that the button navigates, the tabs switch, and the layout holds.
   timestamp is true
 - Alarm retention is 7 days; raising it is possible (`LogTimePeriod.Days` is
   writable) if the client expects to browse older alarms on the panel itself
-- **"S7 diagnostic alarms" is not yet enabled** — a lost ET200SP station
-  currently raises no alarm at all. One checkbox, see [System
-  diagnostics](#system-diagnostics)
+- **A stray `Connection_1`** sits alongside `HMI_Connection_1` with no Station,
+  Partner or Node, and a different HMI address (192.168.0.2 against
+  192.168.0.20). Delete it, and confirm which address the real panel uses
+- **The diagnostic buffer shows `##Text missing##`** — not access, not
+  language; see [System diagnostics](#system-diagnostics)
 - **OB 86 not present** on the PLC, so station failures are not handled
 - Whether the system diagnostics matrix populates usefully on an S7-1200 —
   panel-only question
