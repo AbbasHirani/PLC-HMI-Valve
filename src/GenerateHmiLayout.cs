@@ -444,6 +444,10 @@ namespace ValveDemoHmiBuilder
                 if (item.Name == "AlarmView" && item is HmiAlarmControl) {
                     Console.WriteLine("  [AlarmColumns] Found AlarmView. Applying column config...");
                     ConfigureAlarmColumns((HmiAlarmControl)item);
+                    // Chrome too, on the same fast path. Rebuilding Screen_Alarms to change one
+                    // flag would mean re-placing HmiAlarmControl, which takes minutes and carries
+                    // the COM deadlock risk documented in BuildAlarmScreen.
+                    StripChrome(item);
                     Console.WriteLine("  [AlarmColumns] Done.");
                     return;
                 }
@@ -793,6 +797,7 @@ namespace ValveDemoHmiBuilder
                 Console.WriteLine("  [DEBUG] HmiAlarmControl placed. Configuring columns...");
                 Console.Out.Flush();
                 ConfigureAlarmColumns(alarmCtrl);
+                StripChrome(alarmCtrl);
                 Console.WriteLine("  [DEBUG] Column configuration done. Applying marine theme...");
                 Console.Out.Flush();
                 ApplyAlarmMarineTheme(alarmCtrl);

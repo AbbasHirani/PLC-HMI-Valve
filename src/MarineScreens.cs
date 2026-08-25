@@ -1331,13 +1331,18 @@ namespace ValveDemoHmiBuilder
             // as alarms: the real 365-day record instead of a 7-day copy, plus filtering and the
             // integrity-checked CSV export an auditor actually asks for.
             var av = sc.ScreenItems.Create<HmiCustomWebControlContainer>("AuditViewer_1", "Siemens.AuditViewer");
-            // Placed large deliberately. There is no "open maximised" option - HmiWindowFlag
-            // offers CanMaximize, which is permission to maximise, not a starting state - so
-            // the only way to stop the operator maximising it by hand every time is to give
-            // it the room up front.
+            // Placed large so it needs no resizing to be usable. An earlier note here reasoned
+            // that CanMaximize is permission to maximise rather than a starting state, so the
+            // only defence against the operator maximising it by hand was to give it the room up
+            // front. True as far as it went, but it missed the simpler move: the maximise button
+            // does not have to be there at all. StripChrome below removes it.
             av.Left  = SX(12);   av.Top    = SY(206);
             av.Width = (uint)SX(1896); av.Height = (uint)SY(862);
             av.Authorization = "Operate";
+            // Same chrome as the other controls: caption bar, close box, draggable frame. The
+            // close box is the one that matters - tapping it leaves the operator on an empty
+            // AUDIT LOG screen with no way back except navigating away and returning.
+            StripChrome(av);
 
         }
 
