@@ -341,6 +341,12 @@ namespace ValveDemoHmiBuilder
             // generation, and it carries the COM deadlock risk documented in BuildAlarmScreen.
             if (Want(only, "Nav")) PatchNav(hmi);
 
+            // StripLegend-only: delete the zone screens' colour-legend strip in place.
+            // The strip was built and rejected on the same day, and rebuilding the three zone
+            // screens to drop twelve items would cost ~50 minutes - Aft, Bilge and Fwd each redraw
+            // an illustration, its live valve overlays and a 14-row table.
+            if (Want(only, "StripLegend")) PatchStripLegend(hmi);
+
             // AlarmColumns-only: patch columns on the EXISTING AlarmView without deleting the screen.
             // Run this after Pass-2 alarm additions (--only=DiscreteAlarms) to re-apply column config.
             if (Want(only, "AlarmColumns")) PatchAlarmColumns(hmi);
@@ -486,6 +492,41 @@ namespace ValveDemoHmiBuilder
                 done++;
             }
             Console.WriteLine("[Nav] " + done + " screen(s) updated.");
+        }
+
+        // Removes the horizontal colour legend (LegR_Chip*/LegR_Txt*) from every screen carrying
+        // one. Matches on the name prefix rather than a screen list so it is self-limiting: screens
+        // that never had a strip are skipped, and running it twice is harmless.
+        //
+        // Deliberately a deletion pass and not a rebuild. Everything else on those screens - the
+        // artwork, the valve overlays, the table, the station-offline banner - is correct and took
+        // most of an hour to draw.
+        static void PatchStripLegend(HmiSoftware hmi)
+        {
+            Console.WriteLine("
+[StripLegend] Removing zone colour-legend strips...");
+            int screens = 0, total = 0;
+            foreach (var sc in hmi.Screens) {
+                // Collect first, delete after: mutating ScreenItems while enumerating it is what
+                // makes a patch skip every second item.
+                var doomed = new System.Collections.Generic.List<object>();
+                foreach (var item in sc.ScreenItems) {
+                    if (item.Name.StartsWith("LegR_", StringComparison.Ordinal)) doomed.Add(item);
+                }
+                if (doomed.Count == 0) continue;
+
+                int killed = 0;
+                foreach (var item in doomed) {
+                    try { ((dynamic)item).Delete(); killed++; }
+                    catch (Exception ex) {
+                        Console.WriteLine("  [WARN] " + sc.Name + ": " + ((dynamic)item).Name + " - " + Root(ex));
+                    }
+                }
+                Console.WriteLine("  " + sc.Name + " - " + killed + " of " + doomed.Count + " legend item(s) removed");
+                screens++; total += killed;
+            }
+            if (screens == 0) Console.WriteLine("  No legend strips found - nothing to do.");
+            else Console.WriteLine("[StripLegend] " + total + " item(s) removed across " + screens + " screen(s).");
         }
 
         static void PatchAlarmColumns(HmiSoftware hmi)

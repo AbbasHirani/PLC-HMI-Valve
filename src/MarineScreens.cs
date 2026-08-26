@@ -1741,20 +1741,8 @@ namespace ValveDemoHmiBuilder
             }
         }
 
-        // Horizontal variant for the zone screens. Same six chips, flat run rather than grouped -
-        // the band it lives in is 24px tall and there is no room for group labels. The colours are
-        // what an operator learns, and those are identical either way.
-        static void BuildLegendRow(HmiScreen sc, int x, int y)
-        {
-            const int chipW = 130, chipH = 20, gap = 8;
-            for (int i = 0; i < LEG_NAME.Length; i++) {
-                int cx = x + i * (chipW + gap);
-                MakeRect(sc, "LegR_Chip" + i, cx, y, chipW, chipH, LEG_FILL[i], LEG_FILL[i], 0);
-                MakeTb(sc, "LegR_Txt" + i, cx, y + 2, chipW, 16, LEG_NAME[i], M_TRANS, LEG_INK[i], 0, "Center", 11, true);
-            }
-        }
-
-        // One source for both layouts, so home and the zone screens cannot drift apart.
+        // Home's legend only, since the zone strip was removed - kept as named statics anyway so
+        // the palette has one definition to change if the state colours are ever re-tuned.
         // Six entries, not eight: DispCode runs 0-7 but no-position, opening and closing are all
         // the same blue, and listing them apart would imply a distinction the screen does not draw.
         static readonly string[] LEG_NAME = { "OPEN", "CLOSED", "MOVING", "FAULT", "LOCAL", "UNCONF" };
@@ -1812,11 +1800,12 @@ namespace ValveDemoHmiBuilder
             else
                 BuildZoneDiagram(sc, 16, 174, 1888, 500, "Bilge", zoneLabel, BILGE_DIAGRAM);
 
-            // Colour legend, in the 24px band the illustration leaves above the table - the only
-            // gap on this screen. Everything else is spoken for, and the artwork cannot give any
-            // up: it fills its panel at exactly 1888x500 and the valve overlays map 1:1 onto it,
-            // so trimming even a few pixels slides every square off its pipe.
-            BuildLegendRow(sc, 16, 174 + illustH + 2);
+            // No colour legend on the zone screens. One was built here 2026-08-27 as a flat run of
+            // six chips in the 24px band between the illustration and the table, and it was removed
+            // the same day: that band is the only gap on the screen, and 20px chips squeezed into it
+            // read as clutter against artwork rather than as a key to it. Home carries the legend
+            // instead, where the column has room for it - and the colours are learned once, not
+            // re-read per screen, so one good legend beats three cramped ones.
 
             // ── Station-offline banner ───────────────────────────────────────────────────
             // Home shows which zone has lost its rack. This screen is where somebody goes as a

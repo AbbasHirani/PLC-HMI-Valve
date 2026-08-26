@@ -1282,6 +1282,69 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     confirm **no latched Unexpected Movement flood arrives on recovery** — (d) is the part most likely
     to be got wrong, and it fails silently in testing unless you look for it specifically.
 
+40. **[pending — ORDER SPARE I/O MODULES BEFORE THE PANEL IS BUILT. Cheap now, a mobilisation
+    later. Verified 2026-08-27.]**
+
+    **Three spare valve slots on the entire vessel — 3.4%.**
+
+    Every channel in `Valve_Channels_DB` was parsed and checked against the configured module
+    addresses in `inspect_hw.log` / `inspect_addresses.log`:
+
+    | Station | DI ch. | DI used | DI free | DQ ch. | DQ used | DQ free | Spare valves |
+    |---|---|---|---|---|---|---|---|
+    | AFT | 112 (7 x DI16) | 108 | **4** | 64 (4 x DQ16) | 54 | 10 | **1** |
+    | MID | 112 (7 x DI16) | 108 | **4** | 64 (4 x DQ16) | 54 | 10 | **1** |
+    | FWD | 144 (9 x DI16) | 140 | **4** | 80 (5 x DQ16) | 70 | 10 | **1** |
+
+    Free DI channels are exactly `109-112`, `221-224`, `365-368`. **DI is the binding constraint** —
+    outputs have room for 5 more valves per station, inputs for 1, and a valve needs 4 in and 2 out.
+    A marine retrofit would normally carry 10-20% spare.
+
+    Also verified clean while counting, so the numbers above can be trusted: 534 assignments, **no
+    duplicates, no zero/unassigned entries, none out of range, and none assigned across a station
+    boundary** — every valve's channels sit on the station its slot index implies, which is what
+    `FC_IoMapper`'s index-range `#stationDown` guard depends on.
+
+    **Why this becomes urgent.** Item 3 records seven valves drawn on the client's P&ID that appear
+    in no schedule row (`11-007/300`, `11-013/300`, `11-017/125`, `11-018/125`, `11-019/125`,
+    `11-070/300`, `11-090/200`). If the client confirms any of them are in scope, they need 28 DI and
+    14 DQ. **There are 12 DI free.** They do not fit.
+
+    **The cost is not the module — it is re-addressing.** `FC_PhysicalIoCopy` holds 368 hardcoded DI
+    and 208 DQ assignments (all verified arithmetically perfect: `DI[n]` -> `%I(2 + (n-1)/8).((n-1)
+    mod 8)`, spanning exactly `%I2.0-%I47.7` and `%Q2.0-%Q27.7`, no gaps or duplicates). Insert a
+    module **mid-station** and every address behind it shifts, invalidating those lines and
+    potentially the whole 534-entry channel map — discovered after the panel is built and the cables
+    are terminated.
+
+    **Fix — add spare modules now, appended at the END of each station.** "End" is the load-bearing
+    word: appending after the last module gives the new one fresh addresses above everything existing
+    and **nothing already assigned moves**. Anywhere else and the addresses behind it shift. Empty
+    channels cost nothing to own.
+
+    Suggest one DI16 per station minimum (takes each to 5 spare valves, ~18%), and one DQ16 on AFT
+    and MID if the same 18% is wanted on outputs — FWD's DQ already has the headroom.
+
+    **Each added module also needs a BaseUnit.** Flagging because BaseUnits appear nowhere in any
+    parts list in this repo, along with the 3 bus adapters (`6ES7 193-6AR00-0AA0`) and 3 server
+    modules (`6ES7 193-6PA00-0AA0`) that **are** configured in the project and must therefore be
+    bought. Light vs dark BaseUnits also decide where a new potential group starts, which matters for
+    item 39's load-group reasoning.
+
+    **Caveat on the BOM, stated plainly:** an external audit reported order-number and firmware
+    mismatches against "what you are buying", including a SIPLUS `6AG1214-1AG40-4XB0` CPU and a
+    `6EP1334-2BA20` PSU. **No parts list exists anywhere in this repository** — those part numbers
+    appear in no file, including inside the `.xlsx` files. Either the BOM was supplied to that agent
+    outside the repo, or the column was fabricated. **Get the real BOM into the repo** so this is
+    checkable; until then treat any BOM-vs-project comparison as unverified. The firmware readings
+    themselves are solid, being read from `inspect_hw.log`: CPU configured at **V4.0**, the three IMs
+    at **V6.2**, HMI at **20.0.0.0**.
+
+    **Verification after adding:** re-run `InspectAddresses` and confirm every existing `%I`/`%Q`
+    address is **unchanged** and the new module's range sits entirely above them. If any existing
+    address moved, the module went in at the wrong position — stop and reposition before touching
+    `FC_PhysicalIoCopy`.
+
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
 first if it hasn't already read it. The immediate next actions in priority order are items 4 and 1 in
