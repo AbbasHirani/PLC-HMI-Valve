@@ -334,6 +334,13 @@ namespace ValveDemoHmiBuilder
             if (Want(only, "Alarms")) EnsureAlarmScreen(hmi);
             else Console.WriteLine("  Skipping Screen_Alarms (not in --only)...");
 
+            // Nav-only: redraw the nav bar on every screen that has one, touching nothing else.
+            // Adding the eighth button changed the width of all of them, and BuildNav runs on
+            // every screen - so without this, a nav change means regenerating the lot. Screen_Alarms
+            // alone is ~45 minutes, because --only=Alarms also re-runs the full 632-alarm
+            // generation, and it carries the COM deadlock risk documented in BuildAlarmScreen.
+            if (Want(only, "Nav")) PatchNav(hmi);
+
             // AlarmColumns-only: patch columns on the EXISTING AlarmView without deleting the screen.
             // Run this after Pass-2 alarm additions (--only=DiscreteAlarms) to re-apply column config.
             if (Want(only, "AlarmColumns")) PatchAlarmColumns(hmi);
@@ -435,6 +442,52 @@ namespace ValveDemoHmiBuilder
 
         // Patch columns on an EXISTING AlarmView without rebuilding the screen.
         // Use --only=AlarmColumns after adding new alarms via --only=DiscreteAlarms.
+        // Deletes the existing Nav_* items on each screen and calls BuildNav to lay them out
+        // again. Reusing BuildNav rather than editing buttons individually is the whole point:
+        // a hand-rolled patcher would have to resize seven buttons, retarget two of them, add an
+        // eighth and move the active-highlight index on four different screens - four chances to
+        // get something subtly wrong that only shows up when somebody taps the wrong tab. This way
+        // the patched nav and a freshly built one come from the same code by construction.
+        //
+        // Screens are found by looking for a Nav_0, so popups and any screen without a nav bar are
+        // skipped without needing a list to keep in step.
+        static void PatchNav(HmiSoftware hmi)
+        {
+            Console.WriteLine("\n[Nav] Redrawing nav bars in place...");
+            int done = 0;
+            foreach (var sc in hmi.Screens) {
+                var navItems = new System.Collections.Generic.List<object>();
+                bool hasNav = false;
+                foreach (var item in sc.ScreenItems) {
+                    if (!item.Name.StartsWith("Nav_", StringComparison.Ordinal)) continue;
+                    hasNav = true;
+                    navItems.Add(item);
+                }
+                if (!hasNav) { Console.WriteLine("  " + sc.Name + " - no nav bar, skipped"); continue; }
+
+                int killed = 0;
+                foreach (var item in navItems) {
+                    try { ((dynamic)item).Delete(); killed++; } catch (Exception ex) {
+                        Console.WriteLine("  [WARN] " + sc.Name + ": could not delete an item: " + Root(ex));
+                    }
+                }
+                // The nav background is drawn by BuildNav too, so it goes with them.
+                foreach (var item in sc.ScreenItems) {
+                    if (item.Name != "Nav_BG") continue;
+                    try { item.Delete(); killed++; } catch { }
+                    break;
+                }
+
+                // activeTarget is the screen's own name - a screen whose name matches no nav
+                // target simply gets eight live buttons, which is correct for Screen_SysDiag
+                // before it had a tab of its own.
+                BuildNav(sc, sc.Name);
+                Console.WriteLine("  " + sc.Name + " - " + killed + " old item(s) replaced");
+                done++;
+            }
+            Console.WriteLine("[Nav] " + done + " screen(s) updated.");
+        }
+
         static void PatchAlarmColumns(HmiSoftware hmi)
         {
             Console.WriteLine("  [AlarmColumns] Finding existing Screen_Alarms...");

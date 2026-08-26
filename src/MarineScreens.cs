@@ -1185,13 +1185,39 @@ namespace ValveDemoHmiBuilder
 
             // Created LAST so they sit above both the artwork and the status squares: a tap
             // anywhere in a half - including straight on a valve box - navigates to that zone.
-            MakeZoneTouch(sc, "Home_HitAft", HOME_BAL_X, HOME_BAL_Y, HOME_SPLIT_AX, HOME_BAL_H, "Screen_AftBallast");
-            MakeZoneTouch(sc, "Home_HitFwd", divX, HOME_BAL_Y, HOME_BAL_W - HOME_SPLIT_AX, HOME_BAL_H, "Screen_FwdBallast");
-            MakeZoneTouch(sc, "Home_HitBlg", HOME_BLG_X, HOME_BLG_Y, HOME_BLG_W, HOME_BLG_H, "Screen_Bilge");
+            var hitAft = MakeZoneTouch(sc, "Home_HitAft", HOME_BAL_X, HOME_BAL_Y, HOME_SPLIT_AX, HOME_BAL_H, "Screen_AftBallast");
+            var hitFwd = MakeZoneTouch(sc, "Home_HitFwd", divX, HOME_BAL_Y, HOME_BAL_W - HOME_SPLIT_AX, HOME_BAL_H, "Screen_FwdBallast");
+            var hitBlg = MakeZoneTouch(sc, "Home_HitBlg", HOME_BLG_X, HOME_BLG_Y, HOME_BLG_W, HOME_BLG_H, "Screen_Bilge");
+
+            // ── Station-lost overlay ─────────────────────────────────────────────────────
+            // While a station is off the network its valves keep showing their last known
+            // positions - that is deliberate, and it is what an operator needs, since the first
+            // question after losing a rack is whether those ballast lines were open or shut.
+            // But last-known and live must not look identical, or the screen is asserting
+            // something it cannot know. Tinting the zone says "these are the last readings, not
+            // live" without hiding the readings themselves.
+            //
+            // These three buttons already cover exactly the right areas and already sit on top of
+            // the artwork, so the overlay costs three properties and no new elements. The zone
+            // split matches the station split: AFT is valves 1-27, BILGE/ER 28-54, FWD 55-89.
+            //
+            // Alpha 80 out of 255, not 128. Verified in the runtime 2026-08-27 with six swatches
+            // of red over green: at 128 the green underneath goes olive and open stops being
+            // distinguishable from closed, which would defeat the point of keeping the positions.
+            // At 80 the zone is unmistakably flagged and the valve colours still read. Worth
+            // noting the runtime does blend alpha properly - this project had only ever used 0 and
+            // 255, so it was not a safe assumption.
+            var lostTint = Color.FromArgb(80, 235, 60, 48);
+            AddValueMap(DynTag(hitAft, "BackColor", "Diag_AftLost"),
+                        new int[] { 0, 1 }, new object[] { M_TRANS, lostTint });
+            AddValueMap(DynTag(hitFwd, "BackColor", "Diag_FwdLost"),
+                        new int[] { 0, 1 }, new object[] { M_TRANS, lostTint });
+            AddValueMap(DynTag(hitBlg, "BackColor", "Diag_MidLost"),
+                        new int[] { 0, 1 }, new object[] { M_TRANS, lostTint });
         }
 
         // Full-bleed transparent navigation target.
-        static void MakeZoneTouch(HmiScreen sc, string name, int x, int y, int w, int h, string target)
+        static HmiButton MakeZoneTouch(HmiScreen sc, string name, int x, int y, int w, int h, string target)
         {
             var b = sc.ScreenItems.Create<HmiButton>(name);
             b.Left = SX(x); b.Top = SY(y);
@@ -1201,6 +1227,7 @@ namespace ValveDemoHmiBuilder
             SetText(b, "Text", "");
             try { b.GetType().GetProperty("ShowFocusVisual").SetValue(b, false, null); } catch {}
             AddNavClick(b, target);
+            return b;
         }
 
         // Fault count per zone - the one number kept from the five KPI cards that were removed.
@@ -1360,18 +1387,24 @@ namespace ValveDemoHmiBuilder
 
             // Zone buttons run in valve-number order (AFT slots 1-27, BILGE/ER slots 28-54,
             // FWD slots 55-89), which is also stern->bow, matching the mimic's zone order.
+            // DIAGNOSTICS sits next to ALARMS rather than at the engineering end: both answer
+            // "something is wrong", and CONFIG and AUDIT LOG stay together as the two screens an
+            // operator has no routine reason to open.
             string[] labels  = { "&#x2302;  HOME", "&#x2693;  BALLAST AFT", "&#x1F4A7;  BILGE / ER",
-                                 "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x1F4C8;  CONFIG", "&#x1F4CB;  AUDIT LOG" };
+                                 "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x2699;  DIAGNOSTICS",
+                                 "&#x1F4C8;  CONFIG", "&#x1F4CB;  AUDIT LOG" };
             string[] targets = { "Screen_Home", "Screen_AftBallast", "Screen_Bilge", "Screen_FwdBallast",
-                                 "Screen_Alarms", "Screen_Diagnostics", "Screen_Login" };
+                                 "Screen_Alarms", "Screen_SysDiag", "Screen_Diagnostics", "Screen_Login" };
 
-            int w = 258, h = 46, y = 110, x0 = 20, gap = 8;
+            // 228, not 258: 20 + 8*228 + 7*8 = 1900, leaving the same 20px margin each side that
+            // seven buttons had. Font drops a point with it so "BALLAST FWD" still clears its icon.
+            int w = 228, h = 46, y = 110, x0 = 20, gap = 8;
             for (int i = 0; i < labels.Length; i++) {
                 bool active = (targets[i] == activeTarget);
                 Color bg = active ? M_ACCENT : M_BOX;
                 Color fg = active ? Color.White : M_TEXT;
                 Color bd = active ? M_ACCENT : M_LINE;
-                var btn = MakeBtn(sc, "Nav_" + i, x0 + i * (w + gap), y, w, h, labels[i], bg, fg, bd, 1, 18, active);
+                var btn = MakeBtn(sc, "Nav_" + i, x0 + i * (w + gap), y, w, h, labels[i], bg, fg, bd, 1, 17, active);
                 if (!active) AddNavClick(btn, targets[i]); // no self-navigation needed on the active screen
             }
         }
@@ -1683,24 +1716,60 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Leg_Hdr", x, y, w, 28, M_HDR, M_HDR, 0);
             MakeTb(sc, "Leg_Ttl", x, y + 3, w, 22, "LEGEND", M_TRANS, M_HDRTXT, 0, "Center", 13, true);
 
-            string[] name = { "OPEN", "CLOSED", "MOVING", "FAULT", "LOCAL", "UNCONF" };
-            Color[] fill  = { M_GREEN,
-                              Color.FromArgb(255,  96, 106, 122),
-                              Color.FromArgb(255,   0, 162, 255),
-                              Color.FromArgb(255, 235,  60,  48),
-                              Color.FromArgb(255, 226, 168,   0),
-                              Color.FromArgb(255, 154, 163, 176) };
-            // Amber is the one colour dark text reads better on than white.
-            Color[] ink   = { Color.White, Color.White, Color.White,
-                              Color.White, M_TEXT,      M_TEXT };
-
-            const int chipH = 30, pitch = 42;
-            for (int i = 0; i < name.Length; i++) {
-                int cy = y + 40 + i * pitch;
-                MakeRect(sc, "Leg_Chip" + i, x + 8, cy, w - 16, chipH, fill[i], M_BORDER, 1);
-                MakeTb(sc, "Leg_Txt" + i, x + 8, cy + 6, w - 16, 20, name[i], M_TRANS, ink[i], 0, "Center", 12, true);
+            // Split into two groups because that is how the display actually behaves, not for
+            // decoration: OPEN/CLOSED/MOVING say where the valve is, while FAULT and LOCAL are
+            // conditions that OVERRIDE the position colour - a faulted valve flashes red over its
+            // position, and local mode is steady amber wherever the valve happens to be sitting.
+            // A flat list of six implies they are six alternatives, which they are not.
+            //
+            // Sized to fill the column. The first version put 30px chips on a 42px pitch, which
+            // used 290 of 554 and left the bottom 40% of the panel empty - it read as unfinished
+            // rather than spacious. 52px chips on a 76px pitch reach 502, and bigger blocks are
+            // easier to match against a valve square from a metre away.
+            //
+            // No chip borders. The colour is the whole point of the entry and an outline around it
+            // is noise; the panel border already separates the legend from the drawing.
+            const int chipH = 52, pitch = 76;
+            MakeTb(sc, "Leg_GrpA", x, y + 34, w, 18, "POSITION", M_TRANS, M_MUTED, 0, "Center", 11, true);
+            MakeTb(sc, "Leg_GrpB", x, y + 278, w, 18, "CONDITION", M_TRANS, M_MUTED, 0, "Center", 11, true);
+            for (int i = 0; i < LEG_NAME.Length; i++) {
+                // The second group starts 244px below where a straight run of six would put it.
+                int cy = (i < 3) ? y + 54 + i * pitch
+                                 : y + 298 + (i - 3) * pitch;
+                MakeRect(sc, "Leg_Chip" + i, x + 8, cy, w - 16, chipH, LEG_FILL[i], LEG_FILL[i], 0);
+                MakeTb(sc, "Leg_Txt" + i, x + 8, cy + 17, w - 16, 20, LEG_NAME[i], M_TRANS, LEG_INK[i], 0, "Center", 12, true);
             }
         }
+
+        // Horizontal variant for the zone screens. Same six chips, flat run rather than grouped -
+        // the band it lives in is 24px tall and there is no room for group labels. The colours are
+        // what an operator learns, and those are identical either way.
+        static void BuildLegendRow(HmiScreen sc, int x, int y)
+        {
+            const int chipW = 130, chipH = 20, gap = 8;
+            for (int i = 0; i < LEG_NAME.Length; i++) {
+                int cx = x + i * (chipW + gap);
+                MakeRect(sc, "LegR_Chip" + i, cx, y, chipW, chipH, LEG_FILL[i], LEG_FILL[i], 0);
+                MakeTb(sc, "LegR_Txt" + i, cx, y + 2, chipW, 16, LEG_NAME[i], M_TRANS, LEG_INK[i], 0, "Center", 11, true);
+            }
+        }
+
+        // One source for both layouts, so home and the zone screens cannot drift apart.
+        // Six entries, not eight: DispCode runs 0-7 but no-position, opening and closing are all
+        // the same blue, and listing them apart would imply a distinction the screen does not draw.
+        static readonly string[] LEG_NAME = { "OPEN", "CLOSED", "MOVING", "FAULT", "LOCAL", "UNCONF" };
+        static readonly Color[] LEG_FILL = {
+            M_GREEN,
+            Color.FromArgb(255,  96, 106, 122),
+            Color.FromArgb(255,   0, 162, 255),
+            Color.FromArgb(255, 235,  60,  48),
+            Color.FromArgb(255, 226, 168,   0),
+            Color.FromArgb(255, 154, 163, 176),
+        };
+        // Amber and light grey are the two that dark ink reads better on than white.
+        static readonly Color[] LEG_INK = {
+            Color.White, Color.White, Color.White, Color.White, M_TEXT, M_TEXT,
+        };
 
         // ── Zone screen (AFT / BILGE-ER / FWD): illustration + paged table + summary ──
         // One builder for all three zones — they differ only in valve range, page count and which
@@ -1742,6 +1811,38 @@ namespace ValveDemoHmiBuilder
                 BuildZoneDiagram(sc, 16, 174, 1888, 500, "FWD Zone", zoneLabel, FWD_DIAGRAM);
             else
                 BuildZoneDiagram(sc, 16, 174, 1888, 500, "Bilge", zoneLabel, BILGE_DIAGRAM);
+
+            // Colour legend, in the 24px band the illustration leaves above the table - the only
+            // gap on this screen. Everything else is spoken for, and the artwork cannot give any
+            // up: it fills its panel at exactly 1888x500 and the valve overlays map 1:1 onto it,
+            // so trimming even a few pixels slides every square off its pipe.
+            BuildLegendRow(sc, 16, 174 + illustH + 2);
+
+            // ── Station-offline banner ───────────────────────────────────────────────────
+            // Home shows which zone has lost its rack. This screen is where somebody goes as a
+            // result, and without this it looks entirely normal - illustration, table and summary
+            // all showing last-known data with nothing saying so.
+            //
+            // Drawn as colour rather than Visible: transparent when the station is present, red
+            // when it is not. Same trick as the home overlay, and it reuses a value-map pattern
+            // this project already relies on everywhere instead of assuming Visible accepts one.
+            //
+            // It sits over the top strip of the drawing. That covers a little artwork, which is
+            // the right trade when the alternative is an operator trusting stale positions.
+            string lostTag = (zonePrefix == "Aft") ? "Diag_AftLost"
+                           : (zonePrefix == "Fwd") ? "Diag_FwdLost"
+                                                   : "Diag_MidLost";
+            string lostWho = (zonePrefix == "Aft") ? "AFT"
+                           : (zonePrefix == "Fwd") ? "FWD"
+                                                   : "BILGE / ER";
+            var banner = MakeRect(sc, "Zn_LostBar", 16, 178, 1888, 40, M_TRANS, M_TRANS, 0);
+            AddValueMap(DynTag(banner, "BackColor", lostTag),
+                        new int[] { 0, 1 }, new object[] { M_TRANS, Color.FromArgb(255, 205, 32, 38) });
+            var bannerTxt = MakeTb(sc, "Zn_LostTxt", 16, 187, 1888, 24,
+                                   "&#x26A0;  " + lostWho + " STATION OFFLINE &#x2014; VALVE POSITIONS BELOW ARE LAST KNOWN, NOT LIVE",
+                                   M_TRANS, M_TRANS, 0, "Center", 16, true);
+            AddValueMap(DynTag(bannerTxt, "ForeColor", lostTag),
+                        new int[] { 0, 1 }, new object[] { M_TRANS, Color.White });
 
             // Table takes width back off the summary (1650 -> 1674): the summary only has to fit
             // six short label/number rows, whereas the table has six columns fighting for room.
@@ -2225,14 +2326,8 @@ namespace ValveDemoHmiBuilder
             SetStr(fwdBtn, "Authorization", "Operate");
             AddScriptEvent(fwdBtn, ZoneConfigureAllScript(55, 89));
 
-            // Way in to system diagnostics. It lives here rather than in the nav bar because the
-            // nav is full at seven buttons and an eighth would mean narrowing all of them on
-            // every screen - a full rebuild for a screen an operator has no reason to open.
-            // Config is already the engineering screen, which is who this is for. Set apart from
-            // the CONFIGURE ALL group so it does not read as a fourth bulk action.
-            var sysBtn = MakeBtn(sc, "Cfg_SysDiag", bulkX + 530, pbY2, 240, 34,
-                                 "&#x2699;  SYSTEM DIAGNOSTICS", M_ACCENT, Color.White, M_ACCENT, 1, 13, true);
-            AddNavClick(sysBtn, "Screen_SysDiag");
+            // The SYSTEM DIAGNOSTICS button that used to sit here is gone: the screen has its own
+            // nav tab now, and two ways into one screen invites the question of whether they differ.
         }
 
         // One-time cost on tap only (not recurring per-scan work) - loops the zone's fixed valve
