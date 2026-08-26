@@ -1142,6 +1142,85 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     `[8]` FALSE together and confirm the other seven **stay** where they were — that is the regression
     test for the sentinel fix, and it fails today.
 
+38. **[pending — THERE IS NO AUDIBLE ALARM. Decided 2026-08-27: use the panel buzzer.]**
+    **The "beep" is an HTTP call to a service that does not exist, it fails silently, and it only
+    runs while the ALARMS screen is displayed.**
+
+    `GenerateHmiLayout.cs:774`, inside the `TotalFaults` label's script dynamization on
+    `Screen_Alarms`:
+
+    ```js
+    if (!globalThis._beepTimer) globalThis._beepTimer =
+      setInterval(function() { try { fetch('http://127.0.0.1:8081/beep/'); } catch(e){} }, 1500);
+    ```
+
+    Three separate faults, any one of which is enough to make it useless:
+
+    - **Nothing serves 127.0.0.1:8081.** That address means "this machine" — on the panel, the panel
+      itself. Nothing in this project installs or starts anything on that port. It was written
+      against something on a development laptop and cannot work on the delivered system.
+    - **`catch(e){}` swallows the failure.** It fails every 1.5 s forever with no error, no log and
+      no screen indication, which is precisely why it has survived this long looking like working code.
+    - **It only runs while `Screen_Alarms` is displayed.** Screen scripts do not execute when their
+      screen is not shown. So the annunciator only attempts to sound when the operator is already
+      looking at the alarm list — backwards, since the entire job of an audible alarm is to fetch
+      somebody who is *not* looking.
+
+    Net effect: **a ballast, bilge and fire valve system with no audible annunciation whatsoever.**
+    Beyond the operational problem, expect a surveyor to ask how alarms are annunciated.
+
+    **Decision (user, 2026-08-27): use the MTP1500's built-in buzzer.** Confirmed by the user that
+    the panel has one. A hardwired sounder on a spare DQ was the alternative and is not being taken;
+    if a surveyor later requires annunciation independent of the HMI, revisit — there are 10 free DQ
+    channels per station (item 35's channel audit) so the option stays open at no cost today.
+
+    **Step 1 — recover the API answer that was already paid for.** `InspectAcousticSignal.exe` exists
+    in the repo, built 2026-08-01, written to search the Siemens DLLs for acoustic-signal types and
+    read a live `SetAcousticSignal` handler. **It was run and the output was never recorded** — there
+    is no log and no note of it anywhere. Re-run it and commit the output this time.
+
+    What that determines: whether the buzzer is reachable through Openness (so `HmiBuilder` sets it,
+    like the alarm-class colours) or is **UI-only** and needs a manual TIA step documented in the
+    panel setup. Do not assume the former — the "main database location for alarm logging" turned out
+    to be UI-only and unreachable through Openness (item 34), and creating a log before it was set by
+    hand broke the HMI compile outright. Same class of trap.
+
+    Likeliest place to look: `HmiAlarmClass`. Commit `55f7cd6` established it exposes `RaisedState` /
+    `AcknowledgedState` / `ClearedState` / `AcknowledgedClearedState`, each with writable `BackColor`,
+    `TextColor` and `Flashing`, and that **class-level changes DO flow through to existing alarm
+    instances** — so if the acoustic setting lives there too, all 632 alarms can be given sound
+    without an alarm regeneration.
+
+    **Step 2 — decide which classes sound.** Mirror the existing colour/flash tiering, which was
+    already reasoned out against ISA-18.2 / EEMUA 191 and should not be re-litigated:
+
+    | Class | Priority | Sound? |
+    |---|---|---|
+    | `ValveFault` | 14 | **yes** |
+    | `System` | 12 | **yes** |
+    | `ValveWarning` | 8 | probably — decide with the client |
+    | `ValveEvent` | 3 | **no** — Local mode is information, and it already never flashes |
+
+    **Step 3 — the buzzer must stop on ACKNOWLEDGE, not on clear.** An operator silences by
+    acknowledging; the alarm stays visible until the condition actually goes away. Silencing on clear
+    means the noise continues until the valve is fixed, which trains people to ignore it. Verify the
+    acoustic setting is tied to the unacknowledged state — the same `RaisedState` /
+    `AcknowledgedState` split the flashing already uses.
+
+    **Step 4 — remove the localhost beep.** Note it is *inside* the script that also renders
+    "ACTIVE FAULTS: n", so the dynamization is edited, not deleted. `Internal_PrevFaultCount` exists
+    only to give that script its 0→n edge and becomes unused once the beep goes — check for other
+    readers before removing the tag.
+
+    **Build cost:** this touches one script on `Screen_Alarms`, and `--only=Alarms` is the ~45-minute
+    rebuild that also regenerates all 632 alarms and carries the COM deadlock risk documented in
+    `BuildAlarmScreen`. Do it as a targeted patch instead — `PatchNav` and `PatchAlarmColumns` are the
+    existing pattern for reaching into one screen and rewriting one thing in place.
+
+    **Verification:** raise a valve fault with the panel showing **Home**, not the alarm screen, and
+    confirm the buzzer sounds. That is the exact case today's code fails. Then acknowledge without
+    fixing the valve and confirm the buzzer stops while the alarm stays active.
+
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
 first if it hasn't already read it. The immediate next actions in priority order are items 4 and 1 in
