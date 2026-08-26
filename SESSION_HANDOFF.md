@@ -1345,6 +1345,71 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     address moved, the module went in at the wrong position — stop and reposition before touching
     `FC_PhysicalIoCopy`.
 
+41. **[pending — SECURITY. Both parts are pre-ship: one is a hardware-config change, the other
+    cannot be fixed from the panel afterwards. Verified 2026-08-27.]**
+
+    **a. The PLC has no password, and direct writes bypass the audit trail.**
+
+    `compile_plc_physio.log` (2026-08-08, the most recent PLC compile on record):
+
+    > `[Warning] PLC_1 does not contain a configured protection level`
+
+    Independently confirmed by the user's own screenshot of Protection & Security showing **Full
+    access (no protection)**, no password. Anyone who can reach the CPU on the ship's network, with
+    TIA Portal on a laptop, can stop it, upload the whole program, or **write directly into
+    `Valves_DB` — which operates ballast valves with no HMI, no login and no button press.**
+
+    **The part that matters most: this bypasses the audit trail entirely.** The audit trail records
+    actions taken *at the panel*. A direct PLC write never touches the panel, so the one record of
+    who moved what has a hole in it that leaves no trace. That is a surveyor question as much as a
+    security one.
+
+    Realistic threat model is not hackers — it is a service engineer "just checking" something, a
+    crew laptop on the same network, or somebody tracing an unrelated fault who opens the wrong block.
+
+    **Fix:** set a protection level and password in the CPU's Protection & Security settings.
+    Read-only for general access, password-protected for write. Hardware configuration, so it is a
+    download — **must be done before the panel ships.** Record the password somewhere the vessel's
+    engineers will still have it in five years; a PLC nobody can get into is its own failure mode.
+
+    **b. No panel account can manage accounts — so logins are frozen at handover.**
+
+    Present in every HMI compile log from at least 2026-08-13 through 2026-08-15:
+
+    > `[Warning] The configuration is missing a user with the function right "User management".
+    > User data cannot be changed in runtime`
+
+    Nobody on the panel holds the right to administer users. Once the panel is aboard: **no user can
+    be added when an engineer joins, none removed when somebody leaves, and no password changed —
+    ever.** The only route is TIA Portal and a download, which is precisely what the
+    no-changes-at-the-ship constraint rules out.
+
+    **This undermines the audit trail that was built for exactly this purpose** (see
+    `AUDIT_DEPLOYMENT.md`). With no way to issue accounts, everyone shares one login, so the trail
+    records "Operator opened CM51" with no way to say which person that was — and a shared password
+    that can never be changed also can never be revoked when someone leaves the vessel. An audit
+    trail that cannot attribute an action to a person is far weaker as evidence, and attribution is
+    the first thing a surveyor tests.
+
+    **Fix:** grant the "User management" function right to at least one role before shipping. One
+    setting in HMI user administration. Decide *which* role deliberately — Master or a dedicated
+    admin, not Operator.
+
+    **c. Runtime language mismatch — ten minutes, possibly related to a live problem.**
+
+    > `[Warning] The configured runtime language for the HMI device does not match the language
+    > configuration of connected PLC "PLC_1"`
+
+    Low severity alone. Worth doing now because `##Text missing##` on the panel is still unexplained
+    (the PLC read-access theory was killed by the user's screenshot showing Full access), and an
+    HMI/PLC language mismatch is a plausible cause of text failing to resolve at runtime. Cheap to
+    align and it removes one candidate.
+
+    **Verification:** after (a), confirm an online connection without the password is refused write
+    access and that the HMI connection still works — the HMI uses its own connection and must not be
+    locked out by the new protection level. After (b), log in at the panel and confirm a user can
+    actually be added and a password changed **in runtime**, not just that the warning disappeared.
+
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
 first if it hasn't already read it. The immediate next actions in priority order are items 4 and 1 in
