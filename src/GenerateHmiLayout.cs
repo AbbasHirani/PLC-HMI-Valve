@@ -1803,6 +1803,16 @@ namespace ValveDemoHmiBuilder
             // internal only, no PLC binding, same pattern as SelectedValve.
             CreateInternalTag(hmi, "BilgePage", "Int");
             CreateInternalTag(hmi, "Internal_PrevFaultCount", "Int");
+            // Written once a second by the home panel from GetActiveAlarms, so the home count and
+            // the alarm list cannot drift apart.
+            CreateInternalTag(hmi, "ActiveAlarmCount", "Int");
+            // Station health, written by OB86 into Diag_DB. Nothing read these until the home
+            // panel did - AnyStationLost was built as "one bit for the HMI to watch" and then
+            // watched by nothing.
+            CreateSummaryTag(hmi, "Diag_AftLost",        "Diag_DB.AftLost",        "Bool");
+            CreateSummaryTag(hmi, "Diag_MidLost",        "Diag_DB.MidLost",        "Bool");
+            CreateSummaryTag(hmi, "Diag_FwdLost",        "Diag_DB.FwdLost",        "Bool");
+            CreateSummaryTag(hmi, "Diag_AnyStationLost", "Diag_DB.AnyStationLost", "Bool");
             CreateSummaryTag(hmi, "Valves_DB_TotalOpen",   "Valves_DB.TotalOpen",   "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalClosed", "Valves_DB.TotalClosed", "Int");
             CreateSummaryTag(hmi, "Valves_DB_TotalTransit","Valves_DB.TotalTransit","Int");

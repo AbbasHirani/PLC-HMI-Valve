@@ -1153,6 +1153,10 @@ namespace ValveDemoHmiBuilder
             // The five KPI cards came off on request - the bilge drawing occupies that row now.
             // The one figure per zone worth keeping is the fault count, which moves into a strip
             // under the alarm card rather than being lost entirely.
+            // The ballast drawing stops at 1808; the row below runs to 1904. That 96px gap is
+            // the only free space on this screen that costs nothing to use.
+            BuildLegend(sc, HOME_BAL_X + HOME_BAL_W + 8, HOME_BAL_Y, 88, HOME_BAL_H);
+
             BuildAlarmPanel(sc, HOME_ALM_X, HOME_ALM_Y, HOME_ALM_W, HOME_ALM_H - 74);
             BuildZoneFaultStrip(sc, HOME_ALM_X, HOME_ALM_Y + HOME_ALM_H - 66, HOME_ALM_W, 66);
 
@@ -1585,24 +1589,117 @@ namespace ValveDemoHmiBuilder
             MakeRect(sc, "Alm_Hdr", x, y, w, 36, M_HDR, M_HDR, 0);
             MakeTb(sc, "Alm_Ttl", x + 10, y + 5, w - 20, 26, "ACTIVE ALARMS", M_TRANS, M_HDRTXT, 0, "Left", 17, true);
 
-            // The count is a straight passthrough, so it binds natively.
-            var big = MakeLiveText(sc, "Alm_Count", x + 14, y + 42, 90, h - 92, M_RED, "Center", 50, true);
-            DynTag(big, "Text", "Valves_DB_TotalFault");
+            // ── The count ────────────────────────────────────────────────────────────────
+            // This is the number of alarms actually standing on Screen_Alarms, read from the
+            // same place that screen reads: HMIRuntime.Alarming.GetActiveAlarms.
+            //
+            // It used to be Valves_DB.TotalFault, which counts VALVES in a fault state - a
+            // different quantity entirely. None of the nine System_* alarms reach that total, nor
+            // do WinCC's own PlcInStopAlarm and PlcDisconnectedAlarm, and one faulted valve can
+            // raise several alarms at once. So the home screen could read 0 with rows standing on
+            // the alarm list, and the number's whole job is to make somebody go and look. If it
+            // disagrees with the screen it is pointing at, nobody looks.
+            //
+            // Counting real alarms also settles the station-failure case on its own: the RIO
+            // alarm is an alarm, so it lands in this total without any special handling.
+            //
+            // GetActiveAlarms is asynchronous and cannot be returned from a dynamization, so the
+            // script requests the new count and displays the previous one. Up to one second
+            // stale, which does not matter for a go-and-look indicator.
+            var big = MakeLiveText(sc, "Alm_Count", x + 14, y + 44, 90, 62, M_RED, "Center", 44, true);
+            Dyn(big, "Text", JS_READ +
+                "try { HMIRuntime.Alarming.GetActiveAlarms(HMIRuntime.Language).then(function(a){\n" +
+                "  Tags(\"ActiveAlarmCount\").Write(a.length);\n" +
+                "}); } catch(e) {}\n" +
+                "return \"\" + (r(Tags(\"ActiveAlarmCount\").Read()) || 0);", "T1s");
 
-            // The state word/colour stay on scripts. A fault total is 0..88, so expressing
-            // "zero vs non-zero" as a discrete value map would need ~89 entries per property —
-            // i.e. ~178 extra Openness round-trips at build time to remove just two scripts.
-            // Not worth it; the win from native binding is in the 88 badges and 15 KPI cells.
-            string readFaultTotal = JS_READ + "var n=r(Tags(\"Valves_DB_TotalFault\").Read());\n";
-            var state = MakeLiveText(sc, "Alm_State", x + 112, y + 48, w - 126, 26, M_GREEN, "Left", 18, true);
-            Dyn(state, "Text", readFaultTotal + "return n>0?\"ALARM ACTIVE\":\"ALL NORMAL\";", "AutomaticTags");
-            Dyn(state, "ForeColor", readFaultTotal + "return n>0?0xFFCD2026:0xFF009E4A;", "AutomaticTags");
+            string readCount = JS_READ + "var n=r(Tags(\"ActiveAlarmCount\").Read())||0;\n";
+            var state = MakeLiveText(sc, "Alm_State", x + 112, y + 52, w - 126, 28, M_GREEN, "Left", 18, true);
+            Dyn(state, "Text", readCount + "return n>0?\"ALARM ACTIVE\":\"ALL NORMAL\";", "T1s");
+            Dyn(state, "ForeColor", readCount + "return n>0?0xFFCD2026:0xFF009E4A;", "T1s");
+            // The "Tap to open annunciator" hint is gone - the button below says the same thing,
+            // and the room it took is worth more as live figures.
 
-            MakeTb(sc, "Alm_Hint", x + 112, y + 78, w - 126, 22, "Tap to open annunciator", M_TRANS, M_MUTED, 0, "Left", 13, false);
+            // ── Remote I/O ───────────────────────────────────────────────────────────────
+            // The count says something is wrong; these say which rack. A dot rather than a
+            // number because the useful fact is binary - either the PLC is talking to that
+            // station or it is not.
+            MakeRect(sc, "Alm_Sep1", x + 14, y + 114, w - 28, 1, M_LINE, M_LINE, 0);
+            int ry = y + 122;
+            MakeTb(sc, "Alm_RioLbl", x + 14, ry, 96, 20, "REMOTE I/O", M_TRANS, M_MUTED, 0, "Left", 12, true);
+
+            string[] rioName = { "AFT", "BILGE / ER", "FWD" };
+            string[] rioTag  = { "Diag_AftLost", "Diag_MidLost", "Diag_FwdLost" };
+            for (int i = 0; i < 3; i++) {
+                int cx = x + 118 + i * 150;
+                var dot = MakeDot(sc, "Alm_RioDot" + i, cx, ry + 10, 7, 7, M_GREEN, M_BORDER, 1);
+                // Bool arrives as 0/1. FALSE = station present = green, TRUE = lost = red.
+                AddValueMap(DynTag(dot, "BackColor", rioTag[i]),
+                            new int[] { 0, 1 }, new object[] { M_GREEN, M_RED });
+                MakeTb(sc, "Alm_RioTxt" + i, cx + 14, ry, 130, 20, rioName[i], M_TRANS, M_TEXT, 0, "Left", 13, false);
+            }
+
+            // ── Plant summary ────────────────────────────────────────────────────────────
+            // All four totals are computed by FB_ValveLoop every scan and were displayed
+            // nowhere: they were on the five KPI cards that came off when the bilge drawing
+            // took that row. LOCAL is the one that earns its place - those valves cannot be
+            // operated from this panel at all, and nothing else on the home screen says so.
+            MakeRect(sc, "Alm_Sep2", x + 14, y + 152, w - 28, 1, M_LINE, M_LINE, 0);
+            int vy = y + 160;
+            MakeTb(sc, "Alm_VlvLbl", x + 14, vy, 96, 20, "VALVES", M_TRANS, M_MUTED, 0, "Left", 12, true);
+
+            string[] vName = { "OPEN", "CLOSED", "MOVING", "LOCAL" };
+            string[] vTag  = { "Valves_DB_TotalOpen", "Valves_DB_TotalClosed",
+                               "Valves_DB_TotalTransit", "Valves_DB_TotalLocal" };
+            for (int i = 0; i < 4; i++) {
+                int cx = x + 118 + i * 133;
+                MakeTb(sc, "Alm_VlvTxt" + i, cx, vy + 3, 62, 18, vName[i], M_TRANS, M_MUTED, 0, "Left", 12, false);
+                var num = MakeLiveText(sc, "Alm_VlvNum" + i, cx + 60, vy, 44, 22, M_TEXT, "Left", 16, true);
+                DynTag(num, "Text", vTag[i]);
+            }
 
             var goAlarms = MakeBtn(sc, "Alm_Btn", x + 14, y + h - 42, w - 28, 34, "&#x1F514;  OPEN ALARMS",
                                     M_HDR, M_HDRTXT, M_BORDER, 1, 15, true);
             AddNavClick(goAlarms, "Screen_Alarms");
+        }
+
+        // ── COLOUR LEGEND ───────────────────────────────────────────────────────────────
+        // Lives in the strip to the right of the ballast drawing. That drawing ends at x=1808
+        // while the row beneath it runs to 1904, so those 96px are dead space - the legend costs
+        // nothing else on the screen. Nothing is resized to make room: both artworks are authored
+        // at exactly the box they occupy so the valve overlays map 1:1, and rescaling either would
+        // move all 89 squares off their pipes.
+        //
+        // The label sits INSIDE the coloured block rather than beside a swatch. At 88px wide a
+        // swatch plus text leaves about 50px for the word, which is too small to read; filling the
+        // block uses the whole width and the colour is its own sample.
+        //
+        // Six entries, not eight. DispCode runs 0-7 but codes 5, 6 and 7 - no position, opening,
+        // closing - are all the same blue, so listing them separately would imply a distinction
+        // the screen does not draw.
+        static void BuildLegend(HmiScreen sc, int x, int y, int w, int h)
+        {
+            MakePanel(sc, "Leg_BG", x, y, w, h, M_BOX, M_BORDER, 1);
+            MakeRect(sc, "Leg_Hdr", x, y, w, 28, M_HDR, M_HDR, 0);
+            MakeTb(sc, "Leg_Ttl", x, y + 3, w, 22, "LEGEND", M_TRANS, M_HDRTXT, 0, "Center", 13, true);
+
+            string[] name = { "OPEN", "CLOSED", "MOVING", "FAULT", "LOCAL", "UNCONF" };
+            Color[] fill  = { M_GREEN,
+                              Color.FromArgb(255,  96, 106, 122),
+                              Color.FromArgb(255,   0, 162, 255),
+                              Color.FromArgb(255, 235,  60,  48),
+                              Color.FromArgb(255, 226, 168,   0),
+                              Color.FromArgb(255, 154, 163, 176) };
+            // Amber is the one colour dark text reads better on than white.
+            Color[] ink   = { Color.White, Color.White, Color.White,
+                              Color.White, M_TEXT,      M_TEXT };
+
+            const int chipH = 30, pitch = 42;
+            for (int i = 0; i < name.Length; i++) {
+                int cy = y + 40 + i * pitch;
+                MakeRect(sc, "Leg_Chip" + i, x + 8, cy, w - 16, chipH, fill[i], M_BORDER, 1);
+                MakeTb(sc, "Leg_Txt" + i, x + 8, cy + 6, w - 16, 20, name[i], M_TRANS, ink[i], 0, "Center", 12, true);
+            }
         }
 
         // ── Zone screen (AFT / BILGE-ER / FWD): illustration + paged table + summary ──
