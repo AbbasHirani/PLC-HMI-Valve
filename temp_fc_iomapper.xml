@@ -52,6 +52,7 @@
   <Section Name="InOut" />
   <Section Name="Temp">
     <Member Name="i" Datatype="Int" />
+    <Member Name="stationDown" Datatype="Bool" />
   </Section>
   <Section Name="Constant" />
 </Sections></Interface>
@@ -85,7 +86,33 @@
     // A channel value of 0 means "not assigned" - that field is simply left untouched, so an
     // unconfigured channel never overwrites a valve's simulated status with a false FALSE.
     FOR #i := 1 TO 89 DO
-        IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
+        // Which station carries this valve. Confirmed against Valve_Channels_DB rather than
+        // assumed: valves 1-27 use DI channels 1-108 (AFT provides 1-112), 28-54 use 113-220
+        // (MID provides 113-224), 55-89 use 225-364 (FWD provides 225-368).
+        #stationDown := (#i &lt;= 27 AND &quot;Diag_DB&quot;.AftLost)
+                     OR (#i &gt; 27 AND #i &lt;= 54 AND &quot;Diag_DB&quot;.MidLost)
+                     OR (#i &gt; 54 AND &quot;Diag_DB&quot;.FwdLost);
+
+        // NOT #stationDown is the important half of this guard. When a station is off the network
+        // its input data is not a report from the field, and what the process image holds instead
+        // is not something this project has been able to establish - Siemens' own documentation
+        // was not found to say whether inputs go to zero or freeze at their last value, and it
+        // cannot be tested in simulation because PLCSIM runs no PROFINET. Both possibilities are
+        // bad in different ways: zeros make every valve on the station report no position and not
+        // healthy, which is ~54 alarms burying the one that explains them; frozen values make a
+        // dead station look perfectly normal.
+        //
+        // Skipping the copy removes the question. Valve[i].OpenFB/ClosedFB/Healthy/LocalMode
+        // simply keep the values they last had, which is the last real report from the field -
+        // the thing an operator actually needs when a station drops, since knowing whether a
+        // ballast line was open or shut is the first question asked. And because Healthy stays
+        // TRUE and the position stays valid, the Unhealthy and Loss-of-Position alarms do not
+        // fire for the whole station, leaving the RIO station alarm standing on its own.
+        //
+        // Travel timeouts are deliberately NOT suppressed. If someone commands a valve on a dead
+        // station, nothing moves and FailOpen/FailClose is the correct thing to say - that is one
+        // alarm about one deliberate action, not a flood.
+        IF &quot;Valves_DB&quot;.Valve[#i].Configured AND NOT #stationDown THEN
             IF &quot;Valve_Channels_DB&quot;.OpenFbChannel[#i] &gt; 0 THEN
                 &quot;Valves_DB&quot;.Valve[#i].OpenFB := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.OpenFbChannel[#i]];
             END_IF;

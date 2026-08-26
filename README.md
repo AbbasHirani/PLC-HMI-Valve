@@ -430,6 +430,61 @@ Note the inverted sense: `HwHealthy` TRUE means well, and `HwWord` sets its bit
 on `NOT HwHealthy`. Backwards here would mean a system that reports healthy
 precisely when it is not.
 
+#### A lost station's inputs are not read at all
+
+`FC_IoMapper` skips the input copy for any valve whose station is down, so
+`OpenFB`, `ClosedFB`, `Healthy` and `LocalMode` keep the values they last had.
+
+This is not a nicety. **What the process image holds for a failed PROFINET
+device could not be established.** Siemens documentation was searched and did
+not yield a statement on whether inputs go to zero or freeze at their last
+value, and it cannot be tested here because PLCSIM runs no PROFINET - there is
+no station to unplug. Both possibilities are bad, differently:
+
+| If inputs... | Consequence |
+|---|---|
+| go to zero | every valve on the station reads no-position and not-healthy: ~54 alarms burying the one that explains them |
+| freeze | a dead station looks perfectly normal and nothing anywhere says otherwise |
+
+Skipping the copy removes the question rather than answering it. The behaviour
+is identical either way: zeros are ignored, frozen values are held regardless.
+
+That matters here because **code cannot be changed during commissioning.**
+There is no opportunity to observe the real behaviour and then adjust, so the
+logic has to be correct under both answers before the panel ships.
+
+What it buys, in one guard:
+
+- **Last known position is preserved.** When a station drops, the first thing
+  an operator needs is whether those ballast lines were open or shut. Blanking
+  them to UNKNOWN would destroy exactly that.
+- **No Unhealthy flood.** `Healthy` stays TRUE, so 27 ValveFault alarms at
+  priority 14 do not fire on top of a station alarm at priority 12.
+- **No Loss-of-Position flood.** The position stays valid, so the 2 s
+  `PosLostTmr` never runs.
+- **The RIO station alarm stands alone**, which is the alarm that tells the
+  operator what to actually do.
+
+Travel timeouts are deliberately **not** suppressed. Commanding a valve on a
+dead station moves nothing, and `FailOpen`/`FailClose` is the correct response
+- one alarm about one deliberate action, not a flood.
+
+Station membership is confirmed against `Valve_Channels_DB`, not assumed:
+valves 1-27 use DI channels 1-108 (AFT provides 1-112), 28-54 use 113-220 (MID
+provides 113-224), 55-89 use 225-364 (FWD provides 225-368).
+
+Two other findings from that investigation, neither acted on:
+
+- Each DI submodule carries `ReactionToError = 2`. Something is configured;
+  what the value means was not established, and it appears to concern module
+  and channel errors rather than the station vanishing.
+- `EnableValueStatus = False`. ET200SP modules can send a per-channel validity
+  bit alongside the data (1 = no fault, 0 = fault or channel disabled), which
+  would answer "can I trust this input" at source. Enabling it adds status
+  bytes and shifts every I/O address, which would invalidate all 534 channel
+  assignments - a bad trade for a signal station status already provides. Worth
+  turning on if the I/O map is ever rebuilt from scratch.
+
 #### Not testable in simulation
 
 There is no station to unplug. It compiles and downloads; whether it fires is a
