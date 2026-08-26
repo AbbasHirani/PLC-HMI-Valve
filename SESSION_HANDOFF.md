@@ -1221,6 +1221,67 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     confirm the buzzer sounds. That is the exact case today's code fails. Then acknowledge without
     fixing the valve and confirm the buzzer stops while the alarm stays active.
 
+39. **[pending — ALARM FLOOD. One 24 V field-supply failure raises 81 alarms and none of them says
+    why. Found 2026-08-27.]**
+
+    **The failure.** The 24 V supply feeding the field wiring on one station fails — fuse, loose
+    terminal, dead PSU — but **the ET200SP itself stays powered and stays on PROFINET**. Every input
+    on that station reads 0, and the PLC has no reason to disbelieve it. Per valve, three separate
+    alarms fire (all three verified 2026-08-27, none suppressed by any of the others):
+
+    | Alarm | Why it fires | Where |
+    |---|---|---|
+    | Unhealthy | `Healthy` input reads 0 | packed from `Valve[i].Healthy` |
+    | Loss of Position | both limits 0, no run latch, 2 s debounce | `PosLostTmr`, ~line 413 |
+    | Unexpected Movement | a made limit switch dropped with no command | ~line 431-437, **and it latches** |
+
+    27 valves x 3 = **81 alarms in about two seconds**. If the failure is upstream of all three
+    stations, **267**. ISA-18.2 puts the flood threshold at 10 alarms per 10 minutes per operator.
+
+    **And nothing states the cause.** `System_Power_UPS_Fault` is one of the six bits nothing drives
+    (item 37). So the operator gets 81 rows saying valves are broken, zero rows saying the power
+    failed, and the reasonable conclusion available to them is that 27 valves failed simultaneously.
+
+    **Why the station-loss case does not have this problem.** `FC_IoMapper`'s `#stationDown` guard
+    freezes the last known feedbacks instead of copying zeros, so a station dropping off PROFINET
+    raises exactly one alarm and leaves last-known positions on screen. That is good design and it is
+    already there. It does not help here for one reason: **OB86 tells the PLC the station is gone.
+    Nothing tells it the power died.** Identical symptom at the valves, opposite handling, purely
+    because of what the PLC was told. The two cases cannot collide — a frozen station keeps its last
+    `Healthy` value, so it never floods.
+
+    **Fix — detect the pattern and raise one alarm instead of many.**
+
+    a. **Count unhealthy configured valves per station**, in `FB_ValveLoop`. The 1..89 loop already
+       does per-zone counting (~line 441-455) and the increments are already free, so this is a
+       counter alongside the existing ones.
+    b. **Threshold, and why not "all".** ET200SP load groups mean a single fuse may kill only part of
+       a station — how much depends on the BaseUnit mix, which is not finalised (item 14 / the
+       BaseUnit gap). "All 27 unhealthy" would miss a partial-group failure entirely and leave 8-12
+       alarms flooding anyway. Use **N or more configured valves on one station unhealthy at once**,
+       with N held in a DB member so it is tunable at commissioning rather than compiled in — same
+       lesson as item 35. Start at 5. Debounce ~2 s so a transient cannot trip it.
+       Accepted trade-off: five genuinely-failed valves on one station would be reported as a group
+       fault. Unlikely, and far better than the current behaviour.
+    c. **Suppress the per-valve alarms for that station while the group alarm is active** — gate the
+       `W_Unhealthy`, `W_LossPos` and `W_UnexpMove` packing for those slots. Suppress the *alarms*
+       only: the valves must still show unhealthy on the zone screens and in the summary counts. The
+       information stays, the 81 notifications do not.
+    d. **Do not let `UnexpMove` latch during the event.** It is latched (~line 435) and nothing else
+       here is. Suppressing only the alarm bit while still setting the latch means all 27 latched
+       faults appear the moment power returns — the flood arrives late instead of not at all. The
+       latch itself has to be inhibited while the group fault is active.
+    e. **Three new alarms, one per station** — "AFT/BILGE/FWD station field supply failure".
+       **Tidy option: reuse the bits item 37 deletes.** That item removes bits 0, 6 and 8 (CPU fault,
+       Network loss, General fault) as undriveable, freeing exactly three. Reusing them means no new
+       tag, no change to `HwWord`, and no alarm-count change. It does make 37 and 39 one piece of
+       work rather than two — decide that before starting either.
+
+    **Verification:** force `Healthy` FALSE on all 27 AFT valves from the watch table. Confirm **one**
+    alarm, not 81; confirm the zone screen still shows those valves unhealthy; then restore and
+    confirm **no latched Unexpected Movement flood arrives on recovery** — (d) is the part most likely
+    to be got wrong, and it fails silently in testing unless you look for it specifically.
+
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
 first if it hasn't already read it. The immediate next actions in priority order are items 4 and 1 in
