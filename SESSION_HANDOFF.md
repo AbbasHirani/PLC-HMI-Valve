@@ -190,7 +190,8 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     `OpenFB`/`ClosedFB`/`Healthy` — on a real valve that manufactured a phantom Unexpected Movement.
     And `FB_ValveLoop`'s first-scan init no longer seeds `Healthy` for real-channel valves.)*
 
-13. **[pending — BLOCKER for install]** **The 8 s travel timeout is a simulation number and will stop
+13. **[pending — BLOCKER for install. The BUILD half is now item 35; this item is the analysis.]**
+    **The 8 s travel timeout is a simulation number and will stop
     every real valve mid-stroke.** Raised 2026-08-15 from the "how do the output commands work"
     question. Context first, because the two facts only bite when combined:
 
@@ -876,6 +877,133 @@ It is not reproduced here — regenerate it from `MV_Westerly_IO_Wiring_Schedule
 addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `CreateAlarms`.
 
 ## 7. How to resume
+
+34. **[pending - COMMISSIONING ON REAL HARDWARE. Storage medium for logs.]**
+    **Logging works, but where it writes differs between simulation and the real panel - and only
+    the panel setting is part of the delivered system.**
+
+    How it stands today:
+    - Project: `AlarmLog_Main.Settings.StorageDevice = USBX61` and
+      `Audit trail_1.Settings.StorageDevice = USBX61`.
+    - "Main database location for alarm logging" set to USB-X61 by hand in TIA (UI-only, NOT
+      reachable through Openness. Creating a log before this is set breaks the HMI compile).
+    - **Simulation ignores all of the above.** Per Siemens V20 docs, simulation uses the path from
+      the "WinCC Unified Configuration" tool -> Archive settings, which on this laptop is
+      C:\UnifiedArchive. Confirmed working 2026-08-21: alarm history populated and
+      HMI_RT_1-SIM_AlarmLoggingDatabase.db3 grew on disk as alarms were raised.
+    - The laptop path is a simulation artefact only. It does not transfer and needs no cleanup.
+
+    On the real MTP1500, the project settings ARE what govern. To do at commissioning:
+
+    a. **Decide the medium, and prefer SD-X51 over USB.** Siemens documents the SD card as the
+       recommended medium for frequent read/write, and alarm logging writes constantly. A USB stick
+       protruding from a panel on a ship is also physically exposed - easy to knock out, easy to
+       walk off with. If switching, change BOTH the project objects (MakeAlarmLog.exe sets them,
+       currently hardcoded to "USBX61" - change that string) AND the main database location in the
+       TIA UI. They must match or the HMI compile fails with
+       "Database of the log must be on the same medium as the main database for alarm logging."
+    b. **Fit the card before first runtime start.** Siemens recommends a SIMATIC SD card of at
+       least 32 GB for panel data memory, particularly for data consistency on power-off.
+    c. **Verify on the panel**: browse to media/simatic/X51 (or the USB equivalent) in the panel's
+       file explorer to confirm the medium is detected, then raise and clear a valve alarm and
+       confirm ALARM HISTORY populates and the database file appears.
+    d. **Expect the "Storage medium not available" system alarm to disappear** on the real panel.
+       In simulation it persists and is CORRECT - the laptop genuinely has no USB-X61 port. Do not
+       chase it in simulation; do not judge logging by it.
+    e. **Sizing**: LogMaxSize is 20000 and the segment period is 30 days. Worth a sanity check
+       against how many alarms 89 valves actually generate in service before handover.
+
+35. **[pending — BUILD THIS BEFORE THE PANEL SHIPS. Does NOT depend on the client.]**
+    **Per-valve travel and seat-break times, held as data instead of code.**
+
+    Item 13 describes the defect and names the fix. This is the build task, split out because the
+    two are separate jobs and only one of them is blocked on anybody else:
+
+    - **Job A — get the numbers.** Section 2 already asks the client for full travel time and
+      seat-break time per valve. Still outstanding. *Blocked on the client.*
+    - **Job B — build somewhere to put them.** Not started. *Blocked on nobody.*
+
+    **The trap:** these look like one job and are not. If the client emails all 89 travel times
+    tomorrow, they still cannot be used — the times are compiled into the SCL and there is no
+    mechanism that accepts them. Job B has to happen regardless of whether Job A ever completes,
+    and because it is a code change it cannot wait for the ship.
+
+    Confirmed still hardcoded 2026-08-27, exactly as item 13 describes:
+
+    | Value | Where | Drives |
+    |---|---|---|
+    | `PT := T#8S` | `FB_ValveLoop`, TimerOpen | Fail-to-Open, and halts the valve |
+    | `PT := T#8S` | `FB_ValveLoop`, TimerClose | Fail-to-Close, and halts the valve |
+    | `PT := T#5S` | `FB_ValveLoop`, `DirTmr[#i]` | Direction/limit fault, and halts the valve |
+
+    **Design:**
+
+    a. **Two new `Array[1..89] of Time` members: `TravelTimeout[]` and `SeatBreakGrace[]`.**
+       Put them in `Valve_Channels_DB`. That DB is already the per-valve configuration table, it
+       already carries 535 compiled start values, and it is already the thing `FB_ValveLoop` reads
+       per valve. **Do not put them in `Valves_DB`** — that DB has zero start values, so anything
+       living there comes up as `T#0S` after a power cycle, and a zero PT means the timer expires
+       instantly. That would be worse than today.
+    b. **Compiled start values for all 89: `T#60S` travel, `T#10S` seat-break.** Generous on
+       purpose. A timeout that is too long raises a late alarm; one that is too short stops a
+       working valve. Only one of those strands a ballast valve half-open.
+    c. **Substitute the three PT arguments** with the array reads. SCL takes a variable PT on a
+       TON directly, so this is three lines.
+    d. **Guard against zero.** If either value reads `T#0S`, fall back to the default in code
+       rather than arming a timer that fires on the first scan. Cheap insurance against a bad
+       import or a mis-typed panel entry.
+    e. **A way to edit them at the panel**, on the Config screen, per valve. This needs editable
+       numeric input fields — the buffer-tag pattern from the removed Name/Location fields is the
+       method, and it is written up in the project memory. Authorization `Operate` at minimum;
+       consider restricting to a commissioning role.
+    f. **Decide what survives a power cycle.** A value typed at the panel writes to the DB, and
+       `Valve_Channels_DB` is `NonRetain` — so it reverts to its compiled start value on the next
+       blackout, silently. Either mark the two new arrays `Retain`, or accept that panel entries
+       are provisional and must be written back into the project start values before handover.
+       **Whichever is chosen, write it down here** — a commissioning engineer who tunes 89 valves
+       and loses the lot to a power cut will not guess which behaviour was intended. See item 36.
+
+    **Verification:** set one valve to `T#3S` travel, command it, confirm Fail-to-Open raises at 3 s
+    and not 8. Set another to `T#90S` and confirm it does not trip early. Then confirm both survive
+    (or do not survive, per (f)) a CPU stop/start.
+
+    **Once this is built, item 13 stops being a blocker** and becomes a commissioning task: an
+    engineer times each valve with a stopwatch and types the numbers in. That is true even if the
+    client never answers Job A, which is the whole point of doing it this way.
+
+36. **[pending — BLOCKER for install. Ten-minute fix, found 2026-08-27.]**
+    **Every valve comes up UNCONFIGURED after a power cycle, so nothing responds until somebody
+    presses CONFIGURE ALL.**
+
+    Found while cross-checking an external audit. The audit reported this as "all runtime
+    configuration, names and CM tags are lost on every power cycle" — **that part is wrong**, and the
+    distinction matters because it changes the fix from days of work to minutes:
+
+    - `Valve_Meta_DB` holds **443 compiled start values** — every name, location and CM number.
+    - `Valve_Channels_DB` holds **535** — all 534 channel assignments.
+    - `NonRetain` means "revert to the start value", and here the start value *is* the correct
+      data. **All of that survives a blackout intact.** Nothing is lost.
+
+    What actually resets is one flag. `Valves_DB` has **zero** start values, so
+    `Valve[i].Configured` comes back FALSE for all 89. `FC_IoMapper` skips unconfigured valves and
+    `FB_ValveLoop` will not accept a command for one, so after any 24 V blip the panel shows 89
+    valves reading UNCONF and **no valve on the ship answers the panel** until someone notices and
+    presses CONFIGURE ALL.
+
+    There is no auto-configure and no first-scan init — verified, `Configured` is only ever read in
+    `FB_ValveLoop`, never written. The HMI is the only thing that writes it.
+
+    **Fix:** give `Valve[i].Configured` a start value of `TRUE` for all 89 in the `Valves_DB` import.
+    A data change, no code, no logic. Then a power cycle brings the plant back with every valve live.
+
+    **The one judgement call:** an engineer who deliberately takes a valve out of service will find
+    it back in service after the next blackout. That is the right default for ballast — "all valves
+    work" beats "no valves work" — but it should be a decision somebody made, not a side effect.
+    If out-of-service needs to persist, `Configured` has to be `Retain` instead, and then item 35(f)
+    should match it so the two behave the same way.
+
+    **Verification:** stop and restart the CPU, and confirm the Config screen shows 89 configured
+    without anyone touching it.
 
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
