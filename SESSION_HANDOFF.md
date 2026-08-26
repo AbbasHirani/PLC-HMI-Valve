@@ -956,12 +956,12 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
        numeric input fields — the buffer-tag pattern from the removed Name/Location fields is the
        method, and it is written up in the project memory. Authorization `Operate` at minimum;
        consider restricting to a commissioning role.
-    f. **Decide what survives a power cycle.** A value typed at the panel writes to the DB, and
-       `Valve_Channels_DB` is `NonRetain` — so it reverts to its compiled start value on the next
-       blackout, silently. Either mark the two new arrays `Retain`, or accept that panel entries
-       are provisional and must be written back into the project start values before handover.
-       **Whichever is chosen, write it down here** — a commissioning engineer who tunes 89 valves
-       and loses the lot to a power cut will not guess which behaviour was intended. See item 36.
+    f. **Mark both arrays `Retain`** — settled 2026-08-27 with item 36, which took the same decision
+       for `Valve[i].Configured` and explains the reasoning. A time typed at the panel is exactly the
+       kind of data that is meaningless if it silently reverts: `Valve_Channels_DB` is `NonRetain`
+       today, so without this an afternoon of stopwatch work disappears at the next blackout with no
+       message. Keep the generous start values from (b) as the floor for a memory reset or CPU swap —
+       a valve falling back to a 60 s timeout is safe, one falling back to `T#0S` is not.
 
     **Verification:** set one valve to `T#3S` travel, command it, confirm Fail-to-Open raises at 3 s
     and not 8. Set another to `T#90S` and confirm it does not trip early. Then confirm both survive
@@ -971,7 +971,7 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     engineer times each valve with a stopwatch and types the numbers in. That is true even if the
     client never answers Job A, which is the whole point of doing it this way.
 
-36. **[pending — BLOCKER for install. Ten-minute fix, found 2026-08-27.]**
+36. **[pending — BLOCKER for install. Found and decided 2026-08-27.]**
     **Every valve comes up UNCONFIGURED after a power cycle, so nothing responds until somebody
     presses CONFIGURE ALL.**
 
@@ -993,17 +993,44 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     There is no auto-configure and no first-scan init — verified, `Configured` is only ever read in
     `FB_ValveLoop`, never written. The HMI is the only thing that writes it.
 
-    **Fix:** give `Valve[i].Configured` a start value of `TRUE` for all 89 in the `Valves_DB` import.
-    A data change, no code, no logic. Then a power cycle brings the plant back with every valve live.
+    **Fix, decided 2026-08-27 — three parts, all of them needed:**
 
-    **The one judgement call:** an engineer who deliberately takes a valve out of service will find
-    it back in service after the next blackout. That is the right default for ballast — "all valves
-    work" beats "no valves work" — but it should be a decision somebody made, not a side effect.
-    If out-of-service needs to persist, `Configured` has to be `Retain` instead, and then item 35(f)
-    should match it so the two behave the same way.
+    a. **Mark `Valve[i].Configured` as `Retain`.** This is the actual fix. Retentive memory survives
+       a power cut, so the plant comes back exactly as it was left — including valves deliberately
+       taken out of service. The 1214C has ~10 KB of retentive memory and 89 Bools is 12 bytes, so
+       capacity is not a consideration.
 
-    **Verification:** stop and restart the CPU, and confirm the Config screen shows 89 configured
-    without anyone touching it.
+    b. **Leave the start value FALSE.** Retain is wiped by a memory reset, a `Valves_DB` structure
+       download, or a CPU swap, and the start value is what the CPU lands on afterwards. TRUE was
+       considered and rejected: **all three of those situations have an engineer standing at the
+       cabinet**, so "the plant re-enables itself" buys one saved button press, while FALSE holds the
+       line that 89 valves do not arm themselves because somebody swapped a CPU. Retain already
+       covers the blackout, which is the case that happens with nobody there.
+
+    c. **Make "nothing is configured" visible on the panel.** (b)'s failure mode is silent — after an
+       MRES the screen looks entirely normal: no alarm, no message, just 89 grey boxes. Anyone who
+       does not already know the system reads that as a broken panel. Add a banner on Home, shown
+       when `Valves_DB.TotalConfigured = 0`:
+
+       > **NO VALVES CONFIGURED — system not commissioned. Go to CONFIG.**
+
+       `TotalConfigured` is already computed every scan by `FB_ValveLoop` and already has an HMI tag,
+       so this is a rectangle and a value-mapped colour on Home — the same pattern as the
+       station-offline banner on the zone screens. No PLC change.
+
+    **Do not skip (c).** Parts (a) and (b) are the engineering decision; (c) is what stops that
+    decision becoming a trap for whoever is on board at the time.
+
+    **Item 35(f) must match this.** The per-valve travel times are the same class of data — set at
+    the panel, meaningless if lost — so they get `Retain` for the same reason. Note the interaction:
+    while the program is still changing during commissioning, every structure download wipes retain
+    and both the flags and the tuned times reset. That is expected, it settles once downloads stop,
+    and anyone tuning valves needs to be told so they do not lose an afternoon's stopwatch work
+    without understanding why.
+
+    **Verification:** configure some valves, disable one deliberately, power-cycle the CPU, and
+    confirm the exact pattern comes back — including the disabled one still disabled. Then memory-
+    reset the CPU and confirm all 89 read UNCONF *and the Home banner appears*.
 
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
