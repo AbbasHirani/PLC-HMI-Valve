@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V20" />
+  <DocumentInfo>
+    <Created>2026-08-26T00:00:00.0000000Z</Created>
+    <ExportSetting>WithDefaults</ExportSetting>
+    <InstalledProducts>
+      <Product>
+        <DisplayName>Totally Integrated Automation Portal</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>TIA Portal Openness</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>STEP 7 Professional</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+    </InstalledProducts>
+  </DocumentInfo>
+  <SW.Blocks.OB ID="0">
+    <AttributeList>
+      <HeaderAuthor />
+      <HeaderFamily />
+      <HeaderName />
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input">
+    <Member Name="LADDR" Datatype="HW_DEVICE" Accessibility="Public" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Hardware identifier</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Event_Class" Datatype="Byte" Accessibility="Public" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Event class</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Fault_ID" Datatype="Byte" Accessibility="Public" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Fault identifier</MultiLanguageText>
+      </Comment>
+    </Member>
+  </Section>
+  <Section Name="Temp">
+    <Member Name="lost" Datatype="Bool" />
+    <Member Name="id" Datatype="UInt" />
+  </Section>
+  <Section Name="Constant" />
+</Sections></Interface>
+      <IsIECCheckEnabled>false</IsIECCheckEnabled>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>RackOrStationFailure</Name>
+      <Namespace />
+      <Number>86</Number>
+      <ProgrammingLanguage>SCL</ProgrammingLanguage>
+      <SecondaryType>RackOrStationFailure</SecondaryType>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>Called by the CPU when a PROFINET IO device drops off the network, and again when it comes back. Writes station health into Diag_DB. Two reasons this block exists. The first is that nothing else notices: before it, an ET200SP could lose power and the valves on it would simply stop answering while the HMI carried on showing their last known positions as live. The second is that on some SIMATIC CPUs an unhandled station-failure event puts the whole CPU into STOP - one station taking the entire system down. Whether the 1214C does that is not documented in what was checked, so the block is present on the safe side regardless.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v4">
+  <Text UId="1">
+    // The same OB fires for a station leaving and for it returning. Event_Class is what tells
+    // them apart, and getting this backwards would set the fault flag on recovery and clear it
+    // on failure - a system that reports healthy precisely when it is not:
+    //     16#39  incoming event - the station has just failed
+    //     16#38  outgoing event - the station has come back
+    #lost := (#Event_Class = B#16#39);
+    #id := #LADDR;
+
+    // Identifiers live in Diag_DB rather than as literals here, so re-adding a station in TIA -
+    // which reassigns them - is a data change instead of an SCL edit and a redownload.
+    IF #id = &quot;Diag_DB&quot;.Laddr_AFT THEN
+        &quot;Diag_DB&quot;.AftLost := #lost;
+        IF #lost THEN
+            &quot;Diag_DB&quot;.AftLossCount := &quot;Diag_DB&quot;.AftLossCount + 1;
+        END_IF;
+
+    ELSIF #id = &quot;Diag_DB&quot;.Laddr_MID THEN
+        &quot;Diag_DB&quot;.MidLost := #lost;
+        IF #lost THEN
+            &quot;Diag_DB&quot;.MidLossCount := &quot;Diag_DB&quot;.MidLossCount + 1;
+        END_IF;
+
+    ELSIF #id = &quot;Diag_DB&quot;.Laddr_FWD THEN
+        &quot;Diag_DB&quot;.FwdLost := #lost;
+        IF #lost THEN
+            &quot;Diag_DB&quot;.FwdLossCount := &quot;Diag_DB&quot;.FwdLossCount + 1;
+        END_IF;
+
+    ELSE
+        // An identifier matching none of the three. Recorded rather than dropped: it means either
+        // the identifiers were reassigned and Diag_DB was not updated, or a device is on the
+        // network that this block does not know about. Silently ignoring it would hide a real
+        // station failure, which is the exact failure this block was written to prevent.
+        &quot;Diag_DB&quot;.UnknownLost := #lost;
+        &quot;Diag_DB&quot;.LastUnknownLaddr := #id;
+    END_IF;
+
+    // One bit for the HMI to watch instead of ORing four.
+    &quot;Diag_DB&quot;.AnyStationLost := &quot;Diag_DB&quot;.AftLost
+                              OR &quot;Diag_DB&quot;.MidLost
+                              OR &quot;Diag_DB&quot;.FwdLost
+                              OR &quot;Diag_DB&quot;.UnknownLost;
+  </Text>
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Station failure and return</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+    </ObjectList>
+  </SW.Blocks.OB>
+</Document>

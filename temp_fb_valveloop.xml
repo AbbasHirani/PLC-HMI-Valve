@@ -183,6 +183,22 @@
         END_FOR;
     END_IF;
 
+    // Remote I/O station health, from OB86 (RackOrStationFailure) via Diag_DB. HwHealthy[2..4]
+    // are already wired to the System_Aft/Bilge/Fwd_RIO_Fault alarms through HwWord bits 1..3 -
+    // those alarms have existed since the alarm set was generated and nothing has ever set them,
+    // so a station could drop off PROFINET and the alarm built for exactly that stayed silent.
+    //
+    // Derived here every scan rather than written directly by OB86, because of the auto-init
+    // immediately above: it fires whenever HwHealthy[1] and [8] are both FALSE, which is the
+    // state at CPU startup. A station already down when the CPU starts would have OB86 set its
+    // bit and then have that init wipe it in the same scan. Diag_DB is written by OB86 alone and
+    // read here, so the ordering cannot lose a genuine station loss.
+    //
+    // Sense is inverted: HwHealthy TRUE means well, and HwWord sets its bit on NOT HwHealthy.
+    &quot;Valves_DB&quot;.HwHealthy[2] := NOT &quot;Diag_DB&quot;.AftLost;
+    &quot;Valves_DB&quot;.HwHealthy[3] := NOT &quot;Diag_DB&quot;.MidLost;
+    &quot;Valves_DB&quot;.HwHealthy[4] := NOT &quot;Diag_DB&quot;.FwdLost;
+
     FOR #i := 1 TO 89 DO
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
             // Snapshot BEFORE this scan's command/timer processing runs — needed by the

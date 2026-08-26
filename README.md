@@ -362,6 +362,86 @@ startup entries. Treat it as a first-boot check on the panel: if real events
 show real text there, it was simulation all along. If they do not, the compile
 warning about the PLC language configuration is the next thread to pull.
 
+### Station failure detection (OB 86)
+
+Until this existed, an ET200SP could lose power and nothing in the system
+noticed. The valves on it stopped answering, and **the HMI carried on showing
+their last known positions as though they were live.** Stale data presented as
+current is the real hazard here, more than the loss of control - an operator
+plans a ballast transfer on positions that stopped being true ten minutes ago.
+
+The chain, end to end:
+
+```
+ET200SP_AFT loses power
+   -> CPU calls OB86        LADDR=273, Event_Class=16#39
+   -> Diag_DB.AftLost := TRUE, AftLossCount +1
+   -> FB_ValveLoop          HwHealthy[2] := NOT AftLost
+   -> Valves_DB.HwWord      bit 1
+   -> HMI tag Valves_DB_HwWord, 1 s poll
+   -> "Aft Ballast RIO station failure." on the ALARMS screen
+```
+
+and the reverse on `Event_Class = 16#38`, when the station returns.
+
+| Station | Hardware id | Diag_DB flag | HwHealthy | HwWord bit | Alarm |
+|---|---|---|---|---|---|
+| ET200SP_AFT | 273 | `AftLost` | `[2]` | 1 | System_Aft_RIO_Fault |
+| ET200SP_MID | 288 | `MidLost` | `[3]` | 2 | System_Bilge_RIO_Fault |
+| ET200SP_FWD | 306 | `FwdLost` | `[4]` | 3 | System_Fwd_RIO_Fault |
+
+**The three alarms already existed.** They were generated with the rest of the
+alarm set, correctly worded, and nothing had ever set their bits - an alarm
+built for exactly this, waiting on a value nobody wrote. This connects them
+rather than adding parallel ones.
+
+#### Why the hardware identifiers are data, not code
+
+`Diag_DB.Laddr_AFT/MID/FWD` hold 273/288/306. Re-adding a station in TIA
+reassigns these, and as literals in SCL that would be a code edit and a
+redownload; as DB values it is a data change. The current values are readable
+off the **SYSTEM DIAGNOSTICS** screen - every device tile shows its identifier
+beneath the name, which is where these came from in the first place.
+
+If a station fails whose identifier matches none of the three, `UnknownLost`
+and `LastUnknownLaddr` record it rather than dropping it. That means either the
+identifiers moved and Diag_DB was not updated, or a device is on the network
+this block does not know about. Silently ignoring it would hide a real station
+failure, which is the exact thing the block exists to prevent.
+
+#### Why FB_ValveLoop derives HwHealthy instead of OB86 writing it
+
+OB86 could write `HwHealthy` directly and save a hop. It must not, because
+FB_ValveLoop carries this, every scan:
+
+```scl
+IF NOT "Valves_DB".HwHealthy[1] AND NOT "Valves_DB".HwHealthy[8] THEN
+    FOR #b := 1 TO 9 DO "Valves_DB".HwHealthy[#b] := TRUE; END_FOR;
+END_IF;
+```
+
+That condition is the state at CPU startup. A station **already down when the
+CPU starts** would have OB86 set its bit and then have this init wipe it in the
+same scan - the one case that matters most reporting healthy. Deriving
+`HwHealthy[2..4]` from Diag_DB after the guard makes the ordering unable to
+lose a genuine loss. Diag_DB is written by OB86 alone and read everywhere else.
+
+Note the inverted sense: `HwHealthy` TRUE means well, and `HwWord` sets its bit
+on `NOT HwHealthy`. Backwards here would mean a system that reports healthy
+precisely when it is not.
+
+#### Not testable in simulation
+
+There is no station to unplug. It compiles and downloads; whether it fires is a
+pull-the-ethernet-cable check on the panel. What can be said is that every
+value it matches against was read off the hardware rather than assumed, and the
+event-class meanings (16#39 incoming, 16#38 outgoing) are Siemens' convention
+rather than recollection.
+
+The loss counters are worth watching at commissioning: a station cleanly down
+reads 1, one flapping on a loose connector in a vibrating engine room climbs,
+and the status bit alone cannot tell those apart.
+
 ### Not testable in simulation
 
 There are no stations to unplug. The screen compiles, downloads and draws, but
@@ -392,6 +472,5 @@ here is only that the button navigates, the tabs switch, and the layout holds.
   192.168.0.20). Delete it, and confirm which address the real panel uses
 - **The diagnostic buffer shows `##Text missing##`** — not access, not
   language; see [System diagnostics](#system-diagnostics)
-- **OB 86 not present** on the PLC, so station failures are not handled
 - Whether the system diagnostics matrix populates usefully on an S7-1200 —
   panel-only question
