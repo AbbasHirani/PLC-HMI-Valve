@@ -1032,6 +1032,116 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     confirm the exact pattern comes back — including the disabled one still disabled. Then memory-
     reset the CPU and confirm all 89 read UNCONF *and the Home banner appears*.
 
+37. **[pending — six of the nine system alarms can never fire. Found 2026-08-27.]**
+    **`HwWord` has 9 alarms defined and 3 driven. The other six are wired to bits nothing writes.**
+
+    `FB_ValveLoop` packs `HwHealthy[1..9]` into `HwWord` bits 0..8 (~line 743-750) and the HMI binds
+    one system alarm to each bit (`GenerateHmiLayout.cs` ~1769-1777). Only `HwHealthy[2..4]` are ever
+    written — by the OB86-derived station logic at ~line 197-199. Nothing in the project writes the
+    other six, so those alarms are permanently unilluminable:
+
+    | Bit | `HwHealthy[]` | Alarm | Driven by |
+    |---|---|---|---|
+    | 0 | [1] | PLC CPU fault | **nothing** |
+    | 1 | [2] | Aft RIO station failure | OB86 ✅ |
+    | 2 | [3] | Bilge/ER RIO station failure | OB86 ✅ |
+    | 3 | [4] | Fwd RIO station failure | OB86 ✅ |
+    | 4 | [5] | I/O module fault | **nothing** |
+    | 5 | [6] | Power / UPS fault | **nothing** |
+    | 6 | [7] | Network loss | **nothing** |
+    | 7 | [8] | HMI heartbeat loss | **nothing** |
+    | 8 | [9] | System general fault | **nothing** |
+
+    **Why this is worse than having no alarm.** A missing alarm is an absence; a dead alarm is a
+    false statement. An operator who sees Power/UPS Fault sitting inactive concludes the supply is
+    healthy. The panel claims to be watching six things it is not watching.
+
+    ---
+
+    **⚠ READ THIS BEFORE DRIVING ANY OF THEM — the startup init will silently wipe the lot.**
+
+    `FB_ValveLoop` ~line 178-183:
+
+    ```
+    IF NOT "Valves_DB".HwHealthy[1] AND NOT "Valves_DB".HwHealthy[8] THEN
+        FOR #b := 1 TO 9 DO "Valves_DB".HwHealthy[#b] := TRUE; END_FOR;
+    END_IF;
+    ```
+
+    It uses `HwHealthy[1]` and `[8]` as a sentinel for "this is a fresh start, nothing has been set
+    yet". Those are **bit 0 (CPU fault) and bit 7 (HMI heartbeat)** — precisely two of the six this
+    item is about. Drive them and the sentinel becomes reachable in normal operation: the moment a
+    CPU fault and a heartbeat loss are both active, all nine bits reset to healthy, taking the three
+    *working* station alarms with them. And it is not an unlikely pair — a panel powered down
+    overnight holds heartbeat-lost on its own, so it only takes one CPU diagnostic alongside it.
+
+    The station bits already dodge this by being re-derived from `Diag_DB` every scan (~line 190-194
+    explains why). That workaround does not extend to [1] and [8], because they *are* the sentinel.
+
+    **Prerequisite fix — do this first, on its own:** replace the sentinel with an explicit one-shot.
+    Add `HwInitDone` (Bool) to `Valves_DB`, leave it `NonRetain` with no start value so it is FALSE
+    on every CPU start, and gate the init on it:
+
+    ```
+    IF NOT "Valves_DB".HwInitDone THEN
+        FOR #b := 1 TO 9 DO "Valves_DB".HwHealthy[#b] := TRUE; END_FOR;
+        "Valves_DB".HwInitDone := TRUE;
+    END_IF;
+    ```
+
+    Runs exactly once per start, means what it says, and cannot be re-entered by live fault data.
+    Keep it `NonRetain` even after item 36 makes `Configured` retentive — this one *should* reset on
+    every restart, that is its whole job.
+
+    ---
+
+    **Then, per alarm — drive it or delete it. Defined-but-dead is the one option that is not honest.**
+
+    a. **Bit 7, HMI heartbeat — BUILD. Highest value of the six.** Today the PLC has no idea whether
+       the panel is alive: if the MTP1500 dies, the PLC holds every valve output where it was and
+       nothing annunciates. The crew's only window onto 89 ballast valves goes dark in silence.
+       Design: HMI increments a counter tag; `FB_ValveLoop` keeps `PrevHeartbeat` and a TON, and
+       clears `HwHealthy[8]` if the value has not changed for ~5 s.
+       **Open question that must be settled first:** what runs the HMI-side write. A screen script
+       only executes while that screen is displayed — the localhost beep at `GenerateHmiLayout.cs:774`
+       is the cautionary example, an annunciator that only sounds when you are already looking at the
+       alarm list. A heartbeat with that flaw is worse than none, because it would report
+       the panel dead whenever an operator opened a popup. Verify whether WinCC Unified Scheduled
+       Tasks are reachable through Openness and run independently of the displayed screen **before**
+       designing the PLC side around it.
+
+    b. **Bit 4, I/O module fault — BUILD, via OB82.** OB86 catches a whole station dropping off
+       PROFINET. OB82 (diagnostic error) catches a single module failing *inside* a station that is
+       otherwise healthy — a DI card dies, its 16 channels go dead, the station keeps talking. Today
+       that produces four valves reporting Unhealthy and Loss-of-Position with nothing saying why:
+       the operator sees four broken valves instead of one broken card.
+       Same route as OB86: Openness cannot create OBs, so create it in the TIA UI and import the
+       body. Check the S7-1200 OB82 interface before writing SCL rather than assuming — that was the
+       lesson from OB86.
+       **Prerequisite:** module diagnostics are currently OFF (`DiagnosticsWireBreak = False`,
+       `DiagnosticsNoSupplyVoltage = False` — item 14). OB82 fires on diagnostics the module reports,
+       so with all of them disabled it may never fire at all. Enabling them is part of this job, not
+       separate from it.
+
+    c. **Bit 5, Power/UPS — BLOCKED ON THE CLIENT.** Needs a volt-free contact from a real UPS wired
+       to a spare DI. Two things to establish: **is there a UPS at all** (nothing in the project says
+       so), and if yes, does it have an alarm contact. Practical note — there are free DI channels for
+       it: 109-112 on AFT, 221-224 on MID, 365-368 on FWD (item 35's channel audit). If the answer is
+       "no UPS", delete the alarm.
+
+    d. **Bits 0, 6, 8 — DELETE.** PLC CPU fault, Network loss, System general fault. Nothing credible
+       will ever drive them and each is already covered: a CPU that faults is not running this code
+       at all; network loss to a station is bits 1-3 and network loss to the panel is bit 7; and
+       "general fault" adds nothing over the Home screen's active-alarm count, which is already live.
+       Deleting three drops the alarm total from 632 to 629.
+       Note bit 0 is `HwHealthy[1]` — deleting the alarm does not by itself remove the sentinel
+       problem above. Do the prerequisite fix regardless.
+
+    **Verification:** force each surviving bit in `Valves_DB.HwHealthy[]` from the watch table and
+    confirm the matching alarm raises and clears on the ALARMS screen. Then force `HwHealthy[1]` and
+    `[8]` FALSE together and confirm the other seven **stay** where they were — that is the regression
+    test for the sentinel fix, and it fails today.
+
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
 first if it hasn't already read it. The immediate next actions in priority order are items 4 and 1 in
