@@ -403,8 +403,30 @@ namespace ValveDemoHmiBuilder
             } else Console.WriteLine("  Skipping Screen_Login (not in --only)...");
 
             Console.WriteLine("\n=== Complete! ===");
+
+            // Save. This was missing until 2026-08-27 and it cost an 80-minute build: the zone
+            // screens were rebuilt at 03:31-04:53, TIA crashed later that morning, and because
+            // nothing here ever called Save the entire run existed only in TIA's memory. The
+            // project reopened at its last MANUAL save (02:27) with the work gone.
+            //
+            // Every build this project has ever done carried that exposure - Home and the nav bar
+            // survive today only because somebody happened to press save in the UI afterwards.
+            // A builder that spends an hour writing to a project it never persists is a builder
+            // that loses an hour to any crash, and TIA has crashed repeatedly during this work.
+            //
+            // Deliberately last, after every --only branch and patch, so it covers all of them.
+            // Failure is reported loudly rather than swallowed: a silent save failure would put us
+            // straight back to believing work is on disk when it is not.
+            try {
+                Console.WriteLine("Saving project...");
+                project.Save();
+                Console.WriteLine("[SAVE] Project saved.");
+            } catch (Exception ex) {
+                Console.WriteLine("[SAVE ERR] PROJECT WAS NOT SAVED - " + Root(ex));
+                Console.WriteLine("[SAVE ERR] Save manually in TIA before closing, or this run is lost.");
+            }
             Console.WriteLine("Screens: Screen_Home, Screen_Popup, Screen_Alarms, Screen_Bilge, Screen_FwdBallast, Screen_AftBallast, Screen_Diagnostics, Screen_SysDiag, Screen_Login (AUDIT LOG)");
-            Console.WriteLine("All 7 nav bar buttons now target real screens; Screen_SysDiag is reached from CONFIG.");
+            Console.WriteLine("All 8 nav bar buttons target real screens, DIAGNOSTICS included.");
             Console.WriteLine("\nPress Enter to exit...");
         }
 
@@ -503,8 +525,8 @@ namespace ValveDemoHmiBuilder
         // most of an hour to draw.
         static void PatchStripLegend(HmiSoftware hmi)
         {
-            Console.WriteLine("
-[StripLegend] Removing zone colour-legend strips...");
+            Console.WriteLine();
+            Console.WriteLine("[StripLegend] Removing zone colour-legend strips...");
             int screens = 0, total = 0;
             foreach (var sc in hmi.Screens) {
                 // Collect first, delete after: mutating ScreenItems while enumerating it is what
