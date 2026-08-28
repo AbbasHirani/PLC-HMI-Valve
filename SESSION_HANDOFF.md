@@ -141,7 +141,18 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
    arguably better for reliability on a vessel), FAT bench test before anything goes near the ship.
 10. **[done 2026-08-13]** `PLC Address`/`Terminal` translation delivered — see item 5's Excel.
 
-11. **[pending — HIGH PRIORITY, safety-relevant]** **ET200SP station-failure detection does not exist.**
+11. **[done 2026-08-27]** **ET200SP station-failure detection built and verified live.** OB 86
+    (`RackOrStationFailure`) was created in the TIA UI and its body imported; it writes `Diag_DB`,
+    which `FB_ValveLoop` reads into `HwHealthy[2..4]` (derived there rather than written by OB86,
+    so the startup init cannot wipe a station that was already down at power-up). `FC_IoMapper`
+    freezes last-known feedbacks for a lost station instead of copying zeros.
+    **Verified live 2026-08-27** from a watch table: forcing `Diag_DB.AftLost` TRUE drove
+    `HwHealthy[2]` FALSE and `HwWord` `16#0000` -> `16#0002` (bit 1 = `System_Aft_RIO_Fault`), the
+    Home mimic tinted the AFT zone and its REMOTE I/O dot went red, and `Screen_AftBallast` showed
+    the station-offline banner while BILGE/ER stayed clean. Clearing the force removed all of it.
+    The original analysis follows.
+
+    ~~ET200SP station-failure detection does not exist.~~
     Found 2026-08-15 while checking whether PLCSIM could simulate ET200SP diagnostics (it can't —
     PLCSIM simulates the CPU process image including distributed-I/O addresses, which is why forcing
     `%I2.0`/`%I12.0` correctly drove real valve logic, but it does not simulate PROFINET-level events
@@ -557,7 +568,11 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     property (the align argument is silently dropped, text is always centred) and its text property
     is `Text`, not `ProcessValue`. For left-aligned live text use `MakeTb` and bind `Text`.
 
-26. **[pending — PERFORMANCE, do before install]** **Gate the paged table-window rebuild.**
+26. **[done]** **Paged table-window rebuild is gated.** `FB_ValveLoop` runs a 200 ms `WinTmr` and
+    latches `#winTick`; the four table loops run behind `#doWindows := #winTick` rather than every
+    scan. Confirmed in the live block 2026-08-27. The analysis that justified it follows.
+
+    ~~Gate the paged table-window rebuild.~~
     Found in the 2026-08-18 performance audit; **the single biggest contributor to PLC scan time,
     and it is doing work nobody can read.** `FB_ValveLoop`'s four table-window loops (Aft 14, Er 14,
     Fwd 14, Cfg 16 = 58 slots) copy roughly **350 STRINGS every scan** — `TblTag`, `TblName`,
@@ -605,7 +620,20 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     items 15 and 20). **Any future change that introduces a per-valve script, or a `T500ms` trigger,
     is a regression** — the popup was measurably slow with only ~14 polled scripts before item 15.
 
-31. **[pending — UNKNOWN CODE RUNNING EVERY SCAN, read before install]** **Three legacy blocks
+31. **[done 2026-08-21 — commit `55f7cd6`]** **The three legacy blocks were read, and removed.**
+    `FB_HMI_MIirror` was not merely dead weight: it ran at network 4, *after* `FB_ValveLoop`, and
+    forced `Valve[1].OpenCmd := FALSE` every scan from an `HMI_Interface_DB` nothing writes - so a
+    CM25 command arriving between networks 3 and 4 was wiped with no alarm and no trace.
+    `FB_ValveControl` and `FB_PlantSimulation` were wired to loose GlobalVariable tags and did
+    nothing for the 89-valve system. All three networks removed; OB1 re-exported afterwards to
+    confirm the live block is down to `FB_ValveLoop`, `FC_PhysicalIoCopy`, `FC_IoMapper`.
+
+    **This entry stayed marked pending for six days after the fix, and it cost real time:** an
+    external audit on 2026-08-27 read it, believed three unknown blocks were still executing every
+    scan, and reported it as a live finding. Stale "pending" is worse than no entry - it sends
+    people to hunt a problem that is gone while the real ones wait. The original analysis follows.
+
+    ~~Three legacy blocks
     execute in `Main [OB1]` and nobody has read them.** Found 2026-08-18 by exporting the live OB1 to
     confirm scan order. Actual order is:
 
@@ -720,7 +748,11 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
       gap, NOT read off the P&ID. If it is in scope the pool needs a 90th slot. Same family as the
       seven other drawn-but-unscheduled valves in item 3.
 
-33. **[pending — DO THIS WITH OR BEFORE ITEM 24]** **The direction/limit fault has no alarm.**
+33. **[done]** **The direction/limit fault has an alarm.** `GenerateHmiLayout.cs:1883` creates
+    `V###_DirFault` in class `ValveWarning`, bound to `W_DirFault_<w>` bit `(i-1)%16` - the packing
+    `FB_ValveLoop` was already doing. Confirmed 2026-08-27. The analysis follows.
+
+    ~~The direction/limit fault has no alarm.~~
     Verified 2026-08-19: `CreateAlarms` generates **7** alarms per valve (Unhealthy, DoubleInd,
     FailOpen, FailClose, LossPos, UnexpMove, Local) — 632 = 89 x 7 + 9. `W_DirFault` is packed by
     `FB_ValveLoop` every scan but is referenced **zero** times in the alarm generator, so a direction
