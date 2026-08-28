@@ -176,11 +176,26 @@
         &quot;Valves_DB&quot;.WinTmr(IN := FALSE, PT := T#200MS);
     END_IF;
 
-    // Auto-initialize hardware health to TRUE (healthy until told otherwise) if all are FALSE at startup
-    IF NOT &quot;Valves_DB&quot;.HwHealthy[1] AND NOT &quot;Valves_DB&quot;.HwHealthy[8] THEN
+    // Hardware health starts healthy-until-told-otherwise, once per CPU start.
+    //
+    // This used to test &quot;HwHealthy[1] AND [8] are both FALSE&quot; as a stand-in for &quot;nothing has been
+    // set yet&quot;. That worked only while nothing drove those two bits - and they are bit 0 (PLC CPU
+    // fault) and bit 7 (HMI heartbeat loss), both of which are due to be driven. The moment they
+    // are, the sentinel becomes reachable in normal operation: one CPU fault alongside a lost
+    // heartbeat would re-run this loop and reset all nine bits to healthy, silently taking the
+    // three WORKING station alarms with it. Not a far-fetched pair either - a panel powered down
+    // overnight holds heartbeat-lost on its own, so it needs only one CPU diagnostic beside it.
+    //
+    // HwInitDone says what is actually meant. It is NonRetain with no start value, so it is FALSE
+    // on every CPU start and TRUE for the rest of that run - which is the real definition of
+    // &quot;first scan&quot;, and cannot be re-entered by live fault data no matter what drives the bits.
+    // Keep it NonRetain even as other Valves_DB members become retentive: resetting on every
+    // restart is the whole point of it.
+    IF NOT &quot;Valves_DB&quot;.HwInitDone THEN
         FOR #b := 1 TO 9 DO
             &quot;Valves_DB&quot;.HwHealthy[#b] := TRUE;
         END_FOR;
+        &quot;Valves_DB&quot;.HwInitDone := TRUE;
     END_IF;
 
     // Remote I/O station health, from OB86 (RackOrStationFailure) via Diag_DB. HwHealthy[2..4]

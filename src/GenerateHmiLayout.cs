@@ -282,6 +282,11 @@ namespace ValveDemoHmiBuilder
 
             if (importOnly) {
                 Console.WriteLine("\n=== Import-only complete! (PLC blocks re-imported, no HMI changes) ===");
+                // Save here too. The save at the end of this method covers the normal path, but
+                // this branch returns before reaching it - so --import-only was still leaving
+                // finished work in TIA's memory only, which is exactly the failure that lost an
+                // 80-minute screen build on 2026-08-27. An early return is where that hides.
+                SaveProject(project);
                 return;
             }
 
@@ -417,14 +422,7 @@ namespace ValveDemoHmiBuilder
             // Deliberately last, after every --only branch and patch, so it covers all of them.
             // Failure is reported loudly rather than swallowed: a silent save failure would put us
             // straight back to believing work is on disk when it is not.
-            try {
-                Console.WriteLine("Saving project...");
-                project.Save();
-                Console.WriteLine("[SAVE] Project saved.");
-            } catch (Exception ex) {
-                Console.WriteLine("[SAVE ERR] PROJECT WAS NOT SAVED - " + Root(ex));
-                Console.WriteLine("[SAVE ERR] Save manually in TIA before closing, or this run is lost.");
-            }
+            SaveProject(project);
             Console.WriteLine("Screens: Screen_Home, Screen_Popup, Screen_Alarms, Screen_Bilge, Screen_FwdBallast, Screen_AftBallast, Screen_Diagnostics, Screen_SysDiag, Screen_Login (AUDIT LOG)");
             Console.WriteLine("All 8 nav bar buttons target real screens, DIAGNOSTICS included.");
             Console.WriteLine("\nPress Enter to exit...");
@@ -479,6 +477,21 @@ namespace ValveDemoHmiBuilder
         //
         // Screens are found by looking for a Nav_0, so popups and any screen without a nav bar are
         // skipped without needing a list to keep in step.
+        // One save, called from every path that can finish work: the normal end of Run() and the
+        // --import-only early return. Failure is reported loudly rather than swallowed - a silent
+        // save failure would recreate the belief that just proved false, that work is on disk.
+        static void SaveProject(Project project)
+        {
+            try {
+                Console.WriteLine("Saving project...");
+                project.Save();
+                Console.WriteLine("[SAVE] Project saved.");
+            } catch (Exception ex) {
+                Console.WriteLine("[SAVE ERR] PROJECT WAS NOT SAVED - " + Root(ex));
+                Console.WriteLine("[SAVE ERR] Save manually in TIA before closing, or this run is lost.");
+            }
+        }
+
         static void PatchNav(HmiSoftware hmi)
         {
             Console.WriteLine("\n[Nav] Redrawing nav bars in place...");

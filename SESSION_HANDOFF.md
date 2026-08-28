@@ -1064,7 +1064,23 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     confirm the exact pattern comes back — including the disabled one still disabled. Then memory-
     reset the CPU and confirm all 89 read UNCONF *and the Home banner appears*.
 
-37. **[pending — six of the nine system alarms can never fire. Found 2026-08-27.]**
+37. **[prerequisite DONE 2026-08-28; the six alarms themselves still pending.]**
+
+    **The sentinel one-shot is in.** `HwInitDone` (Bool, NonRetain, no start value) added to
+    `Valves_DB`, and `FB_ValveLoop`'s startup init now gates on it instead of testing
+    `HwHealthy[1] AND [8]`. That test was a landmine: those two are bit 0 (CPU fault) and
+    bit 7 (HMI heartbeat), so driving them - which the rest of this item does - would have
+    made the sentinel reachable in normal running, and one CPU fault beside a lost heartbeat
+    would have reset all nine bits to healthy, taking the three working station alarms with
+    it. PLC compiles 0 errors / 0 warnings.
+
+    **Not yet verified on hardware:** force `HwHealthy[1]` and `[8]` FALSE together and
+    confirm the other seven stay put. That test failed before this change.
+
+    The rest of the item - heartbeat, OB82, Power/UPS with the client, delete bits 0/6/8 -
+    is unchanged and still pending. Original analysis follows.
+
+    ~~six of the nine system alarms can never fire~~
     **`HwWord` has 9 alarms defined and 3 driven. The other six are wired to bits nothing writes.**
 
     `FB_ValveLoop` packs `HwHealthy[1..9]` into `HwWord` bits 0..8 (~line 743-750) and the HMI binds
@@ -1377,8 +1393,42 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     address moved, the module went in at the wrong position — stop and reposition before touching
     `FC_PhysicalIoCopy`.
 
-41. **[pending — SECURITY. Both parts are pre-ship: one is a hardware-config change, the other
-    cannot be fixed from the panel afterwards. Verified 2026-08-27.]**
+41. **[mostly done 2026-08-28. Remaining: runtime language, and the download + HMI-connection
+    check, which needs real hardware.]**
+
+    **Done 2026-08-28:**
+    - **PLC set to `Read access` with a password.** Chosen over HMI-access and complete
+      protection: without the password TIA can still go online, read the program and use a
+      watch table, but cannot write - which blocks the actual threat (writing `Valves_DB` to
+      operate valves outside the audit trail) while leaving a service engineer able to
+      diagnose at 2am. Confirmed by the PLC compile going to **0 warnings**; the
+      "does not contain a configured protection level" warning is gone.
+    - **`HMI Administrator` role assigned to user `User`.** The role already carried the
+      User management right; it simply was not assigned to anybody, and the account held
+      only `HMI Operator`. HMI compile warnings 2 -> 1, the User-management one gone.
+
+    **Still open:**
+    - **Runtime language mismatch** - the last remaining HMI compile warning. Cheap, and
+      worth doing because `##Text missing##` on the panel is still unexplained.
+    - **Download the hardware configuration, then confirm the HMI still connects.** The
+      protection level is only live after a download, and this project runs on PLCSIM, which
+      does not enforce access protection the way real hardware does - so **a pass under
+      PLCSIM proves nothing.** This must happen on the real 1214C before shipping; it is the
+      single most likely way this change breaks something.
+    - **Web server and PUT/GET (connection mechanisms) states are still unread** - each is
+      another route into the CPU. Note the S7 protocol needs no Siemens software: Snap7 and
+      its Python binding are free and read or write a DB in a few lines, which is exactly
+      what the access level now blocks.
+    - **One shared account.** `User` is the only login, so the trail records actions against
+      a name several people use. Individual accounts are added on the same screen (Security
+      settings -> Users and roles) and are what make it attributable. `User` now also both
+      operates valves and administers users, which should eventually be split.
+
+    **Corrected while doing this:** SNMP is **inactive** on all three ET200SPs, so the
+    external audit's finding about default `public`/`private` community strings is moot -
+    the strings are default, the service is off. Original analysis follows.
+
+    ~~SECURITY. Both parts are pre-ship.~~
 
     **a. The PLC has no password, and direct writes bypass the audit trail.**
 

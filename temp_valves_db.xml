@@ -544,6 +544,13 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
+    <Member Name="HwInitDone" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <!-- Self-resetting 2 s tick driving Clock_Flash. -->
     <!-- Drives Clock_1Hz. Separate from FlashTmr because they run at different rates. -->
     <Member Name="Clk1Tmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
