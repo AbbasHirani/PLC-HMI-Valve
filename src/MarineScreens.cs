@@ -1183,6 +1183,46 @@ namespace ValveDemoHmiBuilder
             MakeTb(sc, "Home_TtlBlg", HOME_BLG_X + HOME_BLG_W - 160, HOME_BLG_Y + 14, 148, 34,
                    "BILGE", M_TRANS, M_TEXT, 0, "Right", 22, true);
 
+            // ── "NO VALVES CONFIGURED" banner ────────────────────────────────────────────
+            // Item 36(c). Retain (36a) covers a blackout, but a memory reset, a Valves_DB
+            // structure download and a CPU swap all wipe retentive memory, and the start value
+            // is FALSE for all 89 — deliberately, since an engineer is standing at the cabinet
+            // in every one of those three cases. The failure mode that decision creates is
+            // silent: the screen looks entirely normal, no alarm, just 89 grey boxes, and no
+            // valve on the ship answers the panel. Anyone who does not already know the system
+            // reads that as a broken panel rather than an unconfigured one.
+            //
+            // Same construction as the zone screens' station-offline banner: colour-mapped
+            // rather than Visible, transparent at every count except zero, one tag read.
+            // TotalConfigured is already computed every scan by FB_ValveLoop and already has an
+            // HMI tag, so there is no PLC change here.
+            //
+            // Centred over the ballast drawing rather than run as a strip along its top edge —
+            // the top edge already carries the "BALLAST" title, and a full-width bar there
+            // reads as a heading rather than as an alert. It only covers artwork in the state
+            // where the artwork is meaningless anyway.
+            //
+            // Created BEFORE the three zone touch areas on purpose. Those cover the whole
+            // ballast drawing and are created last by design; a transparent button does not
+            // hide what sits under it, so the banner still reads, and navigation keeps working
+            // rather than being swallowed by a rectangle laid over the top of it.
+            const int nvW = 1200, nvH = 96;
+            int nvX = HOME_BAL_X + (HOME_BAL_W - nvW) / 2;
+            int nvY = HOME_BAL_Y + (HOME_BAL_H - nvH) / 2;
+            var noCfgBar = MakeRect(sc, "Home_NoCfgBar", nvX, nvY, nvW, nvH, M_TRANS, M_TRANS, 0);
+            AddValueMap(DynTag(noCfgBar, "BackColor", "Valves_DB_TotalConfigured"),
+                        new int[] { 0 }, new object[] { M_RED });
+            var noCfgTtl = MakeTb(sc, "Home_NoCfgTtl", nvX, nvY + 12, nvW, 38,
+                                  "&#x26A0;  NO VALVES CONFIGURED &#x2014; SYSTEM NOT COMMISSIONED",
+                                  M_TRANS, M_TRANS, 0, "Center", 24, true);
+            AddValueMap(DynTag(noCfgTtl, "ForeColor", "Valves_DB_TotalConfigured"),
+                        new int[] { 0 }, new object[] { Color.White });
+            var noCfgSub = MakeTb(sc, "Home_NoCfgSub", nvX, nvY + 52, nvW, 32,
+                                  "No valve will answer a command. Go to CONFIG and press CONFIGURE ALL.",
+                                  M_TRANS, M_TRANS, 0, "Center", 17, false);
+            AddValueMap(DynTag(noCfgSub, "ForeColor", "Valves_DB_TotalConfigured"),
+                        new int[] { 0 }, new object[] { Color.White });
+
             // Created LAST so they sit above both the artwork and the status squares: a tap
             // anywhere in a half - including straight on a valve box - navigates to that zone.
             var hitAft = MakeZoneTouch(sc, "Home_HitAft", HOME_BAL_X, HOME_BAL_Y, HOME_SPLIT_AX, HOME_BAL_H, "Screen_AftBallast");

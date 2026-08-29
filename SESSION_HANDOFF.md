@@ -1029,7 +1029,8 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     engineer times each valve with a stopwatch and types the numbers in. That is true even if the
     client never answers Job A, which is the whole point of doing it this way.
 
-36. **[PLC half DONE and TESTED 2026-08-29. Remaining: the Home banner.]**
+36. **[BUILT 2026-08-30 — both halves. PLC half tested live 2026-08-29; the Home banner is
+    in the project and compiled but has NOT been seen on glass yet.]**
 
     **Built, but not the way this item originally said.** Retentivity on an optimized DB is set
     per top-level member, and `Configured` sits inside `Array[1..89] of "Valve_IO"` - so it
@@ -1043,9 +1044,44 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     `TotalConfigured` read **23 before a CPU stop/start and 23 after**, with `ConfiguredRet[21]`
     still FALSE. Before this change it would have returned 0 with every valve unconfigured.
 
-    **Still open:** the Home banner on `TotalConfigured = 0`, which covers what retain cannot -
-    a memory reset or CPU swap, where the start value FALSE is what the CPU lands on. HMI work.
-    Original analysis follows.
+    **Part (c) built 2026-08-30 — the Home banner.** `BuildScreenHome` in `MarineScreens.cs`
+    (~line 1209) now draws a 1200x96 bar centred on the ballast drawing, colour-mapped on
+    `Valves_DB_TotalConfigured`:
+
+    > ⚠  NO VALVES CONFIGURED — SYSTEM NOT COMMISSIONED
+    > No valve will answer a command. Go to CONFIG and press CONFIGURE ALL.
+
+    Four things worth knowing about how it is built, because each one was a decision:
+
+    - **Threshold is exactly 0, not "any valve unconfigured".** `TotalConfigured` counts inside
+      the `Configured` gate (`temp_fb_valveloop.xml:254` -> `:500` -> `:661`), so it is the count
+      of configured valves. Some valves unconfigured is a *normal, deliberate* state - a valve
+      taken out of service for maintenance - and a banner for that is noise. Zero is never
+      something anyone chose. It is also the right threshold for the failure mode: retain is
+      wiped wholesale by an MRES or a CPU swap, never one zone at a time.
+    - **Colour-mapped, not `Visible`.** Same construction as the zone screens' station-offline
+      banner. Transparent background AND transparent text at every count except zero, so it
+      costs one tag read and no script.
+    - **`AddValueMap` builds degenerate ranges** (`From = code; To = code;`,
+      `MarineScreens.cs:270`), so a single-entry map `{0}` really does mean only 0. This was
+      checked deliberately - the run logs `[AddValueMap] mapping entries created using: Range`
+      and "Range" could plausibly have meant 0..89 all map to red.
+    - **Created BEFORE the three zone touch areas, on purpose.** `Home_HitAft`/`HitFwd`/`HitBlg`
+      cover the whole ballast drawing and are created last by design, so they stay on top. A
+      transparent button hides nothing and blocks nothing - proven already on this same screen,
+      where the valve status squares are drawn before those buttons and a tap straight on a
+      valve box still navigates. The banner is therefore purely visual: **it does not affect the
+      clickable area.**
+
+    Built with `HmiBuilder.exe --only=Home`, project saved. First attempt failed to attach
+    (`EngineeringSecurityException: Security error / The operation has timed out`) - that is
+    TIA's Openness access prompt waiting for a human click, not a code fault; nothing was
+    written that run.
+
+    **Still to verify:** open Home in the runtime with valves configured and confirm the banner
+    is invisible and zone navigation still works, then force `TotalConfigured` to 0 (disable all
+    89, or watch it after a structure download) and confirm it appears. Original analysis
+    follows.
 
     ~~BLOCKER for install.~~
     **Every valve comes up UNCONFIGURED after a power cycle, so nothing responds until somebody
