@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Document>
   <Engineering version="V20" />
   <DocumentInfo>
-    <Created>2026-08-08T00:00:00.0000000Z</Created>
+    <Created>2026-08-29T09:13:25.674568Z</Created>
     <ExportSetting>WithDefaults</ExportSetting>
     <InstalledProducts>
       <Product>
@@ -30,10 +30,6 @@
         <DisplayVersion>V20</DisplayVersion>
       </Product>
       <Product>
-        <DisplayName>WinCC Professional</DisplayName>
-        <DisplayVersion>V20</DisplayVersion>
-      </Product>
-      <Product>
         <DisplayName>WinCC Unified</DisplayName>
         <DisplayVersion>V20</DisplayVersion>
       </Product>
@@ -53,6 +49,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>1</StartValue>
@@ -327,6 +324,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>2</StartValue>
@@ -601,6 +599,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>3</StartValue>
@@ -875,6 +874,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>4</StartValue>
@@ -1149,6 +1149,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>1</StartValue>
@@ -1423,6 +1424,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>2</StartValue>
@@ -1692,20 +1694,12 @@
         <StartValue>198</StartValue>
       </Subelement>
     </Member>
-    <!-- Full travel time allowance per valve, seat to seat. Was PT := T#8S compiled into
-         FB_ValveLoop, a number that dated from a 3s simulated stroke. Real DN200-DN400
-         hydraulic valves take 15-60s, and because the command is MAINTAINED, an expiring
-         timeout does not merely raise a nuisance alarm - it drops the run latch and
-         physically halts the valve part-open. Every valve, on every command.
-         Default is deliberately generous: a long timeout raises a late alarm, a short one
-         strands a ballast valve half open. Measure at commissioning and set per valve.
-         Retain so values typed at the panel survive a blackout; the start value is the
-         floor after a memory reset or CPU swap -->
     <Member Name="TravelTimeout" Datatype="Array[1..89] of Time" Remanence="Retain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>T#60s</StartValue>
@@ -1975,17 +1969,12 @@
         <StartValue>T#60s</StartValue>
       </Subelement>
     </Member>
-    <!-- How long a valve may still show its STARTING limit switch after the actuator drives.
-         Was PT := T#5S on DirTmr. That timer arms the instant a valve is commanded open
-         while still on its closed limit - which is exactly what every large valve does for
-         the first few seconds - so with a grace shorter than the real seat-break time,
-         every normal stroke raises a direction fault and drops both run latches. It fires
-         BEFORE the travel timeout, so it is the one that bites first -->
     <Member Name="SeatBreakGrace" Datatype="Array[1..89] of Time" Remanence="Retain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Subelement Path="1">
         <StartValue>T#10s</StartValue>
@@ -2255,7 +2244,7 @@
         <StartValue>T#10s</StartValue>
       </Subelement>
     </Member>
-    </Section>
+  </Section>
 </Sections></Interface>
       <IsOnlyStoredInLoadMemory>false</IsOnlyStoredInLoadMemory>
       <IsRetainMemResEnabled>false</IsRetainMemResEnabled>
@@ -2264,6 +2253,7 @@
       <MemoryReserve>100</MemoryReserve>
       <Name>Valve_Channels_DB</Name>
       <Namespace />
+      <Number>9</Number>
       <ProgrammingLanguage>DB</ProgrammingLanguage>
     </AttributeList>
     <ObjectList>

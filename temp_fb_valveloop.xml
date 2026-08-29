@@ -106,6 +106,8 @@
     <Member Name="packWord" Datatype="Word" />
     <Member Name="simStepAtStart" Datatype="Int" />
     <Member Name="sel" Datatype="Int" />
+        <Member Name="travelPT" Datatype="Time" />
+        <Member Name="seatPT" Datatype="Time" />
     <Member Name="winTick" Datatype="Bool" />
     <Member Name="doWindows" Datatype="Bool" />
   </Section>
@@ -232,6 +234,22 @@
         // Keep the retentive mirror in step with the live flag, so whatever an engineer sets on
         // the Config screen survives the next blackout. One Bool copy per valve per scan.
         &quot;Valves_DB&quot;.ConfiguredRet[#i] := &quot;Valves_DB&quot;.Valve[#i].Configured;
+
+        // Per-valve stroke times, replacing the compiled-in T#8S and T#5S. Both were simulation
+        // numbers: real DN200-DN400 hydraulic valves stroke in 15-60s, and because the command is
+        // MAINTAINED, an expiring timer drops the run latch and physically halts the valve rather
+        // than merely raising an alarm. The 5s direction grace was the worse of the two, since it
+        // arms the moment a valve is driven while still on its starting limit switch - which is
+        // exactly what a large valve does for its first few seconds - so every normal stroke
+        // raised a direction fault before the travel timeout ever got a chance.
+        //
+        // Zero guard is not paranoia: PT := T#0S expires on the very first scan, so a bad import
+        // or a mis-typed panel entry would be worse than the 8 seconds this replaces. Falling back
+        // to the generous default keeps a wrong number merely late rather than actively harmful.
+        #travelPT := &quot;Valve_Channels_DB&quot;.TravelTimeout[#i];
+        IF #travelPT &lt;= T#0S THEN #travelPT := T#60S; END_IF;
+        #seatPT := &quot;Valve_Channels_DB&quot;.SeatBreakGrace[#i];
+        IF #seatPT &lt;= T#0S THEN #seatPT := T#10S; END_IF;
 
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
             // Snapshot BEFORE this scan's command/timer processing runs — needed by the
@@ -367,7 +385,7 @@
             &quot;Valves_DB&quot;.DirTmr[#i](
                 IN := (&quot;Valves_DB&quot;.Valve[#i].OpenValve AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB)
                       OR (&quot;Valves_DB&quot;.Valve[#i].CloseValve AND &quot;Valves_DB&quot;.Valve[#i].OpenFB),
-                PT := T#5S);
+                PT := #seatPT);
             IF &quot;Valves_DB&quot;.DirTmr[#i].Q THEN
                 &quot;Valves_DB&quot;.DirFault[#i] := TRUE;
                 // Fail safe: when direction is in doubt, stop. Continuing to energise would keep
@@ -390,7 +408,7 @@
             // IN covers both cases: SimStep=1 during a simulated open travel, OpenValve latched
             // true during a real one - the two are mutually exclusive per valve (Section 1 only
             // ever sets one or the other for a given i), so sharing the one TON instance is safe.
-            &quot;Valves_DB&quot;.Valve[#i].TimerOpen(IN := (#SimStep[#i] = 1) OR &quot;Valves_DB&quot;.Valve[#i].OpenValve, PT := T#8S);
+            &quot;Valves_DB&quot;.Valve[#i].TimerOpen(IN := (#SimStep[#i] = 1) OR &quot;Valves_DB&quot;.Valve[#i].OpenValve, PT := #travelPT);
             IF #SimStep[#i] = 1 THEN
                 IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerOpen.ET &gt;= T#3S THEN
                     &quot;Valves_DB&quot;.Valve[#i].OpenFB := TRUE;   // Reached OPEN position!
@@ -410,7 +428,7 @@
                 &quot;Valves_DB&quot;.Valve[#i].OpenValve := FALSE;
             END_IF;
 
-            &quot;Valves_DB&quot;.Valve[#i].TimerClose(IN := (#SimStep[#i] = 2) OR &quot;Valves_DB&quot;.Valve[#i].CloseValve, PT := T#8S);
+            &quot;Valves_DB&quot;.Valve[#i].TimerClose(IN := (#SimStep[#i] = 2) OR &quot;Valves_DB&quot;.Valve[#i].CloseValve, PT := #travelPT);
             IF #SimStep[#i] = 2 THEN
                 IF NOT &quot;Valves_DB&quot;.Stuck[#i] AND &quot;Valves_DB&quot;.Valve[#i].TimerClose.ET &gt;= T#3S THEN
                     &quot;Valves_DB&quot;.Valve[#i].ClosedFB := TRUE; // Reached CLOSED position!
