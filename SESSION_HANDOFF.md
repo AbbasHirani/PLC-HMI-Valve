@@ -479,7 +479,12 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     succeeded immediately on retry - TIA was still busy from the compile. A failed attach right
     after a long operation is worth simply retrying before investigating.
 
-24. **[APPROVED 2026-08-18 — build at 0.25 Hz, pair with item 26]** **Mimic fault flash, computed in the
+24. **[DONE — confirmed built 2026-08-30 by reading the code; this header said "APPROVED,
+    build at 0.25 Hz" until then.]** `Clock_Flash` toggles at 0.25 Hz (2 s on, 2 s off,
+    `temp_fb_valveloop.xml:166`) and `DispCode` is computed exactly as designed below
+    (`:556-565`), with `V0xx_DispCode` created and bound to the mimic boxes. The code even
+    carries its own note that `Clock_Flash` never went true at first and was fixed. Found
+    during a stale-record sweep prompted by the alarm count in item 1 being out of date. **Mimic fault flash, computed in the
     PLC.** The mimic boxes currently show position as fill with a red fault border; the popup circle
     flashes red-to-position. Two visual languages for the same thing. Agreed target is to flash on
     the mimic too, but the flash must NOT be a script — 89 boxes re-evaluating on a 1Hz clock tick
@@ -666,7 +671,11 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     document why they stay.** Note the OB1 export/patch/re-import route works fine (item 7), so
     removing a call is straightforward if they turn out to be dead.
 
-32. **[pending — HMI REBUILD, agreed 2026-08-18. Do this ONE SCREEN AT A TIME.]**
+32. **[BUILD DONE — confirmed 2026-08-30. What is left is the LOOK, which is item 2.]**
+    All three zone screens draw their own artwork under the new names (`"AFT zone"`,
+    `"FWD Zone"`, `"Bilge"`, `MarineScreens.cs:1837-1841`) with live overlays, and Home
+    carries the ballast drawing plus the parked Bilge grid. Verified from a build log and
+    from the code during the same sweep as item 24. The original plan follows.
     **Screen structure changed: Bilge is its own section, not part of the vessel overview.**
 
     **The decision and why.** Bilge is a genuinely separate system from ballast, not a region of it.
@@ -849,6 +858,52 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     confirm a fresh row reads `V021_Unhealthy` / "CM79 reported Unhealthy status.". That proves the
     alarm text path end-to-end in the runtime and independently retires the runtime-language worry
     (item 41) for the alarm list.
+
+44. **[DONE 2026-08-30, patched into the live project. Needs a look on the panel.]**
+    **Command buttons drew on EMPTY table rows.**
+
+    Reported from the panel: FWD page 3 (7 of 14 rows used), BILGE page 2 (13 of 14) and CONFIG
+    page 6 of 6 (9 of 16) all drew full-strength OPEN / CLOSE and DISABLED buttons on their unused
+    rows — no CM number, no tag, no status, but a button.
+
+    **Never dangerous, and that was checked before anything else.** `AddSlotCmdScript`
+    (`MarineScreens.cs:464`) reads the slot's NO. tag and returns on zero, with a second guard on
+    `Configured` after it; the Config toggle's click handler does the same. A press on an empty row
+    writes nothing. The problem is that a button which looks pressable and does nothing teaches an
+    operator that buttons sometimes do not work — not a lesson worth teaching on a panel that
+    strokes ballast valves.
+
+    **No PLC change was needed — the signal already existed.** `FB_ValveLoop` writes
+    `<Zone>TblState := 9`, `TblNo := 0` and an empty `TblStateTxt` for an unused slot
+    (`temp_fb_valveloop.xml:870`, and `:1008` for Config). The STATUS cell already honoured code 9
+    through `TBL_CODES`, which is why it renders blank. The buttons simply never listened:
+
+    | Property | Mapped | On code 9 |
+    |---|---|---|
+    | BackColor | `{3}` / `{4}` | fell back to the button's white |
+    | ForeColor | `LOCK_CODES = {0..7}` | fell back to full green / red |
+    | BorderColor | **never mapped at all** | always green / red 1px |
+
+    **Fixed in BOTH places, and the duplication is the point.** `LOCK_CODES`, `FILL_OPEN_CODES` and
+    `FILL_CLOSE_CODES` gained code 9, a `BorderColor` map was added, and
+    `AddConfigToggleTextAndColor` now reads `Cfg_TblNo_<slot>` first and returns empty text and
+    transparent colours on zero. A new patch pass `PatchTableButtons` (`--only=TableButtons`)
+    applies the same thing to the live screens. **Item 17 is why both were needed:** `Authorization`
+    was once applied only by a repair pass over live objects, so every later zone-screen rebuild
+    silently wiped it — which really happened on 2026-08-15 and left 28 table command buttons
+    unprotected. A patch that is not mirrored in the builder is a fix with an expiry date.
+
+    **Done as a patch, not a rebuild**, on the user's suggestion — four screens' worth of full
+    rebuild to change three colour properties on ~100 existing buttons is not a good trade. The
+    pass deletes no screen and touches no artwork, tag, alarm or PLC block.
+
+    Result: `Screen_AftBallast 28/28`, `Screen_Bilge 28/28`, `Screen_FwdBallast 28/28`,
+    `Screen_Diagnostics 16/16` — **100 buttons patched**, every name matched, nothing silently
+    skipped. Project saved, HMI compiled **0 errors, 1 warning** (the pre-existing item 41 runtime
+    language warning, unrelated).
+
+    **Still to verify on the panel:** FWD page 3, BILGE page 2 and CONFIG page 6 — the unused rows
+    should now be genuinely empty, and the populated rows completely unchanged.
 
 ## 4. The valve count saga — read this before touching counts again
 

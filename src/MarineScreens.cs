@@ -421,24 +421,44 @@ namespace ValveDemoHmiBuilder
         // Known gap: an UNHEALTHY valve is also refused but reports StateCode 1, which it shares
         // with latched-alarm-but-healthy. StateCode alone cannot separate them, so that case is
         // not covered here; it needs a per-slot fault code in the table window.
-        static readonly int[] LOCK_CODES = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        // Code 9 is an EMPTY SLOT on a short last page - FB_ValveLoop writes <Zone>TblState := 9,
+        // TblNo := 0 and an empty TblStateTxt for it (temp_fb_valveloop.xml ~L870/L1008). The
+        // STATUS cell already honoured 9 via TBL_CODES, which is why it renders blank; the command
+        // buttons did not, so every unused row drew a full-strength OPEN and CLOSE. Reported from
+        // the panel 2026-08-30 on the FWD and BILGE lists. They were never dangerous - the click
+        // script reads the slot's NO. tag and returns on zero (AddSlotCmdScript) - but a button
+        // that looks pressable and does nothing teaches an operator that buttons sometimes do not
+        // work, which is not a lesson worth teaching on a panel that strokes ballast valves.
+        // All three colour properties need the entry: background and foreground fall back to the
+        // button's own colours when a code has no entry, and BorderColor was never mapped at all.
+        static readonly int[] LOCK_CODES = { 0, 1, 2, 3, 4, 5, 6, 7, 9 };
         static readonly object[] LOCK_OPEN_FORE = {
             Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255,   0, 158,  74),
             Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255,   0, 158,  74),
             Color.FromArgb(255,   0, 158,  74), Color.FromArgb(255,   0, 158,  74),
-            Color.FromArgb(255,   0, 158,  74), Color.FromArgb(255,   0, 158,  74)
+            Color.FromArgb(255,   0, 158,  74), Color.FromArgb(255,   0, 158,  74),
+            M_TRANS                               // 9 empty slot
         };
         static readonly object[] LOCK_CLOSE_FORE = {
             Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255, 205,  32,  38),
             Color.FromArgb(255, 108, 117, 128), Color.FromArgb(255, 205,  32,  38),
             Color.FromArgb(255, 205,  32,  38), Color.FromArgb(255, 205,  32,  38),
-            Color.FromArgb(255, 205,  32,  38), Color.FromArgb(255, 205,  32,  38)
+            Color.FromArgb(255, 205,  32,  38), Color.FromArgb(255, 205,  32,  38),
+            M_TRANS                               // 9 empty slot
         };
 
-        static readonly int[] FILL_OPEN_CODES  = { 3 };
-        static readonly object[] FILL_OPEN     = { Color.FromArgb(255, 0, 158, 74) };
-        static readonly int[] FILL_CLOSE_CODES = { 4 };
-        static readonly object[] FILL_CLOSE    = { Color.FromArgb(255, 205, 32, 38) };
+        // 3/4 fill the button in its own state; 9 blanks it. Every other code has no entry and
+        // falls back to the button's own white background, which is the intended look.
+        static readonly int[] FILL_OPEN_CODES  = { 3, 9 };
+        static readonly object[] FILL_OPEN     = { Color.FromArgb(255, 0, 158, 74), M_TRANS };
+        static readonly int[] FILL_CLOSE_CODES = { 4, 9 };
+        static readonly object[] FILL_CLOSE    = { Color.FromArgb(255, 205, 32, 38), M_TRANS };
+
+        // BorderColor was never dynamized, so the 1px green/red outline drew on empty rows even
+        // once the fill and label were blanked. One entry each: 9 transparent, everything else
+        // falls back to the button's own border.
+        static readonly int[] EMPTY_CODES        = { 9 };
+        static readonly object[] EMPTY_TRANSPARENT = { M_TRANS };
 
         // Click handler for a table slot. The slot doesn't know its valve at build time — that
         // depends on the page — so it resolves it at click time from the slot's live NO. tag
@@ -2107,6 +2127,9 @@ namespace ValveDemoHmiBuilder
                     // Colour only — Authorization below and the PLC interlock are the real guards.
                     AddValueMap(DynTag(openBtn,  "ForeColor", stateTag), LOCK_CODES, LOCK_OPEN_FORE);
                     AddValueMap(DynTag(closeBtn, "ForeColor", stateTag), LOCK_CODES, LOCK_CLOSE_FORE);
+                    // Blank the outline too on an empty slot, or the button is still a visible box.
+                    AddValueMap(DynTag(openBtn,  "BorderColor", stateTag), EMPTY_CODES, EMPTY_TRANSPARENT);
+                    AddValueMap(DynTag(closeBtn, "BorderColor", stateTag), EMPTY_CODES, EMPTY_TRANSPARENT);
                     // Set HERE, in the build path, not by the --finish-login-auth repair pass.
                     // These buttons bypass the popup entirely, so without it a logged-out user can
                     // stroke any valve straight from the list. The repair pass set it on the live
@@ -2487,11 +2510,27 @@ namespace ValveDemoHmiBuilder
         static void AddConfigToggleTextAndColor(HmiButton btn, int slot)
         {
             string tagName = "Cfg_TblConfigured_" + slot;
+            // Guard on the slot's valve number FIRST. Page 6 of 6 carries only 9 of its 16 rows
+            // (89 = 5x16 + 9), and an empty slot has Configured = false exactly like a deliberately
+            // disabled valve - so without this the seven unused rows each drew a full DISABLED
+            // button. Reported from the panel 2026-08-30. FB_ValveLoop writes CfgTblNo := 0 for an
+            // empty slot (temp_fb_valveloop.xml ~L998), which is the same signal the click handler
+            // already tests before it will write anything.
+            // This one cannot use AddValueMap the way the zone tables do: the source is a Bool and
+            // the mapping table is int-keyed - hence the script, matching the popup SERVICE button.
+            string noTag = "Cfg_TblNo_" + slot;
             Dyn(btn, "Text",
-                JS_READ + "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? \"\\u2713 CONFIGURED\" : \"DISABLED\";",
+                JS_READ + "let no=r(Tags(\"" + noTag + "\").Read());\nif(!no) return \"\";\n" +
+                "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? \"\\u2713 CONFIGURED\" : \"DISABLED\";",
                 "AutomaticTags");
             Dyn(btn, "BackColor",
-                JS_READ + "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? 0xFF00C7BE : 0xFF3A3A3C;",
+                JS_READ + "let no=r(Tags(\"" + noTag + "\").Read());\nif(!no) return 0x00000000;\n" +
+                "let cfg=r(Tags(\"" + tagName + "\").Read());\nreturn cfg ? 0xFF00C7BE : 0xFF3A3A3C;",
+                "AutomaticTags");
+            // The 1px border draws even when fill and label are blank, so it needs the same
+            // guard or an empty row is still a visible outlined box.
+            Dyn(btn, "BorderColor",
+                JS_READ + "let no=r(Tags(\"" + noTag + "\").Read());\nreturn no ? 0xFF5A6478 : 0x00000000;",
                 "AutomaticTags");
         }
 

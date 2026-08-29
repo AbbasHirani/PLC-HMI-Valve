@@ -351,6 +351,7 @@ namespace ValveDemoHmiBuilder
             // screens to drop twelve items would cost ~50 minutes - Aft, Bilge and Fwd each redraw
             // an illustration, its live valve overlays and a 14-row table.
             if (Want(only, "StripLegend")) PatchStripLegend(hmi);
+            if (Want(only, "TableButtons")) PatchTableButtons(hmi);
 
             // AlarmColumns-only: patch columns on the EXISTING AlarmView without deleting the screen.
             // Run this after Pass-2 alarm additions (--only=DiscreteAlarms) to re-apply column config.
@@ -536,6 +537,107 @@ namespace ValveDemoHmiBuilder
         // Deliberately a deletion pass and not a rebuild. Everything else on those screens - the
         // artwork, the valve overlays, the table, the station-offline banner - is correct and took
         // most of an hour to draw.
+
+        // ── Patch: blank the command buttons on EMPTY table rows ────────────────────────
+        // Reported from the panel 2026-08-30: the last page of a zone list (FWD page 3 carries 7
+        // of 14 rows, BILGE page 2 carries 13) and CONFIG page 6 of 6 (9 of 16) drew full-strength
+        // OPEN/CLOSE and DISABLED buttons on every unused row.
+        //
+        // Never dangerous - AddSlotCmdScript reads the slot's NO. tag and returns on zero, and the
+        // Config toggle does the same - but a button that looks pressable and does nothing teaches
+        // an operator that buttons sometimes do not work, which is not a lesson worth teaching on
+        // a panel that strokes ballast valves.
+        //
+        // Runs as a PATCH rather than a screen rebuild: it touches ~100 existing buttons and
+        // nothing else - no screen deleted, no artwork re-placed, no tags, no alarms, no PLC
+        // import. The equivalent full rebuild of four screens is minutes of work to change three
+        // colour properties.
+        //
+        // The same fix is ALSO in the creation path (BuildValveTable's value-map constants and
+        // AddConfigToggleTextAndColor). That duplication is deliberate and item 17 is why: the
+        // Authorization property was once applied only by a repair pass over live objects, so
+        // every later zone-screen rebuild silently wiped it - which really happened on 2026-08-15
+        // and left 28 table command buttons unprotected. A patch that is not mirrored in the
+        // builder is a fix with an expiry date.
+        static void PatchTableButtons(HmiSoftware hmi)
+        {
+            Console.WriteLine();
+            Console.WriteLine("[TableButtons] Blanking command buttons on empty table rows...");
+
+            string[][] zones = {
+                new[] { "Screen_AftBallast", "Aft" },
+                new[] { "Screen_Bilge",      "Er"  },   // the Bilge screen's PLC window is Er*
+                new[] { "Screen_FwdBallast", "Fwd" },
+            };
+
+            int total = 0;
+            foreach (var z in zones) {
+                var sc = FindScreen(hmi, z[0]);
+                if (sc == null) { Console.WriteLine("  [WARN] " + z[0] + " not found - skipped."); continue; }
+                int n = 0;
+                for (int col = 0; col < 2; col++) {
+                    for (int r = 0; r < 7; r++) {
+                        int slot = col * 7 + r + 1;
+                        string sfx = "_" + col + "_" + r;
+                        string stateTag = z[1] + "_TblState_" + slot;
+                        n += RewireCmdButton(sc, "Tr_Open"  + sfx, stateTag, true)  ? 1 : 0;
+                        n += RewireCmdButton(sc, "Tr_Close" + sfx, stateTag, false) ? 1 : 0;
+                    }
+                }
+                Console.WriteLine("  " + z[0] + ": " + n + "/28 command buttons rewired.");
+                total += n;
+            }
+
+            // CONFIG lives on Screen_Diagnostics. Its toggle is script-driven, not value-mapped -
+            // the source is a Bool and the mapping table is int-keyed - so the fix there is to
+            // re-apply the (now slot-guarded) scripts rather than to edit a mapping.
+            var scCfg = FindScreen(hmi, "Screen_Diagnostics");
+            if (scCfg == null) {
+                Console.WriteLine("  [WARN] Screen_Diagnostics not found - CONFIG toggles not patched.");
+            } else {
+                int n = 0;
+                for (int r = 0; r < 16; r++) {
+                    var btn = FindItemByName(scCfg, "CfgTr_Toggle_" + r) as HmiButton;
+                    if (btn == null) continue;
+                    RemoveDyn(btn, "Text");
+                    RemoveDyn(btn, "BackColor");
+                    RemoveDyn(btn, "BorderColor");
+                    AddConfigToggleTextAndColor(btn, r + 1);   // slot is 1-based
+                    n++;
+                }
+                Console.WriteLine("  Screen_Diagnostics: " + n + "/16 CONFIG toggles rewired.");
+                total += n;
+            }
+
+            Console.WriteLine("[TableButtons] " + total + " buttons patched.");
+        }
+
+        // Re-applies all three colour maps on one command button, including code 9 (empty slot)
+        // and the BorderColor map that never existed. Remove-then-add: Dynamizations.Create<T>
+        // throws on a property that already carries one.
+        static bool RewireCmdButton(HmiScreen sc, string name, string stateTag, bool isOpen)
+        {
+            var btn = FindItemByName(sc, name) as HmiButton;
+            if (btn == null) return false;
+            RemoveDyn(btn, "BackColor");
+            RemoveDyn(btn, "ForeColor");
+            RemoveDyn(btn, "BorderColor");
+            AddValueMap(DynTag(btn, "BackColor", stateTag),
+                        isOpen ? FILL_OPEN_CODES : FILL_CLOSE_CODES,
+                        isOpen ? FILL_OPEN : FILL_CLOSE);
+            AddValueMap(DynTag(btn, "ForeColor", stateTag),
+                        LOCK_CODES, isOpen ? LOCK_OPEN_FORE : LOCK_CLOSE_FORE);
+            AddValueMap(DynTag(btn, "BorderColor", stateTag), EMPTY_CODES, EMPTY_TRANSPARENT);
+            return true;
+        }
+
+        static object FindItemByName(HmiScreen sc, string name)
+        {
+            foreach (var it in sc.ScreenItems)
+                if (it.Name.Equals(name, StringComparison.Ordinal)) return it;
+            return null;
+        }
+
         static void PatchStripLegend(HmiSoftware hmi)
         {
             Console.WriteLine();
