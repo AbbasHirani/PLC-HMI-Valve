@@ -115,6 +115,15 @@ relationship to the PLC download beyond needing the PLC's tags to exist.
 The panel needs its **V20 runtime image** already installed. A panel from stock will not accept
 the project until it is updated — do that at the shop, not on board.
 
+**Acknowledge every alarm on the panel BEFORE each HMI download.** Any alarm still unacknowledged
+when the download lands survives as a **blank row** afterwards — it keeps its priority, area,
+timestamp, state and duration, but ALARM ID and DESCRIPTION come up empty, because those two are
+looked up from the configuration at display time and the definition that row pointed at has just
+been replaced. It is not a fault, it cannot be diagnosed from the screen (the row that would say
+what it was is the empty one), and it will not clear itself. Explained in full in
+`SESSION_HANDOFF.md` item 43, where it was traced live on 2026-08-30. During commissioning you will
+download many times, so make the acknowledge a habit rather than a cleanup.
+
 ### 1.7 First three numbers to read — this closes item 27
 
 As soon as you are online with the real CPU, `Online & diagnostics`:

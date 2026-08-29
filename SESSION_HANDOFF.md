@@ -58,8 +58,12 @@ in the TIA UI. See `CLAUDE.md` in the repo root for the original engineering spe
 
 Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "item 7" still line up.
 
-1. **[done 2026-08-17]** Discrete alarms regenerated for all 89 slots — **632 alarms** (89 × 7 + 9
-   system). Text and Origin now carry **CM numbers** (name stays `V0xx` as a stable internal id);
+1. **[done 2026-08-17]** Discrete alarms regenerated for all 89 slots — **721 alarms**
+   (89 × 8 + 9 system), counted live 2026-08-30. This item said **632** (89 × 7 + 9) until then,
+   which was correct on the day it was written and went stale when item 33 added `_DirFault` as an
+   eighth alarm per valve. Fixed rather than left, because a wrong total is exactly what sends the
+   next audit hunting 89 alarms that were never missing.
+   Text and Origin now carry **CM numbers** (name stays `V0xx` as a stable internal id);
    `_Conflict` renamed `_DoubleInd` with corrected text; "in automatic mode" → "on remote command".
    See items 22 and 23 for the reasoning and the rename trap.
 2. **[partially done]** Visual render check. AFT zone + Home verified live in TIA/runtime 2026-08-14.
@@ -772,6 +776,57 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
 
     Cost: it rides the `--only=DiscreteAlarms` pass, which is slow (~45 min) but has to run anyway if
     anything else about the alarm set changes. Do it in the same session as 24 and 26.
+
+43. **[explained 2026-08-30, no code fix — but a COMMISSIONING PRACTICE follows from it.]**
+    **Blank rows in the alarm list: a ghost from a previous download, not a broken alarm.**
+
+    Seen on the panel 2026-08-30: an active-alarm row with PRIORITY `14`, SYSTEM `BALLAST AFT`,
+    STATUS `RaisedCleared`, TIME `8/29/2026 6:38`, DURATION `0` — and **ALARM ID and
+    DESCRIPTION both empty.**
+
+    **The configuration is not at fault.** Probed live with `ProbeBlankAlarm.exe`:
+
+    ```
+    DISCRETE ALARMS: 721
+      blank NAME:      0
+      blank EventText: 0
+    ```
+
+    and the alarm it should have been reads correctly:
+
+    ```
+    V021_Unhealthy  class=ValveFault pri=14 origin='CM79' area='BALLAST AFT'
+                    tag='Valves_DB_W_Unhealthy_1' bit=4
+                    'CM79 reported Unhealthy status.'
+    ```
+
+    **How the two candidate causes were separated.** A runtime-language mismatch was the obvious
+    suspect, since every alarm carries text in exactly one language and the HMI compile does warn
+    about language configuration (item 41). It is ruled out by the ALARM ID column: that column is
+    bound to `Name` (`GenerateHmiLayout.cs:952`), and a name is never translated. A language fault
+    blanks DESCRIPTION and leaves ALARM ID populated. **Both** blank means the runtime cannot
+    resolve the row to any definition at all.
+
+    **What it is.** The alarm raised during the 2026-08-29 CM79 testing (slot 21 = AFT =
+    `BALLAST AFT`, ValveFault = priority 14), cleared instantly, and was never acknowledged — so it
+    correctly stayed in the ACTIVE list, which is ISA-18.2 behaviour, not a bug: a transient fault
+    must not vanish before anyone sees it. The HMI configuration was then rebuilt and re-downloaded.
+    The runtime keeps the alarm *instance* and the fields stored on it — priority, area, timestamps,
+    state, duration, all of which still render — but name and text are looked up from the loaded
+    configuration at display time, and the definition that instance pointed at is gone. What shows
+    on that row is exactly the subset that survives without a definition.
+
+    **CONFIRMING TEST, not yet run:** press ACKNOWLEDGE ALL and the row should go and stay gone;
+    then force `Valves_DB.W_Unhealthy_1` bit 4 and a fresh row should read `V021_Unhealthy` /
+    "CM79 reported Unhealthy status.". That second half also proves the alarm text path end-to-end
+    in the runtime, which independently retires the language worry for the alarm list.
+
+    **The practice that follows — this is the part that matters on the ship:**
+    **acknowledge all alarms before every HMI download.** Any alarm left unacknowledged at download
+    time becomes a blank ghost row afterwards, and it is undiagnosable from the screen, because the
+    row that would say what it was is the row that is empty. Harmless during development. On a
+    commissioned panel an operator will reasonably read it as a fault in the alarm system.
+    Belongs in `HARDWARE_INSTALL_TROUBLESHOOTING.md` section 1 alongside the download steps.
 
 ## 4. The valve count saga — read this before touching counts again
 
