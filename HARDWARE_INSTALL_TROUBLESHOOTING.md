@@ -115,14 +115,19 @@ relationship to the PLC download beyond needing the PLC's tags to exist.
 The panel needs its **V20 runtime image** already installed. A panel from stock will not accept
 the project until it is updated — do that at the shop, not on board.
 
-**Acknowledge every alarm on the panel BEFORE each HMI download.** Any alarm still unacknowledged
-when the download lands survives as a **blank row** afterwards — it keeps its priority, area,
-timestamp, state and duration, but ALARM ID and DESCRIPTION come up empty, because those two are
-looked up from the configuration at display time and the definition that row pointed at has just
-been replaced. It is not a fault, it cannot be diagnosed from the screen (the row that would say
-what it was is the empty one), and it will not clear itself. Explained in full in
-`SESSION_HANDOFF.md` item 43, where it was traced live on 2026-08-30. During commissioning you will
-download many times, so make the acknowledge a habit rather than a cleanup.
+**A blank row in the alarm list after a download is a stale view, not a fault.** If a row shows a
+priority, a system and a timestamp but **ALARM ID and DESCRIPTION are both empty**, it is left over
+from an HMI download that replaced an alarm definition while that alarm was still on screen. Name
+and description are looked up from the configuration when the row is drawn; everything else was
+already materialised into the row, which is why the rest of it still reads.
+
+**Acknowledging will NOT clear it** — confirmed live 2026-08-30, the pending-ack count went 1 to 0
+and the row stayed, with its ACK TIME still empty. **Switch to ALARM HISTORY and back to ACTIVE
+ALARMS.** That makes the control re-query its source, the phantom is not in the result, and it
+disappears. Leaving the screen and coming back does the same thing.
+
+Harmless, and it clears on its own the next time the list is rebuilt. Worth knowing only so nobody
+spends an hour treating it as a broken alarm system. Full trace in `SESSION_HANDOFF.md` item 43.
 
 ### 1.7 First three numbers to read — this closes item 27
 

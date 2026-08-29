@@ -777,8 +777,8 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     Cost: it rides the `--only=DiscreteAlarms` pass, which is slow (~45 min) but has to run anyway if
     anything else about the alarm set changes. Do it in the same session as 24 and 26.
 
-43. **[explained 2026-08-30, no code fix — but a COMMISSIONING PRACTICE follows from it.]**
-    **Blank rows in the alarm list: a ghost from a previous download, not a broken alarm.**
+43. **[CLOSED 2026-08-30. Cause confirmed by test, no code fix needed.]**
+    **Blank rows in the alarm list are a stale VIEW, not a stale alarm.**
 
     Seen on the panel 2026-08-30: an active-alarm row with PRIORITY `14`, SYSTEM `BALLAST AFT`,
     STATUS `RaisedCleared`, TIME `8/29/2026 6:38`, DURATION `0` — and **ALARM ID and
@@ -816,17 +816,39 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     configuration at display time, and the definition that instance pointed at is gone. What shows
     on that row is exactly the subset that survives without a definition.
 
-    **CONFIRMING TEST, not yet run:** press ACKNOWLEDGE ALL and the row should go and stay gone;
-    then force `Valves_DB.W_Unhealthy_1` bit 4 and a fresh row should read `V021_Unhealthy` /
-    "CM79 reported Unhealthy status.". That second half also proves the alarm text path end-to-end
-    in the runtime, which independently retires the language worry for the alarm list.
+    **What the tests actually showed — and where the first explanation was wrong.**
 
-    **The practice that follows — this is the part that matters on the ship:**
-    **acknowledge all alarms before every HMI download.** Any alarm left unacknowledged at download
-    time becomes a blank ghost row afterwards, and it is undiagnosable from the screen, because the
-    row that would say what it was is the row that is empty. Harmless during development. On a
-    commissioned panel an operator will reasonably read it as a fault in the alarm system.
-    Belongs in `HARDWARE_INSTALL_TROUBLESHOOTING.md` section 1 alongside the download steps.
+    - **ACKNOWLEDGE ALL did NOT clear it.** The pending-ack count went 1 to 0, so the ack was
+      dispatched, but the row stayed with its ACK TIME still empty and its STATUS still
+      `RaisedCleared`. Compare row 2, a genuine WinCC alarm, which acknowledged normally and
+      showed `ACK TIME 8/30/2026 2:55`.
+    - **Switching to ALARM HISTORY and back to ACTIVE ALARMS cleared it immediately.**
+
+    That second result is what pins the cause. The phantom lived in the **AlarmControl's rendered
+    view**, not in the runtime's alarm store: switching tabs makes the control re-query its source,
+    the row is not in the result, and it goes. A persisted or orphaned *instance* would have
+    survived that.
+
+    So the fields behave exactly as expected once you know where it lives. Name and Alarm text are
+    resolved from the configuration when the row is drawn, and the definition they pointed at was
+    replaced by an HMI download while the row was on screen — hence both blank. Priority, area,
+    timestamp, state and duration had already been materialised into the row, so they still read.
+    The ack could be dispatched but could not update a row that is backed by nothing.
+
+    **The first write-up of this item said the cure was "acknowledge all alarms before every HMI
+    download".** That was wrong and is corrected in `HARDWARE_INSTALL_TROUBLESHOOTING.md` 1.6:
+    acknowledging does not touch it. The cure is to make the list rebuild — ALARM HISTORY and back,
+    or leave the screen and return. Recorded because the wrong version was committed first
+    (`53dc222`) and someone reading only that commit would carry the wrong habit onto the ship.
+
+    **Severity: low.** No persisted corruption, nothing to change about download practice, and it
+    clears itself the next time the list is rebuilt. Worth documenting only so nobody spends an
+    hour treating it as a broken alarm system.
+
+    **Still worth doing once, for a different reason:** force `Valves_DB.W_Unhealthy_1` bit 4 and
+    confirm a fresh row reads `V021_Unhealthy` / "CM79 reported Unhealthy status.". That proves the
+    alarm text path end-to-end in the runtime and independently retires the runtime-language worry
+    (item 41) for the alarm list.
 
 ## 4. The valve count saga — read this before touching counts again
 
