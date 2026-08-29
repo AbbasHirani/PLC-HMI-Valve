@@ -108,11 +108,6 @@
     <Member Name="sel" Datatype="Int" />
         <Member Name="travelPT" Datatype="Time" />
         <Member Name="seatPT" Datatype="Time" />
-        <Member Name="tempAftUnh" Datatype="Int" />
-        <Member Name="tempMidUnh" Datatype="Int" />
-        <Member Name="tempFwdUnh" Datatype="Int" />
-        <Member Name="suppThr" Datatype="Int" />
-        <Member Name="supp" Datatype="Bool" />
     <Member Name="winTick" Datatype="Bool" />
     <Member Name="doWindows" Datatype="Bool" />
   </Section>
@@ -151,7 +146,6 @@
     #tempFault := 0;
     #tempLocal := 0;
     #tempConfigured := 0;
-    #tempAftUnh := 0;   #tempMidUnh := 0;   #tempFwdUnh := 0;
     #tempErOpen := 0;    #tempErClosed := 0;    #tempErTransit := 0;    #tempErFault := 0;    #tempErLocal := 0;    #tempErConfigured := 0;
     #tempFwdOpen := 0;   #tempFwdClosed := 0;   #tempFwdTransit := 0;   #tempFwdFault := 0;   #tempFwdLocal := 0;   #tempFwdConfigured := 0;
     #tempAftOpen := 0;   #tempAftClosed := 0;   #tempAftTransit := 0;   #tempAftFault := 0;   #tempAftLocal := 0;   #tempAftConfigured := 0;
@@ -240,24 +234,6 @@
         // Keep the retentive mirror in step with the live flag, so whatever an engineer sets on
         // the Config screen survives the next blackout. One Bool copy per valve per scan.
         &quot;Valves_DB&quot;.ConfiguredRet[#i] := &quot;Valves_DB&quot;.Valve[#i].Configured;
-
-        // Count configured-but-unhealthy valves per station, for the 24 V group-fault detection
-        // after this loop. Free here - the loop already runs 1..89 every scan.
-        IF &quot;Valves_DB&quot;.Valve[#i].Configured AND NOT &quot;Valves_DB&quot;.Valve[#i].Healthy THEN
-            IF #i &lt;= 27 THEN
-                #tempAftUnh := #tempAftUnh + 1;
-            ELSIF #i &lt;= 54 THEN
-                #tempMidUnh := #tempMidUnh + 1;
-            ELSE
-                #tempFwdUnh := #tempFwdUnh + 1;
-            END_IF;
-        END_IF;
-
-        // Is this valve's station currently in a supply fault? Uses last scan's flag, which is
-        // set after this loop - one scan of lag against a 2 s debounce, so it does not matter.
-        #supp := (#i &lt;= 27 AND &quot;Valves_DB&quot;.AftSupplyFault)
-              OR (#i &gt; 27 AND #i &lt;= 54 AND &quot;Valves_DB&quot;.MidSupplyFault)
-              OR (#i &gt; 54 AND &quot;Valves_DB&quot;.FwdSupplyFault);
 
         // Per-valve stroke times, replacing the compiled-in T#8S and T#5S. Both were simulation
         // numbers: real DN200-DN400 hydraulic valves stroke in 15-60s, and because the command is
@@ -504,12 +480,7 @@
             // Real valves: also require the run-latch off both before and after, same reasoning
             // as SimStep above - a real valve leaving its seat on a legitimate command is not
             // "unexplained" just because OpenValve/CloseValve doesn't happen to be SimStep.
-            // NOT #supp: during a 24 V group fault every limit switch on the station drops at
-            // once, which looks exactly like unexplained movement on all 27 valves. UnexpMove
-            // is the only latched one of the three, so letting it set here would deliver the
-            // whole flood the moment power came back - suppressing only the alarm bit would
-            // move the flood rather than remove it.
-            IF #simStepAtStart = 0 AND #SimStep[#i] = 0 AND NOT #supp
+            IF #simStepAtStart = 0 AND #SimStep[#i] = 0
                AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenValve AND NOT &quot;Valves_DB&quot;.Valve[#i].CloseValve THEN
                 IF (&quot;Valves_DB&quot;.PrevOpenFB[#i] AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB) OR
                    (&quot;Valves_DB&quot;.PrevClosedFB[#i] AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB) THEN
@@ -682,23 +653,6 @@
         END_IF;
     END_FOR;
 
-    // ── 24 V field-supply group fault ────────────────────────────────────────────────
-    // Threshold guard, same reasoning as the timer zero guard: a 0 here would make
-    // "count >= threshold" permanently true and suppress every per-valve alarm on the ship.
-    #suppThr := &quot;Valves_DB&quot;.SupplyFaultThreshold;
-    IF #suppThr &lt;= 0 THEN #suppThr := 5; END_IF;
-
-    &quot;Valves_DB&quot;.AftUnhealthyCnt := #tempAftUnh;
-    &quot;Valves_DB&quot;.MidUnhealthyCnt := #tempMidUnh;
-    &quot;Valves_DB&quot;.FwdUnhealthyCnt := #tempFwdUnh;
-
-    &quot;Valves_DB&quot;.SupplyTmrAft(IN := (#tempAftUnh &gt;= #suppThr), PT := T#2S);
-    &quot;Valves_DB&quot;.SupplyTmrMid(IN := (#tempMidUnh &gt;= #suppThr), PT := T#2S);
-    &quot;Valves_DB&quot;.SupplyTmrFwd(IN := (#tempFwdUnh &gt;= #suppThr), PT := T#2S);
-    &quot;Valves_DB&quot;.AftSupplyFault := &quot;Valves_DB&quot;.SupplyTmrAft.Q;
-    &quot;Valves_DB&quot;.MidSupplyFault := &quot;Valves_DB&quot;.SupplyTmrMid.Q;
-    &quot;Valves_DB&quot;.FwdSupplyFault := &quot;Valves_DB&quot;.SupplyTmrFwd.Q;
-
     &quot;Valves_DB&quot;.TotalOpen := #tempOpen;
     &quot;Valves_DB&quot;.TotalClosed := #tempClosed;
     &quot;Valves_DB&quot;.TotalTransit := #tempTransit;
@@ -738,10 +692,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 89 THEN
-                #supp := (#bitIdx &lt;= 27 AND &quot;Valves_DB&quot;.AftSupplyFault)
-                      OR (#bitIdx &gt; 27 AND #bitIdx &lt;= 54 AND &quot;Valves_DB&quot;.MidSupplyFault)
-                      OR (#bitIdx &gt; 54 AND &quot;Valves_DB&quot;.FwdSupplyFault);
-                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND NOT &quot;Valves_DB&quot;.Valve[#bitIdx].Healthy AND NOT #supp THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND NOT &quot;Valves_DB&quot;.Valve[#bitIdx].Healthy THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
@@ -793,10 +744,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 89 THEN
-                #supp := (#bitIdx &lt;= 27 AND &quot;Valves_DB&quot;.AftSupplyFault)
-                      OR (#bitIdx &gt; 27 AND #bitIdx &lt;= 54 AND &quot;Valves_DB&quot;.MidSupplyFault)
-                      OR (#bitIdx &gt; 54 AND &quot;Valves_DB&quot;.FwdSupplyFault);
-                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.PosLostTmr[#bitIdx].Q AND NOT #supp THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.PosLostTmr[#bitIdx].Q THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;
@@ -809,10 +757,7 @@
         FOR #b := 0 TO 15 DO
             #bitIdx := #w * 16 + #b + 1;
             IF #bitIdx &lt;= 89 THEN
-                #supp := (#bitIdx &lt;= 27 AND &quot;Valves_DB&quot;.AftSupplyFault)
-                      OR (#bitIdx &gt; 27 AND #bitIdx &lt;= 54 AND &quot;Valves_DB&quot;.MidSupplyFault)
-                      OR (#bitIdx &gt; 54 AND &quot;Valves_DB&quot;.FwdSupplyFault);
-                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.UnexpMove[#bitIdx] AND NOT #supp THEN
+                IF &quot;Valves_DB&quot;.Valve[#bitIdx].Configured AND &quot;Valves_DB&quot;.UnexpMove[#bitIdx] THEN
                     #packWord := #packWord OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
                 END_IF;
             END_IF;

@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Document>
   <Engineering version="V20" />
   <DocumentInfo>
-    <Created>2026-07-22T09:37:43.8080715Z</Created>
+    <Created>2026-08-29T19:16:20.8350346Z</Created>
     <ExportSetting>WithDefaults</ExportSetting>
     <InstalledProducts>
       <Product>
@@ -27,10 +27,6 @@
       </OptionPackage>
       <Product>
         <DisplayName>WinCC Basic/Comfort/Advanced</DisplayName>
-        <DisplayVersion>V20</DisplayVersion>
-      </Product>
-      <Product>
-        <DisplayName>WinCC Professional</DisplayName>
         <DisplayVersion>V20</DisplayVersion>
       </Product>
       <Product>
@@ -89,80 +85,228 @@
         </Section>
       </Sections>
     </Member>
-    <Member Name="TotalOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="TotalClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="TotalTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="TotalFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="TotalLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="TotalConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <!-- Per-zone sub-totals: FB_ValveLoop already iterates 1..96 every scan to build the
-         plant-wide totals above, so computing these zone-scoped versions in the same pass
-         costs nothing extra. Each HMI KPI/caption cell reads one of these directly instead
-         of looping 28-32 valves itself, which is what was making Screen_Home's tables slow
-         to repopulate after every screen switch. -->
-    <Member Name="ErOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="ErClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="ErTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="ErFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="ErLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="ErConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="FwdOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="FwdClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="FwdTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="FwdFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="FwdLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="FwdConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="AftOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="AftClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="AftTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="AftFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="AftLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="AftConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <!-- Precomputed per-valve display state, assigned by FB_ValveLoop in the same priority chain
-         it already uses for counting: 0=UNCONFIGURED 1=FAULT 2=LOCAL 3=OPEN 4=CLOSED 5=MOVING.
-         Lets every HMI badge/status cell read ONE tag instead of the five raw bits
-         (Configured/OpenFB/ClosedFB/Healthy/LocalMode) it used to combine itself — on Screen_Home
-         that is 96 reads/cycle instead of 480. -->
+    <Member Name="TotalOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TotalClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TotalTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TotalFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TotalLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="TotalConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="AftOpen" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="AftClosed" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="AftTransit" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="AftFault" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="AftLocal" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="AftConfigured" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <Member Name="StateCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- ── Alarm system support ──────────────────────────────────────────────────────────
-         Stuck: simulation-only — set true via the popup's SIMULATE STUCK toggle so a valve can
-         be made to genuinely fail to reach its limit switch (Fail to Open / Fail to Close, C/D).
-         TimeoutOpenAlarm/TimeoutCloseAlarm/UnexpMove are LATCHED (stay true once set; cleared
-         only by Reset Fault).
-         Loss of Position (E) is NOT latched — its own 2s TON (PosLostTmr) IS the alarm condition,
-         so it clears the moment the valve stops being idle-with-no-position. -->
     <Member Name="Stuck" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Simulation-only scaffolding: gates the one-time "assume closed seat" default a freshly
-         added valve gets (see FB_ValveLoop). Real OpenFB/ClosedFB will be genuine physical limit
-         switch inputs once the real Dynamic I/O Mapper replaces this simulation, at which point
-         this member (and the auto-init logic that reads it) should be removed entirely - real
-         hardware never needs to guess a starting position. -->
     <Member Name="Initialized" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Split by direction (not one shared bit) since Fail to Open (C) and Fail to Close (D)
-         are two separate alarms with separate messages/columns in the catalogue. -->
     <Member Name="TimeoutOpenAlarm" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="TimeoutCloseAlarm" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
@@ -170,6 +314,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="UnexpMove" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
@@ -177,49 +322,31 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Direction / limit-switch discrepancy (H). Latched when a valve has been driven for 5s
-         and the OPPOSITE limit switch is still made — i.e. the physical evidence contradicts the
-         command. Covers two causes the PLC cannot tell apart from two limit switches: the valve
-         moved the wrong way (OPEN/CLOSE swapped at the interposing relays, a commissioning fault)
-         and the valve never left its seat (dead actuator / stuck limit switch). Both need the same
-         operator response - go look at the valve - so they share one alarm rather than splitting
-         into two the operator would treat identically. Found 2026-08-15 by live reversal test:
-         previously a valve commanded CLOSE whose OPEN limit made would display a settled green
-         "FULLY OPEN" for the full 8s travel timeout, then raise a misleading Fail-to-Close. -->
     <Member Name="DirFault" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Last commanded position: 0 = none since startup, 1 = OPEN, 2 = CLOSE. Set when a command
-         is accepted, never cleared on arrival - it is the operator's intent, not a live state, so
-         the HMI can show COMMANDED vs ACTUAL whenever the two disagree. That comparison is what
-         catches a stuck limit switch (valve reports a position it is not in), which is the more
-         likely in-service fault than wrong-direction movement. -->
-    <!-- Position-only state, 3=OPEN 4=CLOSED 5=NO POSITION 6=OPENING 7=CLOSING, 0=unconfigured.
-         Identical to StateCode EXCEPT that a fault never overrides it. StateCode answers "is this
-         valve alright"; PosCode answers "where is it". Both are needed at once: a faulted ballast
-         valve sitting open is a flooding path and a faulted one sitting closed is a blocked line,
-         and the operator could not tell them apart when FAULT replaced the position on screen. -->
     <Member Name="PosCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Which fault, most specific first: 0=none 1=unhealthy 2=double indication 3=fail to open
-         4=fail to close 5=loss of position 6=unexpected movement 7=direction/limit fault.
-         Lets the popup name the cause instead of just saying FAULT. -->
     <Member Name="FaultCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="CmdPos" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
@@ -227,15 +354,15 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Previous-scan snapshot of the limit switches — comparing this scan to last scan is the
-         only way to catch a position change that nobody commanded (Unexpected Movement, F). -->
     <Member Name="PrevOpenFB" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="PrevClosedFB" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
@@ -243,18 +370,15 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- 2-second hold before Loss of Position (E) fires: idle + uncommanded + neither limit made
-         has to persist, or every legitimate stop-then-go transition would falsely alarm. Lives
-         here in the DB (an array of the same TON_TIME type as Valve_IO's TimerOpen/TimerClose)
-         rather than inside the Valve_IO UDT, so adding it doesn't touch every existing block that
-         already uses that UDT. -->
     <Member Name="PosLostTmr" Datatype="Array[1..89] of TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Sections>
         <Section Name="None">
@@ -265,19 +389,12 @@
         </Section>
       </Sections>
     </Member>
-    <!-- 5-second grace before the direction/limit discrepancy (H) fires. The grace is the whole
-         trick: a valve leaving a fully-open seat legitimately holds OpenFB made for the first
-         moment of a close, so an instant check would false-trip on every normal stroke. 5s (not
-         the 3s first considered) because a false alarm in week one costs more operator trust than
-         a true one two seconds later - retune per valve at commissioning alongside the travel
-         timeout (both are currently one-size-fits-all and both should not be; see handoff item 13).
-         One timer serves both directions: OpenValve and CloseValve are mutually exclusive by
-         construction, so they can never both need it in the same scan. -->
     <Member Name="DirTmr" Datatype="Array[1..89] of TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Sections>
         <Section Name="None">
@@ -288,26 +405,20 @@
         </Section>
       </Sections>
     </Member>
-    <!-- Simulated system/hardware health — no real ET 200SP in the hardware config yet, so these
-         are manually-toggled bits standing in for PLC/RIO/UPS/Network diagnostics until real
-         DeviceStates/ModuleStates can replace them. Index: 1=PLC 2=ErRIO 3=FwdRIO 4=AftRIO
-         5=IOModule 6=PSU/UPS 7=Network 8=CPU 9=HMI heartbeat. -->
     <Member Name="HwHealthy" Datatype="Array[1..9] of Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- One Word array per alarm condition, 6 words (96 bits) covering all 96 slots — packed
-         because WinCC discrete alarms trigger off a bit-within-a-word tag (HmiDiscreteAlarm's
-         RaisedStateTag + RaisedStateTagBitNumber), not a bare Bool array element directly.
-         Valve V's bit for any condition: word (V-1)/16, bit (V-1) MOD 16. -->
     <Member Name="W_Unhealthy" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="W_Conflict" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
@@ -315,6 +426,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="W_FailOpen" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
@@ -322,6 +434,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="W_FailClose" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
@@ -329,6 +442,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="W_LossPos" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
@@ -336,6 +450,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="W_UnexpMove" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
@@ -343,6 +458,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="W_Local" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
@@ -350,16 +466,15 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Alarm-word packing for the direction/limit discrepancy (H). Same 6-word x 16-bit layout as
-         every other condition above. The matching discrete alarms do not exist yet - they land with
-         the 89-slot alarm regeneration (handoff item 1), which has to run before install anyway. -->
     <Member Name="W_DirFault" Datatype="Array[0..5] of Word" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="HwWord" Datatype="Word" Remanence="NonRetain" Accessibility="Public">
@@ -367,24 +482,39 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-
-    <!-- Per-zone paged table window. The HMI's valve table has 14 fixed slots; the PLC copies
-         whichever page is being displayed into these arrays every scan. That lets every slot bind
-         to a build-time-constant tag name (e.g. ErTblState[3]) instead of computing the name in
-         JavaScript from a page tag — which is what forced the table onto ~126 polled scripts and
-         made the screen slow to load. Contents shift with the page; tag names never do.
-         Page is written by the screen's UP/DOWN buttons. TblState uses -1 for a slot that has no
-         valve on the current page (distinct from 0 = UNCONFIGURED) so the HMI can blank the row. -->
-    <Member Name="AftPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="ErPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="FwdPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="AftPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ErPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <Member Name="AftTblState" Datatype="Array[1..14] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="ErTblState" Datatype="Array[1..14] of Int" Remanence="NonRetain" Accessibility="Public">
@@ -392,6 +522,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="FwdTblState" Datatype="Array[1..14] of Int" Remanence="NonRetain" Accessibility="Public">
@@ -399,6 +530,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="AftTblNo" Datatype="Array[1..14] of Int" Remanence="NonRetain" Accessibility="Public">
@@ -406,6 +538,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="ErTblNo" Datatype="Array[1..14] of Int" Remanence="NonRetain" Accessibility="Public">
@@ -413,6 +546,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="FwdTblNo" Datatype="Array[1..14] of Int" Remanence="NonRetain" Accessibility="Public">
@@ -420,17 +554,15 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Status word per slot, resolved PLC-side. A TagDynamization mapping table is rejected on a
-         Text property ("Creation of Tag dynamization entries is not allowed for this property") —
-         value-to-text is meant to go through a text list instead. Supplying the word from the PLC
-         keeps the cell a plain direct bind, so the table still needs zero scripts. -->
     <Member Name="AftTblStateTxt" Datatype="Array[1..14] of String[14]" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="ErTblStateTxt" Datatype="Array[1..14] of String[14]" Remanence="NonRetain" Accessibility="Public">
@@ -438,6 +570,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="FwdTblStateTxt" Datatype="Array[1..14] of String[14]" Remanence="NonRetain" Accessibility="Public">
@@ -445,6 +578,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="AftTblTag" Datatype="Array[1..14] of String[8]" Remanence="NonRetain" Accessibility="Public">
@@ -452,6 +586,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="ErTblTag" Datatype="Array[1..14] of String[8]" Remanence="NonRetain" Accessibility="Public">
@@ -459,6 +594,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="FwdTblTag" Datatype="Array[1..14] of String[8]" Remanence="NonRetain" Accessibility="Public">
@@ -466,17 +602,23 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Configuration screen: same paged-window pattern as the zone tables above, but spanning
-         all 96 slots directly (no zone offset) since this screen shows the whole fleet across one
-         global 6-page sequence (16/page) rather than one zone at a time. -->
-    <Member Name="CfgPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="CfgPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <Member Name="CfgTblNo" Datatype="Array[1..16] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="CfgTblTag" Datatype="Array[1..16] of String[8]" Remanence="NonRetain" Accessibility="Public">
@@ -484,6 +626,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="CfgTblZone" Datatype="Array[1..16] of String[12]" Remanence="NonRetain" Accessibility="Public">
@@ -491,6 +634,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="CfgTblConfigured" Datatype="Array[1..16] of Bool" Remanence="NonRetain" Accessibility="Public">
@@ -498,6 +642,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="CfgTblState" Datatype="Array[1..16] of Int" Remanence="NonRetain" Accessibility="Public">
@@ -505,6 +650,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="CfgTblStateTxt" Datatype="Array[1..16] of String[14]" Remanence="NonRetain" Accessibility="Public">
@@ -512,36 +658,79 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="Clock_1Hz" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="ClockCounter" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelIdx" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelState" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelHealthy" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelLocalMode" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelConfigured" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
-    <!-- What the mimic box should show RIGHT NOW, flashing included. 0=unconfigured 1=red(fault half of
-         the flash) 2=local 3..7=position. The alternation is done HERE, in the PLC, so the HMI can bind
-         one native value map and run ZERO scripts - 89 scripted boxes re-evaluating on a clock tick is
-         real load on the panel. Key property: with nothing faulted DispCode equals PosCode and simply
-         never changes, so a healthy plant generates no tag traffic at all. Cost scales with the number
-         of faults, not the number of valves. -->
+    <Member Name="Clock_1Hz" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="ClockCounter" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelIdx" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelState" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelHealthy" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelLocalMode" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelConfigured" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <Member Name="DispCode" Datatype="Array[1..89] of Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- 0.25 Hz (2 s on / 2 s off) flash clock for DispCode. Deliberately slower than Clock_1Hz: a 2 s
-         half-period needs only a ~1 s HMI acquisition cycle, so it cannot alias, and it quarters the
-         update traffic when many valves are faulted. -->
     <Member Name="Clock_Flash" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="HwInitDone" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
@@ -549,30 +738,23 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Retentive mirror of Valve[i].Configured. Retentivity on an optimized DB is set per
-         TOP-LEVEL member, and Configured lives inside Array[1..89] of "Valve_IO" - so it cannot
-         be made retentive on its own. Marking the whole Valve array Retain was rejected: that
-         array also holds OpenValve/CloseValve (the run latches) and both TON timers. A valve
-         mid-stroke when the power failed would come back with its run latch still TRUE, and
-         FC_IoMapper drives the real DQ from it - so the valve would restart on power-up with
-         nobody commanding it. This mirror keeps the one flag that should survive and leaves the
-         dangerous ones non-retentive. -->
     <Member Name="ConfiguredRet" Datatype="Array[1..89] of Bool" Remanence="Retain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- Self-resetting 2 s tick driving Clock_Flash. -->
-    <!-- Drives Clock_1Hz. Separate from FlashTmr because they run at different rates. -->
     <Member Name="Clk1Tmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Sections>
         <Section Name="None">
@@ -588,6 +770,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Sections>
         <Section Name="None">
@@ -598,14 +781,12 @@
         </Section>
       </Sections>
     </Member>
-    <!-- Self-resetting 200 ms tick that gates the paged table windows. Those four loops copy ~350
-         STRINGS every scan - the single biggest contributor to scan time - to build data no operator can
-         read faster than a few times a second. -->
     <Member Name="WinTmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
       <Sections>
         <Section Name="None">
@@ -616,20 +797,20 @@
         </Section>
       </Sections>
     </Member>
-    <!-- Page snapshots: the windows must also rebuild IMMEDIATELY on a page change, -->
     <Member Name="PrevAftPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <!-- not merely on the next 200 ms tick, or paging would feel laggy. -->
     <Member Name="PrevErPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="PrevFwdPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
@@ -637,6 +818,7 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
     <Member Name="PrevCfgPage" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
@@ -644,12 +826,41 @@
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
       </AttributeList>
     </Member>
-    <Member Name="SelDirFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelCmdPos" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelPosCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
-    <Member Name="SelFaultCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelDirFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelCmdPos" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelPosCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SelFaultCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="SetPoint" SystemDefined="true">false</BooleanAttribute>
+      </AttributeList>
+    </Member>
   </Section>
 </Sections></Interface>
       <IsOnlyStoredInLoadMemory>false</IsOnlyStoredInLoadMemory>

@@ -1353,7 +1353,84 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     confirm the buzzer sounds. That is the exact case today's code fails. Then acknowledge without
     fixing the valve and confirm the buzzer stops while the alarm stays active.
 
-39. **[pending — ALARM FLOOD. One 24 V field-supply failure raises 81 alarms and none of them says
+39. **[pending — ALARM FLOOD. A count-and-suppress implementation was BUILT AND REVERTED
+    2026-08-30. Awaiting the client's view before rebuilding. Read the reversal reasoning first.]**
+
+    **The problem is unchanged and real.** A 24 V field-supply failure that leaves the ET200SP
+    powered and on PROFINET puts every input on that station at 0. Each valve then raises
+    Unhealthy, Loss of Position and Unexpected Movement - 81 alarms in about two seconds for one
+    station, 267 if the failure is upstream of all three, against an ISA-18.2 flood threshold of
+    10 per 10 minutes. Nothing names the cause.
+
+    ---
+
+    ### What was built, and why it was reverted
+
+    Counted configured-but-unhealthy valves per station; if N or more stayed unhealthy for 2 s,
+    set a group-fault flag and suppress those valves' `W_Unhealthy` / `W_LossPos` / `W_UnexpMove`
+    bits. Threshold in a Retain DB member, default 5.
+
+    **It worked** - verified live 2026-08-30 with six AFT valves: `W_Unhealthy[0]` went to
+    `16#0000` while the zone screen still showed `FAULTS 6`. Alarms suppressed, information kept.
+
+    **Reverted anyway, on the user's challenge, and the challenge was right.** The approach infers
+    a cause from a symptom count - "five valves went unhealthy, therefore the supply failed" - and
+    that carries problems a working implementation does not excuse:
+
+    - **The operator is never told alarms are being suppressed.** ISA-18.2 is explicit that
+      suppression must be visible and auditable. Alarms would simply stop appearing.
+    - **It can be confidently wrong.** Five genuinely failed valves get reported as a supply fault.
+    - **It has a threshold**, which means it has a threshold to get wrong.
+    - **It does not even fully solve the stated problem** - during the 2 s debounce the individual
+      alarms still raise and are still written to the alarm log. Verified: the alarm screen showed
+      them as `RaisedCleared` with ~20 s durations.
+
+    ---
+
+    ### The better fix, which needs no hardware and should probably happen regardless
+
+    **Neither `PosLostTmr` nor the `UnexpMove` latch tests `Healthy`.** That is the actual defect.
+
+    `Healthy` false means the device is dead, so its limit switches are meaningless:
+    - "Loss of Position" on a valve whose sensors are dead is a restatement, not news.
+    - "Unexpected Movement" because a limit switch dropped is **wrong** - the valve did not move,
+      the sensor died.
+
+    Gate both on `Healthy` and one supply failure produces **27 alarms instead of 81**, each of
+    them true: "CM52 reported Unhealthy". No counting, no threshold, no inference, no suppression,
+    nothing hidden from the operator.
+
+    It is also correct on its own merits: today a single genuinely faulty valve raises three alarms
+    when it should raise one.
+
+    ### And the proper cause detection
+
+    Measure the supply rather than infer it. **One 24 V monitoring relay per station, contact wired
+    to a spare DI.** The channels exist - `109-112`, `221-224`, `365-368`, four free per station
+    (item 40). That gives a real "AFT field supply failure" alarm from a real signal, and it is
+    what bit 5 of `HwWord` (Power/UPS, item 37) was always meant to be driven by.
+
+    **This needs to go to the client**, since it is a BOM and wiring change: three relays, three
+    spare DI channels, and it must be decided before item 40's order is placed.
+
+    ---
+
+    ### Worth keeping from the reverted work
+
+    **The `UnexpMove` latch timing.** Of the three conditions, only `UnexpMove` latches, and it
+    latches on the very first scan a made limit switch drops - which is the same scan every switch
+    on a station drops when its supply dies. A 2 s debounced flag arrives far too late to inhibit
+    it. Suppressing only the alarm bit would have left the latch set underneath and delivered all
+    27 faults the moment power returned: **the flood moved rather than being removed**, and it
+    would have passed a careless test that never checks recovery.
+
+    Any future implementation needs an undebounced signal for anything that gates a latch, and the
+    debounced one only for what gates alarm bits. The reverted code is in commit `943bc40` if that
+    reasoning needs to be recovered.
+
+    ---
+
+    ~~ALARM FLOOD. One 24 V field-supply failure raises 81 alarms and none of them says
     why. Found 2026-08-27.]**
 
     **The failure.** The 24 V supply feeding the field wiring on one station fails — fuse, loose
