@@ -551,6 +551,21 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
+    <!-- Retentive mirror of Valve[i].Configured. Retentivity on an optimized DB is set per
+         TOP-LEVEL member, and Configured lives inside Array[1..89] of "Valve_IO" - so it cannot
+         be made retentive on its own. Marking the whole Valve array Retain was rejected: that
+         array also holds OpenValve/CloseValve (the run latches) and both TON timers. A valve
+         mid-stroke when the power failed would come back with its run latch still TRUE, and
+         FC_IoMapper drives the real DQ from it - so the valve would restart on power-up with
+         nobody commanding it. This mirror keeps the one flag that should survive and leaves the
+         dangerous ones non-retentive. -->
+    <Member Name="ConfiguredRet" Datatype="Array[1..89] of Bool" Remanence="Retain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <!-- Self-resetting 2 s tick driving Clock_Flash. -->
     <!-- Drives Clock_1Hz. Separate from FlashTmr because they run at different rates. -->
     <Member Name="Clk1Tmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">

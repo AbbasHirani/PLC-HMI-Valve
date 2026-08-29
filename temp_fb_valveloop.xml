@@ -195,6 +195,20 @@
         FOR #b := 1 TO 9 DO
             &quot;Valves_DB&quot;.HwHealthy[#b] := TRUE;
         END_FOR;
+
+        // Restore which valves were in service, from the retentive mirror. Without this the
+        // whole plant came back UNCONFIGURED after any power cut: Configured is non-retentive
+        // with no start value, so all 89 read FALSE, FC_IoMapper skipped every valve and
+        // FB_ValveLoop refused every command - while the panel looked entirely normal. Nothing
+        // on the ship answered until somebody knew to press CONFIGURE ALL.
+        //
+        // Restored here rather than anywhere else because this block is the only code that runs
+        // exactly once per CPU start, before the 1..89 loop below saves the value straight back.
+        // Order matters: restore first, then the loop's save is a no-op on this scan.
+        FOR #b := 1 TO 89 DO
+            &quot;Valves_DB&quot;.Valve[#b].Configured := &quot;Valves_DB&quot;.ConfiguredRet[#b];
+        END_FOR;
+
         &quot;Valves_DB&quot;.HwInitDone := TRUE;
     END_IF;
 
@@ -215,6 +229,10 @@
     &quot;Valves_DB&quot;.HwHealthy[4] := NOT &quot;Diag_DB&quot;.FwdLost;
 
     FOR #i := 1 TO 89 DO
+        // Keep the retentive mirror in step with the live flag, so whatever an engineer sets on
+        // the Config screen survives the next blackout. One Bool copy per valve per scan.
+        &quot;Valves_DB&quot;.ConfiguredRet[#i] := &quot;Valves_DB&quot;.Valve[#i].Configured;
+
         IF &quot;Valves_DB&quot;.Valve[#i].Configured THEN
             // Snapshot BEFORE this scan's command/timer processing runs — needed by the
             // Unexpected Movement (F) guard below to tell a genuine idle-and-unexplained drop
