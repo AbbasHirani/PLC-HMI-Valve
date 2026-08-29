@@ -945,7 +945,33 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     e. **Sizing**: LogMaxSize is 20000 and the segment period is 30 days. Worth a sanity check
        against how many alarms 89 valves actually generate in service before handover.
 
-35. **[pending — BUILD THIS BEFORE THE PANEL SHIPS. Does NOT depend on the client.]**
+35. **[PLC half DONE and TESTED 2026-08-29. Remaining: the Config-screen entry fields.]**
+
+    **Built:** `TravelTimeout[1..89]` and `SeatBreakGrace[1..89]`, both `Time`, both `Retain`,
+    in `Valve_Channels_DB` with start values `T#60s` / `T#10s`. All three hardcoded `PT`
+    arguments in `FB_ValveLoop` now read them, with a zero guard falling back to the defaults.
+
+    **Tested live on CM79 (slot 21) through PLCSIM, with a SimTable driving the real addresses**
+    (`%I12.0-12.3` in, `%Q7.0-7.1` out - the actual channels 81-84 and 41-42):
+    - Set `TravelTimeout[21] := T#15S`, commanded OPEN with `ClosedFB` made, dropped `ClosedFB`
+      at ~5 s to simulate the seat breaking, then left both limits false. **`TimeoutOpenAlarm`
+      raised at 15 s and `Q7.0` dropped** - not 8 s (old code), not 60 s (default). The array
+      value genuinely drives the timer.
+    - Arrival path confirmed too: commanding OPEN then making `OpenFB` dropped `Q7.0` on arrival
+      with no alarm, proving the command is held until the limit switch confirms.
+    - `DirTmr[21].PT` observed reading `T#10S`, confirming `SeatBreakGrace` is wired as well.
+
+    **Note for anyone testing this again:** `TimerOpen.PT` is NOT a reliable live indicator. It
+    reads `T#0MS` before the timer has ever been called, and does not re-read the array while the
+    timer sits idle - observed directly, with the array at `T#15S` and `PT` still showing `T#1M`.
+    Watch `ET` and the actual alarm timing instead; `ET` is an output the timer writes every
+    scan. An hour is easily lost chasing that.
+
+    **Still open:** editable per-valve time fields on the Config screen, so values can be set at
+    the panel rather than by re-importing the DB. HMI work, batched with the rest.
+    Original analysis follows.
+
+    ~~BUILD THIS BEFORE THE PANEL SHIPS.~~
     **Per-valve travel and seat-break times, held as data instead of code.**
 
     Item 13 describes the defect and names the fix. This is the build task, split out because the
@@ -1003,7 +1029,25 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     engineer times each valve with a stopwatch and types the numbers in. That is true even if the
     client never answers Job A, which is the whole point of doing it this way.
 
-36. **[pending — BLOCKER for install. Found and decided 2026-08-27.]**
+36. **[PLC half DONE and TESTED 2026-08-29. Remaining: the Home banner.]**
+
+    **Built, but not the way this item originally said.** Retentivity on an optimized DB is set
+    per top-level member, and `Configured` sits inside `Array[1..89] of "Valve_IO"` - so it
+    cannot be made retentive on its own, and marking the whole array `Retain` would also retain
+    `OpenValve`/`CloseValve`. A valve mid-stroke at the power failure would then return with its
+    run latch still set, and `FC_IoMapper` drives the real DQ from it - **the valve would restart
+    with nobody commanding it.** Instead: `ConfiguredRet : Array[1..89] of Bool`, `Retain`,
+    restored inside the `HwInitDone` one-shot and written back every scan from the 1..89 loop.
+
+    **Tested live 2026-08-29:** with 23 valves configured and CM79 deliberately disabled,
+    `TotalConfigured` read **23 before a CPU stop/start and 23 after**, with `ConfiguredRet[21]`
+    still FALSE. Before this change it would have returned 0 with every valve unconfigured.
+
+    **Still open:** the Home banner on `TotalConfigured = 0`, which covers what retain cannot -
+    a memory reset or CPU swap, where the start value FALSE is what the CPU lands on. HMI work.
+    Original analysis follows.
+
+    ~~BLOCKER for install.~~
     **Every valve comes up UNCONFIGURED after a power cycle, so nothing responds until somebody
     presses CONFIGURE ALL.**
 
@@ -1064,7 +1108,20 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     confirm the exact pattern comes back — including the disabled one still disabled. Then memory-
     reset the CPU and confirm all 89 read UNCONF *and the Home banner appears*.
 
-37. **[prerequisite DONE 2026-08-28; the six alarms themselves still pending.]**
+37. **[prerequisite DONE and TESTED 2026-08-29; the six alarms themselves still pending.]**
+
+    **Tested live:** with `HwInitDone` TRUE, modifying `HwHealthy[1]` and `[8]` FALSE together
+    left **the other seven untouched** and `HwWord` read `16#0081` - bits 0 and 7, exactly the
+    two modified. Before this change all nine would have snapped back to TRUE and `HwWord` to
+    `16#0000`, taking the three working station alarms with them.
+
+    **Useful side observation:** the panel raised "PLC CPU fault detected" and "HMI Heartbeat
+    loss detected" while those bits were held, and cleared both when they were restored. So the
+    alarm definitions, the bit packing, the tag binding and the display are **all already
+    correct** for the six dead alarms. They are not broken - they are unconnected. Building the
+    heartbeat and OB82 means giving bits 7 and 4 something real to drive them, and everything
+    downstream already works.
+
 
     **The sentinel one-shot is in.** `HwInitDone` (Bool, NonRetain, no start value) added to
     `Valves_DB`, and `FB_ValveLoop`'s startup init now gates on it instead of testing
