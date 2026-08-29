@@ -1653,6 +1653,64 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     locked out by the new protection level. After (b), log in at the panel and confirm a user can
     actually be added and a password changed **in runtime**, not just that the warning disappeared.
 
+42. **[pending — 24 V POWER ARCHITECTURE. Three questions for the client, and they belong with
+    item 39's monitoring-relay question and item 40's order. Raised 2026-08-30.]**
+
+    **The question asked:** will `6EP1334-2BA20` power all 89 valves?
+
+    **It does not, and is not meant to.** `VALVE_SCADA_SYSTEM_TECHNICAL_DOCUMENTATION.md:339`
+    records the actuators as **Pleiger EHS, 230 VAC power / 24 VDC signalling**. The valves run on
+    230 VAC; the 24 V supply carries signals only. Worth stating plainly because the question is a
+    natural one and the answer changes what the load budget even means.
+
+    **What the 24 V does feed, with a rough estimate:**
+
+    | Load | Approx. |
+    |---|---|
+    | MTP1500 panel | 1.0-1.5 A |
+    | CPU 1214C | ~0.5 A |
+    | 3 x IM 155-6PN | ~0.6 A |
+    | 36 module electronics | ~1.5 A |
+    | DI field supply (limit switches, healthy contacts) | ~1.1 A |
+    | 176 interposing relay **coils** | ~0.3 A typical, ~1.3 A all-driving |
+
+    **Roughly 5-6 A.** `6EP1334-2BA20` is a SITOP PSU100S at 24 V / 10 A - **confirm against the
+    datasheet, this is from memory** - which would put it near 60% loaded. On capacity alone that
+    is a sensible design point. The relay coils are trivial; the panel is the largest single load.
+
+    **These figures are an estimate, not a design document.** No load calculation exists anywhere
+    in this project, and it is the sort of thing a surveyor asks to see.
+
+    ---
+
+    ### Three concerns that matter more than the headroom
+
+    a. **One supply for three cabinets spread along a ship.** AFT, midships and FWD are far apart.
+       24 V DC over long runs at several amps drops voltage, and ET200SPs are particular about
+       their supply. Normal practice is a **local PSU in each station cabinet**, fed by AC. If one
+       PSU is intended to feed all three over long DC runs, that is the first thing to question.
+
+    b. **Single point of failure.** One PSU dies and the CPU, the panel and all three stations go
+       together - every valve on the vessel at once. For a ballast, bilge **and fire** system that
+       invites a redundancy question: two supplies with a redundancy module, or at minimum a UPS.
+
+    c. **No load calculation.** See above.
+
+    ---
+
+    ### Questions for the client
+
+    1. Is this **one PSU for everything**, or one per station cabinet?
+    2. Is there a **UPS**, and does it have a volt-free alarm contact?
+    3. Can they supply a **load calculation**, or should we produce one for them to check?
+
+    **Bundle these with item 39's supply-monitoring relay question** - same conversation about
+    power, same spare DI channels, and both must be settled before item 40's order is placed.
+
+    **Consequence for item 37:** if the answer to (2) is "no UPS", then `HwWord` bit 5
+    (`System_Power_UPS_Fault`) should be **deleted** rather than left pretending to watch something
+    nothing drives.
+
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
 first if it hasn't already read it. The immediate next actions in priority order are items 4 and 1 in
