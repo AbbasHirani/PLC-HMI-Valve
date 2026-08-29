@@ -1629,7 +1629,12 @@ namespace ValveDemoHmiBuilder
                     if (dbBlock != null && dbBlock.Count > 0) 
                         Console.WriteLine("  [PLC] Import successful: " + dbBlock[0].Name);
                 } catch (Exception ex) {
-                    Console.WriteLine("  [PLC] (Skipping Valves_DB re-import - PLC is online or block exists)");
+                    // Print the real reason. This used to guess "PLC is online or block exists",
+                    // which is a plausible-sounding line that hides the actual exception - and on
+                    // 2026-08-29 it hid exactly that, while an import silently did nothing and the
+                    // run looked successful. A swallowed error that invents its own explanation is
+                    // worse than no message.
+                    Console.WriteLine("  [PLC] IMPORT FAILED: Valves_DB - " + Root(ex));
                 }
                 
                 // Import FB_ValveLoop
@@ -1640,7 +1645,12 @@ namespace ValveDemoHmiBuilder
                     if (loopBlock != null && loopBlock.Count > 0)
                         Console.WriteLine("  [PLC] Import successful: " + loopBlock[0].Name);
                 } catch (Exception ex) {
-                    Console.WriteLine("  [PLC] (Skipping FB_ValveLoop re-import - PLC is online or block exists)");
+                    // Print the real reason. This used to guess "PLC is online or block exists",
+                    // which is a plausible-sounding line that hides the actual exception - and on
+                    // 2026-08-29 it hid exactly that, while an import silently did nothing and the
+                    // run looked successful. A swallowed error that invents its own explanation is
+                    // worse than no message.
+                    Console.WriteLine("  [PLC] IMPORT FAILED: FB_ValveLoop - " + Root(ex));
                 }
 
                 // Import Valve_Meta_DB
@@ -1651,7 +1661,12 @@ namespace ValveDemoHmiBuilder
                     if (metaBlock != null && metaBlock.Count > 0)
                         Console.WriteLine("  [PLC] Import successful: " + metaBlock[0].Name);
                 } catch (Exception ex) {
-                    Console.WriteLine("  [PLC] (Skipping Valve_Meta_DB re-import - PLC is online or block exists)");
+                    // Print the real reason. This used to guess "PLC is online or block exists",
+                    // which is a plausible-sounding line that hides the actual exception - and on
+                    // 2026-08-29 it hid exactly that, while an import silently did nothing and the
+                    // run looked successful. A swallowed error that invents its own explanation is
+                    // worse than no message.
+                    Console.WriteLine("  [PLC] IMPORT FAILED: Valve_Meta_DB - " + Root(ex));
                 }
 
                 // Dynamic I/O Mapper scaffolding (UDT_Valve_Config, Valve_Channels_DB, IO_Buffer_DB,
@@ -1675,7 +1690,12 @@ namespace ValveDemoHmiBuilder
                     if (chBlock != null && chBlock.Count > 0)
                         Console.WriteLine("  [PLC] Import successful: " + chBlock[0].Name);
                 } catch (Exception ex) {
-                    Console.WriteLine("  [PLC] (Skipping Valve_Channels_DB re-import - PLC is online or block exists)");
+                    // Print the real reason. This used to guess "PLC is online or block exists",
+                    // which is a plausible-sounding line that hides the actual exception - and on
+                    // 2026-08-29 it hid exactly that, while an import silently did nothing and the
+                    // run looked successful. A swallowed error that invents its own explanation is
+                    // worse than no message.
+                    Console.WriteLine("  [PLC] IMPORT FAILED: Valve_Channels_DB - " + Root(ex));
                 }
                 try {
                     string ioPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_io_buffer_db.xml";
@@ -1684,7 +1704,12 @@ namespace ValveDemoHmiBuilder
                     if (ioBlock != null && ioBlock.Count > 0)
                         Console.WriteLine("  [PLC] Import successful: " + ioBlock[0].Name);
                 } catch (Exception ex) {
-                    Console.WriteLine("  [PLC] (Skipping IO_Buffer_DB re-import - PLC is online or block exists)");
+                    // Print the real reason. This used to guess "PLC is online or block exists",
+                    // which is a plausible-sounding line that hides the actual exception - and on
+                    // 2026-08-29 it hid exactly that, while an import silently did nothing and the
+                    // run looked successful. A swallowed error that invents its own explanation is
+                    // worse than no message.
+                    Console.WriteLine("  [PLC] IMPORT FAILED: IO_Buffer_DB - " + Root(ex));
                 }
                 try {
                     string fcPath = @"C:\Users\abbas\OneDrive\Documents\Automation\valveDemo2\temp_fc_iomapper.xml";
@@ -1693,7 +1718,12 @@ namespace ValveDemoHmiBuilder
                     if (fcBlock != null && fcBlock.Count > 0)
                         Console.WriteLine("  [PLC] Import successful: " + fcBlock[0].Name);
                 } catch (Exception ex) {
-                    Console.WriteLine("  [PLC] (Skipping FC_IoMapper re-import - PLC is online or block exists)");
+                    // Print the real reason. This used to guess "PLC is online or block exists",
+                    // which is a plausible-sounding line that hides the actual exception - and on
+                    // 2026-08-29 it hid exactly that, while an import silently did nothing and the
+                    // run looked successful. A swallowed error that invents its own explanation is
+                    // worse than no message.
+                    Console.WriteLine("  [PLC] IMPORT FAILED: FC_IoMapper - " + Root(ex));
                 }
                 // Reads real %I/%Q bits (AFT/MID/FWD ET200SP stations, addresses confirmed live in
                 // TIA 2026-08-08 after assigning all 3 to PLC_1's PROFINET IO system) into/out of
@@ -1705,7 +1735,12 @@ namespace ValveDemoHmiBuilder
                     if (physIoBlock != null && physIoBlock.Count > 0)
                         Console.WriteLine("  [PLC] Import successful: " + physIoBlock[0].Name);
                 } catch (Exception ex) {
-                    Console.WriteLine("  [PLC] (Skipping FC_PhysicalIoCopy re-import - PLC is online or block exists)");
+                    // Print the real reason. This used to guess "PLC is online or block exists",
+                    // which is a plausible-sounding line that hides the actual exception - and on
+                    // 2026-08-29 it hid exactly that, while an import silently did nothing and the
+                    // run looked successful. A swallowed error that invents its own explanation is
+                    // worse than no message.
+                    Console.WriteLine("  [PLC] IMPORT FAILED: FC_PhysicalIoCopy - " + Root(ex));
                 }
             } catch (Exception ex) {
                 Console.WriteLine("  [PLC] Skipping PLC block import: " + ex.Message);

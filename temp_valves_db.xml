@@ -566,6 +566,98 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
+    <!-- ============ 24 V field-supply group fault (item 39) ============================
+         A supply failure that leaves the ET200SP itself powered and on PROFINET puts every
+         input on that station at 0. Each valve then independently raises Unhealthy, Loss of
+         Position and Unexpected Movement - 81 alarms in about two seconds for one station,
+         267 if the failure is upstream of all three. None of them names the cause.
+         Station LOSS does not do this, because OB86 tells the PLC the rack is gone and
+         FC_IoMapper freezes the feedbacks. Nothing tells it the power died, so it believes
+         the zeros. Detected here instead, by counting how many valves went unhealthy at once. -->
+    <Member Name="SupplyFaultThreshold" Datatype="Int" Remanence="Retain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <StartValue>5</StartValue>
+    </Member>
+    <!-- How many unhealthy valves on one station constitute a supply fault rather than that
+         many broken valves. NOT "all", deliberately: ET200SP load groups mean one fuse may kill
+         only part of a station - how much depends on the BaseUnit mix, which is not finalised -
+         and an all-27 test would miss a partial failure and let it flood anyway. Retain, and a
+         DB member rather than a literal, so it can be tuned at commissioning without a download.
+         Accepted trade: five genuinely failed valves on one station report as a group fault. -->
+    <Member Name="AftUnhealthyCnt" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="MidUnhealthyCnt" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdUnhealthyCnt" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- Live counts, per station, of configured valves currently reading unhealthy. -->
+    <Member Name="AftSupplyFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="MidSupplyFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="FwdSupplyFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- Set when a station has been over threshold for the debounce period. While true, that
+         station's per-valve Unhealthy / LossPos / UnexpMove alarm bits are suppressed and the
+         UnexpMove LATCH is inhibited - the latter matters, because latching during the event
+         would deliver all 27 faults the moment power returned, moving the flood rather than
+         removing it. The valves still read unhealthy on screen; only the alarms are held back. -->
+    <Member Name="SupplyTmrAft" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SupplyTmrMid" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <Member Name="SupplyTmrFwd" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
+    <!-- ~2 s debounce so a transient cannot trip the group fault. -->
     <!-- Self-resetting 2 s tick driving Clock_Flash. -->
     <!-- Drives Clock_1Hz. Separate from FlashTmr because they run at different rates. -->
     <Member Name="Clk1Tmr" Datatype="TON_TIME" Version="1.0" Remanence="NonRetain" Accessibility="Public">
