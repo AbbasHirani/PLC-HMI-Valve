@@ -29,7 +29,153 @@ fixes it, STOP and don't force it (see the last section).
 
 ---
 
-## 1. Downloading to the real PLC
+## 1. Commissioning sequence — do these in this order
+
+The rest of this file is symptom-driven. This section is the running order. Everything
+below assumes the panel is built, the stations are powered, and the network is patched.
+
+### 1.1 Name the three ET200SP stations — before anything else
+
+PROFINET finds devices by **name**, not by IP. New stations arrive unnamed, and until each
+one carries the name the project expects, the CPU cannot find it.
+
+1. `Online access` → your laptop's network adapter → **Update accessible devices**.
+2. The stations appear, identified only by MAC address. **Three identical boxes.**
+3. Select one → **Flash LED**. The physical unit blinks. Walk to the cabinet and see which
+   one it is. This is the only reliable way to tell AFT from MID from FWD.
+4. Right-click → **Assign device name**, matching what the project expects.
+
+Where the project defines it: select the IM → `Properties` → `PROFINET interface` →
+`Ethernet addresses` → **PROFINET device name**.
+
+> **Check the AFT station's name in the project first.** Its IM is still called
+> `ET200SP_AFT_TEST`, so the device name is likely `et200sp-aft-test`. Assigning that writes
+> "test" onto hardware on a working ship. Rename it in the project before this step.
+
+Getting this wrong is not a subtle failure: **every valve on the ship answers to the wrong
+zone**, because `FC_IoMapper` keys the whole station-to-valve relationship off which station
+reported which channel.
+
+### 1.2 Download the hardware configuration
+
+Right-click `PLC_1` → `Download to device` → **Hardware configuration**.
+
+This sends the module layout, the addresses, and the **protection settings**. The CPU stops
+to accept it.
+
+> **On first commissioning, consider `Download to device → All` instead**, which sends
+> hardware and software in one operation. See 1.4 for why the order matters to the password.
+
+### 1.3 Download the program blocks
+
+Right-click `PLC_1` → `Download to device` → **Software (all blocks)**.
+
+`Main [OB1]`, `OB86`, `FB_ValveLoop`, `FC_IoMapper`, `FC_PhysicalIoCopy` and every DB. Then
+put the CPU in RUN.
+
+### 1.4 Expect the password prompt — and know when it starts
+
+The CPU is set to **Read access with a password** (item 41). Timing:
+
+| Download | Prompt? |
+|---|---|
+| The one that installs protection | **No** — the CPU is not protected yet when it begins |
+| Every download after that | **Yes** |
+| Going online only to read / watch | No — that is what Read access permits |
+
+The dialog appears when you click Download, before anything transfers. TIA remembers the
+password for the rest of that session, so it is one prompt per TIA session, not per download.
+
+**This is why `All` is easier on day one:** the whole install happens while the CPU is still
+unprotected, and the prompt starts from your next session.
+
+> The password must be in the handover pack that ships with the panel. If it is lost, the
+> only route back is a factory reset of the CPU, which **erases the program**.
+
+### 1.5 Confirm all three stations came online
+
+A free and very valuable test, and it happens before a single valve is touched.
+
+- Green LEDs on all three IMs.
+- No station alarms on the ALARMS screen.
+- If one is missing, `OB86` has fired and the matching `System_*_RIO_Fault` alarm is active —
+  which also proves that whole detection chain works on real hardware.
+
+Check the **device name first** if a station is missing. It is the most common cause and the
+least obvious.
+
+### 1.6 Fit the SD card, then download the HMI
+
+**Card first.** It goes in the panel's X51 slot and must be present *before* the runtime first
+starts, or alarm and audit logging have nowhere to write. See `README.md` → Panel installation.
+
+Then right-click `HMI_1` → `Download to device`. Separate device, separate download; it has no
+relationship to the PLC download beyond needing the PLC's tags to exist.
+
+The panel needs its **V20 runtime image** already installed. A panel from stock will not accept
+the project until it is updated — do that at the shop, not on board.
+
+### 1.7 First three numbers to read — this closes item 27
+
+As soon as you are online with the real CPU, `Online & diagnostics`:
+
+| Read | Where | Why |
+|---|---|---|
+| **Cycle time** — shortest / longest / current | Online & diagnostics | Scan time has never been measured on real hardware. Watch the *longest*: the 200 ms table refresh is a periodic spike. |
+| **Work memory** used vs free | same screen | 100 KB on a 1214C, shared by program and DBs. Never measured. |
+| **Cycle-time watchdog** setting | `PLC_1 → Properties → Cycle` | Confirms the actual limit. Exceeding it faults the CPU to STOP. |
+
+Estimated scan is 3–8 ms against a 150 ms watchdog, so this should be comfortable — but it is
+an estimate, and five minutes here replaces it with a fact.
+
+### 1.8 Configure the valves
+
+After any download, **every valve comes up UNCONFIGURED** and nothing responds. Press
+**CONFIGURE ALL** on the CONFIG screen.
+
+If item 36 has landed by then this stops being a step, and a Home banner says so out loud when
+it happens anyway. Until then it is an unmarked trap — the panel looks completely normal.
+
+### 1.9 The I/O check — the real work
+
+89 valves × 6 signals = **534 checks**. There is no shortcut and this is what a commissioning
+record is made of.
+
+Per valve:
+
+1. Operate the **open** limit switch by hand. Confirm that valve — **and only that valve** —
+   changes on the panel.
+2. Repeat for **closed**, **healthy**, **local**.
+3. Command OPEN, confirm the correct relay clicks. Then CLOSE.
+
+Step 1's second half is the one that matters. A wrong channel number shows up as *the wrong
+valve reacting*, and it is a **data fix**: change the number in `Valve_Channels_DB` and
+re-import. No code change, nothing to re-test beyond that valve.
+
+### 1.10 Stroke times
+
+Stopwatch each valve, both directions, seat to seat. Also note the **seat-break time** — how
+long it holds its starting limit switch after the actuator drives.
+
+Enter the measured values per valve. **This only works if item 35 has been built** — until the
+timers are per-valve data, there is nowhere to put the numbers and every valve slower than
+8 seconds will halt part-open on every command.
+
+### 1.11 Behaviour tests
+
+- **Pull a station's network cable** → one alarm, zone banner appears, positions freeze at last
+  known. Reconnect → recovers.
+- **Kill 24 V to one station** → today this gives ~81 alarms and nothing naming the cause. After
+  item 39 it should give one.
+- **Power-cycle the CPU** → confirm valves return configured (item 36) and that **nothing moves**
+  on startup.
+- **Switch the panel off** → today the PLC never notices. After the heartbeat work it should alarm.
+- **Clear every force before you leave.** A forced value survives a CPU restart and is easy to
+  forget. Force an output on a real valve and it moves.
+
+---
+
+## 2. Downloading to the real PLC
 
 **Symptom: "No accessible devices found" when trying to go online / download**
 - Check the physical Ethernet cable is actually in the PLC's PROFINET port, not a different port
@@ -63,7 +209,7 @@ fixes it, STOP and don't force it (see the last section).
 
 ---
 
-## 2. Going online / first power-up
+## 3. Going online / first power-up
 
 - Bring the PLC up **without the HMI panel connected first**, if practical — easier to diagnose
   PLC-only problems (via TIA's own online diagnostics) without a second device in the loop.
@@ -76,7 +222,7 @@ fixes it, STOP and don't force it (see the last section).
 
 ---
 
-## 3. I/O-specific checks (this is the part that matters most for this trip)
+## 4. I/O-specific checks (this is the part that matters most for this trip)
 
 The whole point of this trip is validating that real field signals reach the right valve on the
 HMI. Do this in order, valve by valve, starting with just 1-2 valves before assuming everything's
@@ -114,7 +260,7 @@ single most likely false alarm on-site — check it first if things look wrong.*
 
 ---
 
-## 4. TIA Portal quirks already known from this project (don't waste time rediscovering these)
+## 5. TIA Portal quirks already known from this project (don't waste time rediscovering these)
 
 - **`Attach()` / online operations occasionally throw a timeout error even when TIA is completely
   healthy.** Check Task Manager — if TIA is using real CPU (not stuck at 0%), it's just slow, not
@@ -132,7 +278,7 @@ single most likely false alarm on-site — check it first if things look wrong.*
 
 ---
 
-## 5. When to stop and not force it
+## 6. When to stop and not force it
 
 Do **not**:
 - Force-download over a device-name or module mismatch without understanding why it doesn't match
