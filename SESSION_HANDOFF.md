@@ -1190,7 +1190,34 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     `[8]` FALSE together and confirm the other seven **stay** where they were — that is the regression
     test for the sentinel fix, and it fails today.
 
-38. **[pending — THERE IS NO AUDIBLE ALARM. Decided 2026-08-27: use the panel buzzer.]**
+38. **[pending — THERE IS NO AUDIBLE ALARM. Step 1 answered 2026-08-29: the buzzer is NOT
+    reachable through Openness.]**
+
+    **Probe result, recorded this time.** `InspectAcousticSignal.exe` re-run 2026-08-29 and
+    its output committed as `acoustic_probe.log`. It scans the Siemens assemblies for any
+    type, method or property containing "Acoustic" and **finds nothing at all**. Confirmed
+    independently by a separate reflection pass over every type in `Siemens.Engineering.dll`,
+    which is where the `HmiUnified.*` types live - so the search was not looking in the wrong
+    assembly.
+
+    **Consequence: the builder cannot set this.** Whatever configures the panel buzzer is
+    either UI-only in TIA, or lives in the panel's own Control Panel, or is not a Unified
+    feature. This is the same class of thing as the alarm-log main database location (item
+    34) - real, settable, and invisible to Openness.
+
+    **Next, and it needs a human in the TIA UI:** look for an acoustic / audible option under
+    (a) `HMI_1 -> Runtime settings -> Alarms`, (b) the alarm class properties, and (c) the
+    MTP1500's own Control Panel. Record which one it is, because that determines whether it
+    is a documented manual step in the panel setup or something else entirely.
+
+    If none of those offers it, fall back to the hardwired sounder on a spare DQ - there are
+    10 free output channels per station (item 40), so the option costs nothing today.
+
+    Everything else in this item is unchanged: the localhost beep still has to go, the
+    class tiering is still decided, and the buzzer must still silence on acknowledge rather
+    than on clear. Original analysis follows.
+
+    ~~THERE IS NO AUDIBLE ALARM.~~
     **The "beep" is an HTTP call to a service that does not exist, it fails silently, and it only
     runs while the ALARMS screen is displayed.**
 

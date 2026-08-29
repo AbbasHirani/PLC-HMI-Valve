@@ -1,0 +1,29 @@
+=== PART 1: Scanning Siemens DLLs for 'Acoustic' types/members ===
+
+--- Siemens.Engineering.dll ---
+
+--- Siemens.Engineering.Hmi.dll ---
+
+=== PART 2: Reading SetAcousticSignal handler from live TIA project ===
+Found Btn_AckAll. Inspecting its EventHandlers composition type...
+EventHandlers type: Siemens.Engineering.HmiUnified.UI.Events.HmiButtonEventHandlerComposition
+
+Create overloads on EventHandlers:
+  Create(HmiButtonEventType eventType) : HmiButtonEventHandler
+
+Existing event handlers on Btn_AckAll:
+  Count: 1
+  Handler type: Siemens.Engineering.HmiUnified.UI.Events.HmiButtonEventHandler
+    Property: Parent : IEngineeringObject
+    Property: EventType : HmiButtonEventType
+    Property: Script : IHmiScript
+      Value type: Siemens.Engineering.HmiUnified.UI.Dynamization.Script.ScriptDynamization
+        SubProp: Parent : IEngineeringObject
+        SubProp: Async : Boolean
+        SubProp: GlobalDefinitionAreaScriptCode : String
+        SubProp: ScriptCode : String
+        SubProp: Trigger : Trigger
+        SubProp: DynamizationType : DynamizationType
+        SubProp: PropertyName : String
+
+Done. Press Enter to exit.
