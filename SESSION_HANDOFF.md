@@ -1504,37 +1504,60 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     bought. Light vs dark BaseUnits also decide where a new potential group starts, which matters for
     item 39's load-group reasoning.
 
-    **BOM RECEIVED 2026-08-30 and cross-checked — see `HARDWARE_BOM.md`.** This paragraph used to
-    say no parts list existed anywhere in the repo. It does now, and the check found six things:
+    **BOM RECEIVED and CLOSED OUT 2026-08-30 — see `HARDWARE_BOM.md`. Conclusion: nothing on the
+    BOM affects the software.** This paragraph used to say no parts list existed anywhere in the
+    repo. The full list with order numbers is now recorded:
 
-    - **Two relays short — RESOLVED same day, two extra will be ordered.** BOM listed **176**
-      Phoenix interposing relays; `Valve_Channels_DB` has **89 non-zero `OpenCmdChannel` and 89
-      non-zero `CloseCmdChannel`** values, counted not assumed, so **178** are needed. 176 is
-      88 x 2 — the valve-count saga reaching the purchase order. Still open: 178 is exact with no
-      spare relay, and a relay is the most likely thing on the list to fail in service; 4-6 shelf
-      spares suggested.
-    - **BaseUnits missing entirely.** 36 modules need 36 BaseUnits; none on the BOM, and none
-      modelled in the project either, so neither source catches it alone.
-    - **Bus adapters and server modules missing.** 3 x `6ES7 193-6AR00-0AA0` and
-      3 x `6ES7 193-6PA00-0AA0` are configured in the project and must be bought.
-    - **No spare I/O modules** — 23 DI + 13 DQ is exactly what the project consumes, which is this
-      item's whole point.
-    - **No power supply listed.** Hold it pending item 42.
-    - **HMI row is ambiguous:** "MTP1500 main / MTP1200 VE" at Qty 1. The project is
-      `6AV2 128-3QB06-0AXx`, and `3Q` is the **MTP1500** at 1920x1080. An MTP1200 is 1280x800, and
-      every screen here is authored at 1920x1080 with artwork exported to match those exact pixel
-      boxes. That is a re-measure and re-export of all four drawings, not a settings change.
-      **Confirm the panel before anything else on the list.**
+    | Order number | Part | Qty |
+    |---|---|---|
+    | `6AG1214-1AG40-4XB0` | **SIPLUS** S7-1200 CPU 1214C DC/DC/DC | 1 |
+    | `6AV2128-3QB06-0AX1` | HMI MTP1500 Unified Comfort | 1 |
+    | `6ES7155-6AU02-0BN0` | ET 200SP IM 155-6 PN | 3 |
+    | `6ES7131-6BH01-0BA0` | DI 16 x 24 VDC | 23 |
+    | `6ES7132-6BH01-0BA0` | DQ 16 x 24 VDC | 13 |
+    | `6EP1334-2BA20` | Power supply | 1 |
+    | — | Phoenix interposing relays | 176 → **178** |
 
-    **The audit's SIPLUS claim is WRONG.** It reported a SIPLUS `6AG1214-1AG40-4XB0` CPU. The
-    project is configured as **`6ES7 214-1AG40-0XB0`**, a standard 1214C, and the BOM's own text
-    says "S7-1200 CPU 1214C" — agreeing with the project, not the audit. The BOM carries no order
-    numbers at all, which is its own gap (a 1214C ships in three variants), but nothing anywhere
-    says SIPLUS. Its `6EP1334-2BA20` PSU claim is also unsupported: no PSU appears on this BOM.
+    **Matches exactly:** DI 23 = 23, DQ 13 = 13, interface modules 3 = 3, HMI part number identical
+    to the one already named in `GenerateHmiLayout.cs:44`.
 
-    What the BOM does get right: DI modules 23 = 23, DQ modules 13 = 13, interface modules 3 = 3.
-    The firmware readings from `inspect_hw.log` remain solid: CPU **V4.0**, the three IMs **V6.2**,
-    HMI **20.0.0.0**.
+    **One real find, already actioned:** relays were **176**, which is 88 x 2. `Valve_Channels_DB`
+    carries 89 non-zero `OpenCmdChannel` and 89 non-zero `CloseCmdChannel` values — counted, not
+    assumed — so **178** are needed. The valve-count saga reaching the purchase order. Confirmed
+    the same day that two extra will be ordered.
+
+    **TWO WORRIES RAISED HERE WERE WRONG. Both are corrected in `HARDWARE_BOM.md`:**
+
+    - **Panel resolution.** This item briefly warned that the screens were authored at 1920x1080 and
+      that an MTP1200 would mean re-exporting every drawing. The builder has **always** targeted the
+      MTP1500's real 1366x768 (`GenerateHmiLayout.cs:41-58`, `TARGET_W`/`TARGET_H` with `SX()`/
+      `SY()` scaling at write time) and the source comment already names `6AV2128-3QB06-0AX1`.
+      Nothing to do.
+    - **SIPLUS CPU.** This item said "the audit's SIPLUS claim is WRONG". **The audit was right.**
+      The CPU is `6AG1214-1AG40-4XB0`. It does not matter: the core `214-1AG40` is identical, SIPLUS
+      is the same device with conformal coating for salt air and vibration, and Siemens' own practice
+      is to configure it with the **standard** article number. Zero code impact.
+
+      Both errors came from reading the FIRST BOM, which carried descriptions and no order numbers.
+      Reading a gap as evidence is what produced them.
+
+    **OUT OF SCOPE — hardware team, not us.** BaseUnits, bus adapters, server modules, the PSU,
+    spare I/O modules and shelf spare relays were all raised here and are **withdrawn**. There is a
+    full hardware team. Sections 3.2–3.5 of `HARDWARE_BOM.md` stay as reference, not as actions.
+
+    **THE ONE THING THAT IS OURS, and it must reach the hardware team:**
+
+    > **If any I/O module is added or moved, tell us first — and append it at the END of its
+    > station, never in the middle.**
+
+    `FC_PhysicalIoCopy` holds 368 hardcoded DI and 208 DQ assignments. A module inserted mid-station
+    shifts every address behind it and silently invalidates the 534-entry channel map. Nobody finds
+    that by looking at the panel; it surfaces as valves answering the wrong commands.
+
+    **For the item 41 commissioning checklist, not the worry list:** confirm TIA downloads to the
+    SIPLUS CPU configured as the standard article number (if it objects, swap the device in the
+    catalog — minutes, no code change), and leave the configured firmware at **V4.0** unless there is
+    a reason, since bumping it can lock out downloading to an older CPU.
 
     **Verification after adding:** re-run `InspectAddresses` and confirm every existing `%I`/`%Q`
     address is **unchanged** and the new module's range sits entirely above them. If any existing

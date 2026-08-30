@@ -8,17 +8,18 @@ and **no parts list existed anywhere in this repository** to check that against.
 
 ## 1. The BOM as supplied
 
-| Description | Qty |
-|---|---|
-| 1 x S7-1200 CPU 1214C | 1 |
-| 1 x Unified Comfort HMI (MTP1500 main / MTP1200 VE) | 1 |
-| 2 x ET200SP interface modules | 3 |
-| ET200SP DI 16x24VDC modules | 23 |
-| ET200SP DQ 16x24VDC modules | 13 |
-| Phoenix interposing relays | 176 |
+The first version supplied carried descriptions only, with no order numbers. The real part list
+followed the same day and is what should be read:
 
-**No order numbers are given.** That is a gap in its own right — a 1214C exists in DC/DC/DC,
-AC/DC/RLY and DC/DC/RLY variants, and the BOM cannot be ordered from or variant-checked as written.
+| Order number | Part | Qty |
+|---|---|---|
+| `6AG1214-1AG40-4XB0` | **SIPLUS** S7-1200 CPU 1214C DC/DC/DC | 1 |
+| `6AV2128-3QB06-0AX1` | HMI MTP1500 Unified Comfort Panel | 1 |
+| `6ES7155-6AU02-0BN0` | ET 200SP PROFINET interface module IM 155-6 PN | 3 |
+| `6ES7131-6BH01-0BA0` | ET 200SP digital input module (DI 16 x 24 VDC) | 23 |
+| `6ES7132-6BH01-0BA0` | ET 200SP digital output module (DQ 16 x 24 VDC) | 13 |
+| `6EP1334-2BA20` | Power supply unit | 1 |
+| — | Phoenix interposing relays | 176 → **178** |
 
 ---
 
@@ -42,16 +43,41 @@ FWD 9 DI + 5 DQ = 23 and 13.
 correct — there are three stations. The description is a typo and should be fixed before ordering,
 because a reader could act on either number.)*
 
-### The CPU is NOT SIPLUS — the audit was wrong about this
+### The CPU is SIPLUS, and that is fine — correcting an earlier claim here
 
-The project is configured as **`6ES7 214-1AG40-0XB0` @ V4.0**, a standard S7-1200 CPU 1214C.
-The external audit claimed a SIPLUS `6AG1214-1AG40-4XB0`. The BOM's own text says "S7-1200 CPU
-1214C", which agrees with the project and not with the audit. Since the BOM carries no order
-numbers, it cannot confirm the exact variant — but nothing anywhere in this project or this BOM
-says SIPLUS.
+An earlier version of this file said "the CPU is NOT SIPLUS — the audit was wrong about this".
+**That was wrong**, and it was written from the first BOM, which carried no order numbers at all.
+The real list confirms the external audit: the CPU being bought is
+**`6AG1214-1AG40-4XB0`, a SIPLUS S7-1200 CPU 1214C DC/DC/DC**.
+
+**It is not a problem, and it changes nothing in this project.** Compare the two numbers:
+
+```
+6ES7 214-1AG40-0XB0    project, standard
+6AG1 214-1AG40-4XB0    buying,  SIPLUS
+```
+
+The core — `214-1AG40` — is identical. That is exactly how SIPLUS numbering works: the same
+device with conformal coating for humidity, salt air, vibration and a wider temperature range,
+carrying a `6AG1` prefix instead of `6ES7`. Same firmware, same instruction set, same memory, same
+everything the program touches. It is the right choice for a vessel.
+
+Siemens' own practice is to configure SIPLUS using the **standard** article number, because the
+devices are identical from the engineering side and many SIPLUS parts have no separate TIA catalog
+entry. So `6ES7 214-1AG40-0XB0` in the project against a physical `6AG1214-1AG40-4XB0` is expected
+rather than a mistake.
+
+**Confirm it at first download rather than assume it** — on the item 41 checklist, not the worry
+list. If TIA does object, it is a device swap in the hardware catalog: minutes, and **zero code
+change**. Nothing in the program, the DBs, the HMI or the channel map depends on it.
+
+**HMI matches exactly.** Buying `6AV2128-3QB06-0AX1`; `GenerateHmiLayout.cs:44` already names that
+very part number in a comment. No question here at all — see 3.6.
 
 Firmware readings, all from `inspect_hw.log` and solid:
-CPU **V4.0**, the three IMs **V6.2**, HMI **20.0.0.0**.
+CPU **V4.0**, the three IMs **V6.2**, HMI **20.0.0.0**. The physical CPU will likely ship newer than
+V4.0. Configuring a *lower* firmware than the hardware is normal and fine — but nobody should bump
+it in the project without a reason, since that can lock out downloading to an older CPU.
 
 ---
 
@@ -135,38 +161,74 @@ The `6EP1334-2BA20` discussed in item 42 does not appear here. Item 42's three o
 one PSU feeding three distributed cabinets, single point of failure, and no load calculation
 existing anywhere — are unresolved, so **do not order power on this BOM's authority**.
 
-### 3.6 HMI: MTP1500 or MTP1200? The screens only work on one
+### 3.6 Panel resolution — RESOLVED, and the earlier worry here was wrong
 
-The row reads "Unified Comfort HMI (MTP1500 main / MTP1200 VE)" at Qty 1, which is ambiguous.
+An earlier version of this file warned that the project was authored at 1920 x 1080 and that an
+MTP1200 would mean re-exporting every drawing. **The premise was wrong on both counts.**
 
-The project is configured as **`6AV2 128-3QB06-0AXx`**. The `3Q` in that number is the **MTP1500**
-— 15.6 inch, **1920 × 1080**. An MTP1200 is 12.1 inch, **1280 × 800**.
+The panel is confirmed as **MTP1500 Unified Comfort, `6AV2128-3QB06-0AX1`** — 15.6 inch, and its
+real resolution is **1366 x 768**, not 1920 x 1080.
 
-**Every screen in this project is authored at 1920 × 1080.** Artwork was exported to match those
-exact pixel boxes so overlay coordinates map 1:1 with no runtime rescaling (see item 32). Putting
-this project on an MTP1200 is not a settings change — it is a re-measure and re-export of all four
-drawings plus every overlay coordinate.
+**The builder already targets exactly that, and always has.** `GenerateHmiLayout.cs:41-58`:
 
-Confirm which panel is actually being bought before anything else on this list.
+```csharp
+private const int SCREEN_W = 1920;   // virtual design canvas
+private const int SCREEN_H = 1080;
+// Real target panel (MTP1500, 6AV2128-3QB06-0AX1) is 1366x768, not 1920x1080.
+private const int TARGET_W = 1366;
+private const int TARGET_H = 768;
+private static int SX(int v) { return (int)Math.Round(v * (double)TARGET_W / SCREEN_W); }
+private static int SY(int v) { return (int)Math.Round(v * (double)TARGET_H / SCREEN_H); }
+```
+
+Screens are authored against a 1920 x 1080 virtual canvas and every coordinate is scaled to real
+panel pixels at the moment it is written to a screen item. X and Y scale by slightly different
+factors on purpose, because 1366 x 768 is not exactly 16:9. `SFont()` scales type with a floor of
+10 px so scaled-down text stays legible.
+
+**Nothing to do.** The code even names the exact order number being bought.
 
 ---
 
-## 4. Summary of what to add before ordering
+## 4. Conclusion — nothing on this BOM affects the software
 
-| | Item | Qty |
-|---|---|---|
-| 1 | ~~Interposing relays — correct 176 to **178**~~ **confirmed, +2 being ordered** | done |
-| 1b | Shelf spare relays beyond the 178 — open question | +4–6 |
-| 2 | BaseUnits for every I/O module | 36 + spares |
-| 3 | BusAdapter BA 2xRJ45 `6ES7 193-6AR00-0AA0` | 3 |
-| 4 | Server module `6ES7 193-6PA00-0AA0` | 3 |
-| 5 | Spare DI16 `6ES7 131-6BH01-0BA0` | 3 (one per station) |
-| 6 | Spare DQ16 `6ES7 132-6BH01-0BA0` | 2 (AFT, MID) |
-| 7 | Power supply — **hold** pending item 42 | — |
-| 8 | Add order numbers to every line | — |
-| 9 | Confirm MTP1500 vs MTP1200 | — |
+**Matches the project exactly:** DI modules 23 = 23, DQ modules 13 = 13, interface modules 3 = 3,
+and the HMI part number is the same one already named in the builder's source.
 
-**After the spares are added to the TIA project**, re-run `InspectAddresses` and confirm every
-existing `%I`/`%Q` address is **unchanged**, with the new modules' ranges entirely above them. If
-any existing address moved, the module went in at the wrong position — reposition before touching
-`FC_PhysicalIoCopy`.
+**Found and fixed:** relays 176 → **178**. 176 was 88 valves x 2; the system has **89**. Confirmed
+2026-08-30 that two extra will be ordered.
+
+**Two worries raised here were wrong, and are corrected above:** the panel resolution (the builder
+has always targeted 1366 x 768) and the SIPLUS CPU (normal practice, zero code impact). Both came
+from reading the first BOM, which carried no order numbers.
+
+### Out of scope — hardware team, not this project
+
+BaseUnits, bus adapters, server modules, the power supply, spare I/O modules and shelf spare
+relays. Raised here originally and withdrawn: there is a full hardware team and these are theirs.
+The notes remain in 3.2–3.5 as reference only, not as actions on us.
+
+### The ONE thing that is ours, and must reach the hardware team
+
+> **If any I/O module is added or moved, tell us first — and append it at the END of its station,
+> never in the middle.**
+
+`FC_PhysicalIoCopy` holds **368 hardcoded DI and 208 DQ address assignments**, mapping
+`DI[n] -> %I(2 + (n-1)/8).((n-1) mod 8)` across exactly `%I2.0-%I47.7` and `%Q2.0-%Q27.7`. A module
+inserted mid-station shifts every address behind it and silently invalidates the 534-entry channel
+map. Appending after the last module gives fresh addresses above everything existing and moves
+nothing.
+
+Nobody finds that by looking at the panel. It surfaces as valves responding to the wrong commands.
+
+**If a module is ever added:** re-run `InspectAddresses` and confirm every existing `%I`/`%Q`
+address is **unchanged**, with the new module's range entirely above them. If any existing address
+moved, the module went in at the wrong position — reposition before touching `FC_PhysicalIoCopy`.
+
+### For the commissioning checklist (item 41), not the worry list
+
+- Confirm TIA downloads to the SIPLUS CPU configured as the standard article number. If it objects,
+  swap the device in the hardware catalog — minutes, no code change.
+- The project configures firmware **V4.0**; the CPU will likely ship newer. Configuring lower is
+  normal and fine. Do not let anyone bump it without a reason — that can lock out downloading to an
+  older CPU.
