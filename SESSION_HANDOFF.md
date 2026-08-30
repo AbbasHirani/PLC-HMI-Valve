@@ -949,6 +949,40 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     **VERIFIED on the panel 2026-08-30.** Unused rows read genuinely empty and no longer respond
     to a tap; populated rows unchanged. Item closed.
 
+45. **[FIXED 2026-08-30. Read this before adding any new entry point to the builder.]**
+    **Three separate builder paths mutated the project and never saved it.**
+
+    Found while deleting the item 37 alarms: `--purge-alarms` deleted alarms and returned without
+    a `Save()`. Two purges had already run, so those deletions were sitting in TIA's memory only,
+    where one crash would have lost them silently — the tool having reported success.
+
+    Auditing the rest of the entry points found two more:
+
+    | Path | Mutates | Saved? |
+    |---|---|---|
+    | `Run()` (normal) | everything | yes — **fixed 2026-08-27** |
+    | `--import-only` | PLC blocks | yes — **fixed 2026-08-27**, returned before the save |
+    | `--purge-alarms` | deletes alarms | **no — fixed 2026-08-30** |
+    | `--fix-tags` | creates/rebinds HMI tags | **no — fixed 2026-08-30** |
+    | `--alarm-colors` | alarm class colours | **no — fixed 2026-08-30** |
+    | `--finish-login-auth` | Authorization | yes, always did |
+
+    **`--fix-tags` is the worst of the three.** It exists specifically to bind newly created tags to
+    their PLC addresses, and several items in this file name it as the required follow-up to any
+    tag-creating run. Without a save it reports success and loses the binding the moment TIA is
+    closed without one — and the symptom appears later as tags that "did not bind", sending
+    somebody after the binding code rather than the save.
+
+    **The pattern is what matters.** This is the third time this exact bug has been found in this
+    builder, each time only after it had a chance to destroy work: `Run()` cost an 80-minute build
+    to a TIA crash on 2026-08-27, `--import-only` was the same bug one branch over, and these three
+    were found by looking rather than by losing something. **Any new path that touches the project
+    ends with `SaveProject(project)`.** There is no case where a mutating pass should return without
+    one.
+
+    Worth noting the tell: a run that changes the project and prints no `[SAVE] Project saved.` line
+    has not saved. That line is the only evidence, and it is worth checking on any unfamiliar flag.
+
 ## 4. The valve count saga — read this before touching counts again
 
 This went through several wrong turns; the final answer is solid but got there messily:
@@ -1320,7 +1354,47 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     confirm the exact pattern comes back — including the disabled one still disabled. Then memory-
     reset the CPU and confirm all 89 read UNCONF *and the Home banner appears*.
 
-37. **[prerequisite DONE and TESTED 2026-08-29; the six alarms themselves still pending.]**
+37. **[THREE of the six resolved 2026-08-30 by DELETION. Three remain, and they are real work.]**
+
+    **Deleted 2026-08-30 — they could never have fired, by construction.** The alarm count went
+    **721 → 718** (89 × 8 + 6), verified independently with `ProbeBlankAlarm.exe`, with no blank
+    names or texts and nothing collateral:
+
+    | Bit | Alarm | Why it was impossible, not merely unwired |
+    |---|---|---|
+    | 0 | `System_PLC_CPU_Fault` | Set by the PLC program. If the CPU is stopped or faulted the program is not running, so it can never set its own fault bit. |
+    | 6 | `System_Network_Loss` | The PLC cannot tell the HMI its network is down — if it were, the HMI could not read the bit. |
+    | 8 | `System_General_Fault` | Nothing anywhere sets it and there is no definition of what it would mean. |
+
+    No amount of code fixes those three, which is what separated them from the rest. An alarm that
+    can never fire is worse than none: the list implies coverage that does not exist, and the person
+    who trusts it will be diagnosing a real fault at the time. Real coverage for the first two
+    already reaches the operator through WinCC's own `PlcInStopAlarm` and `PlcDisconnectedAlarm` —
+    confirmed reachable, because the Alarm Control's Filter is empty (see the item 8 correction).
+
+    **Bits 4, 5 and 7 were deliberately KEPT.** They are implementable and merely unimplemented,
+    which is a todo, not dead weight:
+    - **bit 4, I/O module** — needs OB82 created in the TIA UI plus module diagnostics enabled.
+    - **bit 5, Power/UPS** — blocked on item 42; there may be no UPS to monitor at all, in which
+      case this one joins the deleted three.
+    - **bit 7, HMI heartbeat** — buildable now, but what the PLC should *do* when the panel dies is
+      a fail-safe question and belongs with item 9 and the client. An HMI-dead alarm that displays
+      on the HMI is circular; its value is the PLC knowing, not the operator being told.
+
+    **`HwWord` still packs all nine bits, deliberately.** Renumbering to close the gaps would
+    silently re-point the surviving alarms at the wrong bits. The three unused ones stay clear.
+    Do not "tidy" that.
+
+    **Method note:** deleted with `--purge-alarms=<FULL alarm name>`, one at a time, each confirming
+    `Found 1`. The flag matches by name *suffix*, so a careless `--purge-alarms=_Fault` would have
+    taken the three surviving RIO alarms, the I/O and UPS and heartbeat alarms **and all 89
+    `_DirFault` alarms**, with nothing but a count in the log to notice it by. Always pass the full
+    name, and always check the count before the next run.
+
+    HMI compiled **0 errors, 1 warning** (item 41 language warning) after the deletions — which is
+    also what proves nothing else referenced them.
+
+    The original analysis of the prerequisite follows.
 
     **Tested live:** with `HwInitDone` TRUE, modifying `HwHealthy[1]` and `[8]` FALSE together
     left **the other seven untouched** and `HwWord` read `16#0081` - bits 0 and 7, exactly the

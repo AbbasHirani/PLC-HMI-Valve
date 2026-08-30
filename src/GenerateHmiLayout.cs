@@ -183,6 +183,11 @@ namespace ValveDemoHmiBuilder
                 }
             }
             Console.WriteLine("  Deleted " + killed + " of " + doomed.Count + ".");
+            // This was MISSING until 2026-08-30, so every purge lived in TIA's memory only and
+            // one crash lost it. Exactly the failure that cost an 80-minute build on 2026-08-27
+            // when Run() itself never saved, and again when --import-only returned before the
+            // save. Any path that mutates the project has to end here.
+            SaveProject(project);
         }
 
         static void Run(HashSet<string> only, bool fixTags = false, string dumpTag = null, string exportBlock = null, bool importOnly = false, bool alarmColorsOnly = false)
@@ -220,6 +225,11 @@ namespace ValveDemoHmiBuilder
                 Console.WriteLine("\n[FIX-TAGS] Re-binding tags that were created before the PLC was compiled...");
                 CreateSummaryHmiTags(fixHmi, true);
                 Console.WriteLine("\n=== Fix-tags complete! ===");
+                // Added 2026-08-30 alongside the same fix to --purge-alarms. This pass exists to
+                // bind newly created tags to their PLC addresses and is the documented follow-up to
+                // any tag-creating run - so without a save it reports success and loses the binding
+                // the moment TIA closes without one. Every mutating path in this file ends here.
+                SaveProject(project);
                 return;
             }
 
@@ -274,6 +284,7 @@ namespace ValveDemoHmiBuilder
                 if (acHmi == null) { Console.WriteLine("[ERROR] HMI software not found."); return; }
                 ApplyAlarmClassColors(acHmi);
                 Console.WriteLine("\n=== Alarm colours applied! (no other changes) ===");
+                SaveProject(project);
                 return;
             }
 
@@ -1993,16 +2004,42 @@ namespace ValveDemoHmiBuilder
             // that CreateDiscreteAlarm must set explicitly, matching its class's value.
             _classPriorities = classPriorities;
 
-            // Generate 9 System Alarms (HwWord bits 0..8)
-            CreateDiscreteAlarm(hmi, "System_PLC_CPU_Fault", "System", "PLC CPU fault detected.", dbName + "_HwWord", 0, "PLC", "SYSTEM");
+            // System Alarms on HwWord bits 0..8 - SIX of the nine, not nine.
+            //
+            // Three were deleted 2026-08-30 (item 37) because they cannot fire BY CONSTRUCTION,
+            // not merely because nothing writes them yet. This distinction is the whole point:
+            //
+            //   bit 0  "PLC CPU fault"   - set by the PLC program. If the CPU is stopped or
+            //                              faulted the program is not running, so it can never
+            //                              set its own fault bit. WinCC's own PlcInStopAlarm
+            //                              covers this and does reach the operator (the Alarm
+            //                              Control's Filter is empty - see item 8).
+            //   bit 6  "Network loss"    - the PLC cannot tell the HMI its network is down,
+            //                              because if it were, the HMI could not read the bit.
+            //                              WinCC's PlcDisconnectedAlarm is the real detector.
+            //   bit 8  "General fault"   - nothing anywhere sets it and there is no definition
+            //                              of what it would mean.
+            //
+            // An alarm that can never fire is worse than no alarm: the list implies coverage that
+            // does not exist, and the person who trusts it will be diagnosing a real fault at the
+            // time. No code could fix these three - hence deletion rather than a todo.
+            //
+            // The bits are still PACKED by FB_ValveLoop, deliberately. Renumbering HwWord to close
+            // the gaps would silently re-point the surviving alarms at the wrong bits, and the
+            // three unused ones simply stay clear. Do not "tidy" that.
+            //
+            // Bits 4, 5 and 7 below are NOT dead - they are implementable and merely unimplemented,
+            // which is a todo, not dead weight. Keep them:
+            //   bit 4  I/O module   - needs OB82 created in the TIA UI + module diagnostics on
+            //   bit 5  Power/UPS    - blocked on item 42; there may be no UPS to monitor at all
+            //   bit 7  HMI heartbeat- buildable, but what the PLC should DO when the panel dies
+            //                         is a fail-safe question and belongs with item 9
             CreateDiscreteAlarm(hmi, "System_Aft_RIO_Fault", "System", "Aft Ballast RIO station failure.", dbName + "_HwWord", 1, "RIO", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Bilge_RIO_Fault", "System", "Bilge/ER RIO station failure.", dbName + "_HwWord", 2, "RIO", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Fwd_RIO_Fault", "System", "Fwd Ballast RIO station failure.", dbName + "_HwWord", 3, "RIO", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_IO_Module_Fault", "System", "I/O Module fault detected.", dbName + "_HwWord", 4, "I/O", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Power_UPS_Fault", "System", "Power/UPS fault detected.", dbName + "_HwWord", 5, "POWER", "SYSTEM");
-            CreateDiscreteAlarm(hmi, "System_Network_Loss", "System", "Network loss detected.", dbName + "_HwWord", 6, "NETWORK", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Heartbeat_Fault", "System", "HMI Heartbeat loss detected.", dbName + "_HwWord", 7, "HMI", "SYSTEM");
-            CreateDiscreteAlarm(hmi, "System_General_Fault", "System", "System fault detected.", dbName + "_HwWord", 8, "SYSTEM", "SYSTEM");
 
             for (int i = 1; i <= VALVE_COUNT; i++) {
                 string vId = string.Format("V{0:D3}", i);
@@ -2047,7 +2084,7 @@ namespace ValveDemoHmiBuilder
                 // actuator from a stuck limit switch, but the technician with a multimeter can.
                 CreateDiscreteAlarm(hmi, vId + "_DirFault", "ValveWarning", cm + " Direction / limit fault - check actuator and limit switch wiring.", dbName + "_W_DirFault_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
             }
-            Console.WriteLine("  Created " + (VALVE_COUNT * 8 + 9) + " discrete alarms.");
+            Console.WriteLine("  Created " + (VALVE_COUNT * 8 + 6) + " discrete alarms.");   // 89x8 + 6 system = 718
         }
 
         static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit, string origin, string area)
