@@ -1454,7 +1454,9 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     to be got wrong, and it fails silently in testing unless you look for it specifically.
 
 40. **[pending — ORDER SPARE I/O MODULES BEFORE THE PANEL IS BUILT. Cheap now, a mobilisation
-    later. Verified 2026-08-27.]**
+    later. Verified 2026-08-27. BOM received and cross-checked 2026-08-30 — `HARDWARE_BOM.md`;
+    NINE things to settle before the order goes in, including two missing relays and an
+    unconfirmed panel model.]**
 
     **Three spare valve slots on the entire vessel — 3.4%.**
 
@@ -1502,14 +1504,34 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     bought. Light vs dark BaseUnits also decide where a new potential group starts, which matters for
     item 39's load-group reasoning.
 
-    **Caveat on the BOM, stated plainly:** an external audit reported order-number and firmware
-    mismatches against "what you are buying", including a SIPLUS `6AG1214-1AG40-4XB0` CPU and a
-    `6EP1334-2BA20` PSU. **No parts list exists anywhere in this repository** — those part numbers
-    appear in no file, including inside the `.xlsx` files. Either the BOM was supplied to that agent
-    outside the repo, or the column was fabricated. **Get the real BOM into the repo** so this is
-    checkable; until then treat any BOM-vs-project comparison as unverified. The firmware readings
-    themselves are solid, being read from `inspect_hw.log`: CPU configured at **V4.0**, the three IMs
-    at **V6.2**, HMI at **20.0.0.0**.
+    **BOM RECEIVED 2026-08-30 and cross-checked — see `HARDWARE_BOM.md`.** This paragraph used to
+    say no parts list existed anywhere in the repo. It does now, and the check found six things:
+
+    - **Two relays short.** BOM lists **176** Phoenix interposing relays; `Valve_Channels_DB` has
+      **89 non-zero `OpenCmdChannel` and 89 non-zero `CloseCmdChannel`** values, counted not assumed,
+      so **178** are needed. 176 is 88 x 2 — the valve-count saga reaching the purchase order.
+    - **BaseUnits missing entirely.** 36 modules need 36 BaseUnits; none on the BOM, and none
+      modelled in the project either, so neither source catches it alone.
+    - **Bus adapters and server modules missing.** 3 x `6ES7 193-6AR00-0AA0` and
+      3 x `6ES7 193-6PA00-0AA0` are configured in the project and must be bought.
+    - **No spare I/O modules** — 23 DI + 13 DQ is exactly what the project consumes, which is this
+      item's whole point.
+    - **No power supply listed.** Hold it pending item 42.
+    - **HMI row is ambiguous:** "MTP1500 main / MTP1200 VE" at Qty 1. The project is
+      `6AV2 128-3QB06-0AXx`, and `3Q` is the **MTP1500** at 1920x1080. An MTP1200 is 1280x800, and
+      every screen here is authored at 1920x1080 with artwork exported to match those exact pixel
+      boxes. That is a re-measure and re-export of all four drawings, not a settings change.
+      **Confirm the panel before anything else on the list.**
+
+    **The audit's SIPLUS claim is WRONG.** It reported a SIPLUS `6AG1214-1AG40-4XB0` CPU. The
+    project is configured as **`6ES7 214-1AG40-0XB0`**, a standard 1214C, and the BOM's own text
+    says "S7-1200 CPU 1214C" — agreeing with the project, not the audit. The BOM carries no order
+    numbers at all, which is its own gap (a 1214C ships in three variants), but nothing anywhere
+    says SIPLUS. Its `6EP1334-2BA20` PSU claim is also unsupported: no PSU appears on this BOM.
+
+    What the BOM does get right: DI modules 23 = 23, DQ modules 13 = 13, interface modules 3 = 3.
+    The firmware readings from `inspect_hw.log` remain solid: CPU **V4.0**, the three IMs **V6.2**,
+    HMI **20.0.0.0**.
 
     **Verification after adding:** re-run `InspectAddresses` and confirm every existing `%I`/`%Q`
     address is **unchanged** and the new module's range sits entirely above them. If any existing
