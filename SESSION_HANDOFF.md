@@ -796,330 +796,6 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     Cost: it rides the `--only=DiscreteAlarms` pass, which is slow (~45 min) but has to run anyway if
     anything else about the alarm set changes. Do it in the same session as 24 and 26.
 
-43. **[CLOSED 2026-08-30. Cause confirmed by test, no code fix needed.]**
-    **Blank rows in the alarm list are a stale VIEW, not a stale alarm.**
-
-    Seen on the panel 2026-08-30: an active-alarm row with PRIORITY `14`, SYSTEM `BALLAST AFT`,
-    STATUS `RaisedCleared`, TIME `8/29/2026 6:38`, DURATION `0` — and **ALARM ID and
-    DESCRIPTION both empty.**
-
-    **The configuration is not at fault.** Probed live with `ProbeBlankAlarm.exe`:
-
-    ```
-    DISCRETE ALARMS: 721
-      blank NAME:      0
-      blank EventText: 0
-    ```
-
-    and the alarm it should have been reads correctly:
-
-    ```
-    V021_Unhealthy  class=ValveFault pri=14 origin='CM79' area='BALLAST AFT'
-                    tag='Valves_DB_W_Unhealthy_1' bit=4
-                    'CM79 reported Unhealthy status.'
-    ```
-
-    **How the two candidate causes were separated.** A runtime-language mismatch was the obvious
-    suspect, since every alarm carries text in exactly one language and the HMI compile does warn
-    about language configuration (item 41). It is ruled out by the ALARM ID column: that column is
-    bound to `Name` (`GenerateHmiLayout.cs:952`), and a name is never translated. A language fault
-    blanks DESCRIPTION and leaves ALARM ID populated. **Both** blank means the runtime cannot
-    resolve the row to any definition at all.
-
-    **What it is.** The alarm raised during the 2026-08-29 CM79 testing (slot 21 = AFT =
-    `BALLAST AFT`, ValveFault = priority 14), cleared instantly, and was never acknowledged — so it
-    correctly stayed in the ACTIVE list, which is ISA-18.2 behaviour, not a bug: a transient fault
-    must not vanish before anyone sees it. The HMI configuration was then rebuilt and re-downloaded.
-    The runtime keeps the alarm *instance* and the fields stored on it — priority, area, timestamps,
-    state, duration, all of which still render — but name and text are looked up from the loaded
-    configuration at display time, and the definition that instance pointed at is gone. What shows
-    on that row is exactly the subset that survives without a definition.
-
-    **What the tests actually showed — and where the first explanation was wrong.**
-
-    - **ACKNOWLEDGE ALL did NOT clear it.** The pending-ack count went 1 to 0, so the ack was
-      dispatched, but the row stayed with its ACK TIME still empty and its STATUS still
-      `RaisedCleared`. Compare row 2, a genuine WinCC alarm, which acknowledged normally and
-      showed `ACK TIME 8/30/2026 2:55`.
-    - **Switching to ALARM HISTORY and back to ACTIVE ALARMS cleared it immediately.**
-
-    That second result is what pins the cause. The phantom lived in the **AlarmControl's rendered
-    view**, not in the runtime's alarm store: switching tabs makes the control re-query its source,
-    the row is not in the result, and it goes. A persisted or orphaned *instance* would have
-    survived that.
-
-    So the fields behave exactly as expected once you know where it lives. Name and Alarm text are
-    resolved from the configuration when the row is drawn, and the definition they pointed at was
-    replaced by an HMI download while the row was on screen — hence both blank. Priority, area,
-    timestamp, state and duration had already been materialised into the row, so they still read.
-    The ack could be dispatched but could not update a row that is backed by nothing.
-
-    **The first write-up of this item said the cure was "acknowledge all alarms before every HMI
-    download".** That was wrong and is corrected in `HARDWARE_INSTALL_TROUBLESHOOTING.md` 1.6:
-    acknowledging does not touch it. The cure is to make the list rebuild — ALARM HISTORY and back,
-    or leave the screen and return. Recorded because the wrong version was committed first
-    (`53dc222`) and someone reading only that commit would carry the wrong habit onto the ship.
-
-    **Severity: low.** No persisted corruption, nothing to change about download practice, and it
-    clears itself the next time the list is rebuilt. Worth documenting only so nobody spends an
-    hour treating it as a broken alarm system.
-
-    **Still worth doing once, for a different reason:** force `Valves_DB.W_Unhealthy_1` bit 4 and
-    confirm a fresh row reads `V021_Unhealthy` / "CM79 reported Unhealthy status.". That proves the
-    alarm text path end-to-end in the runtime and independently retires the runtime-language worry
-    (item 41) for the alarm list.
-
-44. **[DONE 2026-08-30, patched into the live project. Needs a look on the panel.]**
-    **Command buttons drew on EMPTY table rows.**
-
-    Reported from the panel: FWD page 3 (7 of 14 rows used), BILGE page 2 (13 of 14) and CONFIG
-    page 6 of 6 (9 of 16) all drew full-strength OPEN / CLOSE and DISABLED buttons on their unused
-    rows — no CM number, no tag, no status, but a button.
-
-    **Never dangerous, and that was checked before anything else.** `AddSlotCmdScript`
-    (`MarineScreens.cs:464`) reads the slot's NO. tag and returns on zero, with a second guard on
-    `Configured` after it; the Config toggle's click handler does the same. A press on an empty row
-    writes nothing. The problem is that a button which looks pressable and does nothing teaches an
-    operator that buttons sometimes do not work — not a lesson worth teaching on a panel that
-    strokes ballast valves.
-
-    **No PLC change was needed — the signal already existed.** `FB_ValveLoop` writes
-    `<Zone>TblState := 9`, `TblNo := 0` and an empty `TblStateTxt` for an unused slot
-    (`temp_fb_valveloop.xml:870`, and `:1008` for Config). The STATUS cell already honoured code 9
-    through `TBL_CODES`, which is why it renders blank. The buttons simply never listened:
-
-    | Property | Mapped | On code 9 |
-    |---|---|---|
-    | BackColor | `{3}` / `{4}` | fell back to the button's white |
-    | ForeColor | `LOCK_CODES = {0..7}` | fell back to full green / red |
-    | BorderColor | **never mapped at all** | always green / red 1px |
-
-    **Fixed in BOTH places, and the duplication is the point.** `LOCK_CODES`, `FILL_OPEN_CODES` and
-    `FILL_CLOSE_CODES` gained code 9, a `BorderColor` map was added, and
-    `AddConfigToggleTextAndColor` now reads `Cfg_TblNo_<slot>` first and returns empty text and
-    transparent colours on zero. A new patch pass `PatchTableButtons` (`--only=TableButtons`)
-    applies the same thing to the live screens. **Item 17 is why both were needed:** `Authorization`
-    was once applied only by a repair pass over live objects, so every later zone-screen rebuild
-    silently wiped it — which really happened on 2026-08-15 and left 28 table command buttons
-    unprotected. A patch that is not mirrored in the builder is a fix with an expiry date.
-
-    **Done as a patch, not a rebuild**, on the user's suggestion — four screens' worth of full
-    rebuild to change three colour properties on ~100 existing buttons is not a good trade. The
-    pass deletes no screen and touches no artwork, tag, alarm or PLC block.
-
-    Result: `Screen_AftBallast 28/28`, `Screen_Bilge 28/28`, `Screen_FwdBallast 28/28`,
-    `Screen_Diagnostics 16/16` — **100 buttons patched**, every name matched, nothing silently
-    skipped. Project saved, HMI compiled **0 errors, 1 warning** (the pre-existing item 41 runtime
-    language warning, unrelated).
-
-    **Second pass, same day: blank was not enough.** Confirmed on the panel that the buttons had
-    gone invisible — and that they were still tappable, because a transparent button still takes
-    the tap. Inert (the slot guard returns on zero), but `MakeBtn` never sets `ShowFocusVisual`,
-    so a tap on a blanked row could still **flash a focus rectangle** on a row meant to be empty.
-    `MakeZoneTouch` already turns that off for exactly this reason, which is what made it worth
-    chasing rather than shrugging at.
-
-    **They cannot simply be deleted, and this is the part worth remembering.** Row 8's OPEN button
-    on FWD page 3 is the *same screen object* that shows CM70's OPEN button on page 1 — the table
-    is a 14-row window and the PLC swaps what sits behind it. Deleting it breaks paging on every
-    other page. The fix has to be a property that varies with state, like the colours do.
-
-    **`Visible`, not `Enabled`.** `Enabled = false` is the intuitive choice and is wrong here:
-    WinCC renders a disabled control in its own greyed style, which would override the transparent
-    colours and put the buttons back on screen as grey boxes. `Visible = false` is neither drawn
-    nor hit-tested and has no styling to fight. `ShowFocusVisual = false` set on all 100 buttons
-    at the same time.
-
-    **This is the project's FIRST `Visible` dynamization, and it works.** Offline reflection
-    confirmed `HmiButton.Visible` is a writable Boolean and `MappingTableEntryRange.Value` is typed
-    `Object`, so a map can carry a bool; the patch then reported
-    **"Visible maps accepted on every command button"** — the pass counts rejections explicitly
-    rather than letting them pass silently. That retires a long-standing assumption: the
-    station-offline banner carries a comment saying it used colour *"instead of assuming Visible
-    accepts one"*, and the Home zone tint and mimic flash were shaped the same way. **Do not go
-    back and convert those** — they work, and a colour map degrades to invisible rather than to
-    wrong — but hiding something outright is now a known-available option for new work.
-
-    The colour maps were kept as belt-and-braces: if a `Visible` map is ever rejected on some row,
-    that row still reads blank instead of showing a live-looking OPEN button.
-
-    Second run: `28/28`, `28/28`, `28/28`, `16/16` again, HMI **0 errors, 1 warning** (item 41
-    language warning, unrelated).
-
-    **VERIFIED on the panel 2026-08-30.** Unused rows read genuinely empty and no longer respond
-    to a tap; populated rows unchanged. Item closed.
-
-45. **[FIXED 2026-08-30. Read this before adding any new entry point to the builder.]**
-    **Three separate builder paths mutated the project and never saved it.**
-
-    Found while deleting the item 37 alarms: `--purge-alarms` deleted alarms and returned without
-    a `Save()`. Two purges had already run, so those deletions were sitting in TIA's memory only,
-    where one crash would have lost them silently — the tool having reported success.
-
-    Auditing the rest of the entry points found two more:
-
-    | Path | Mutates | Saved? |
-    |---|---|---|
-    | `Run()` (normal) | everything | yes — **fixed 2026-08-27** |
-    | `--import-only` | PLC blocks | yes — **fixed 2026-08-27**, returned before the save |
-    | `--purge-alarms` | deletes alarms | **no — fixed 2026-08-30** |
-    | `--fix-tags` | creates/rebinds HMI tags | **no — fixed 2026-08-30** |
-    | `--alarm-colors` | alarm class colours | **no — fixed 2026-08-30** |
-    | `--finish-login-auth` | Authorization | yes, always did |
-
-    **`--fix-tags` is the worst of the three.** It exists specifically to bind newly created tags to
-    their PLC addresses, and several items in this file name it as the required follow-up to any
-    tag-creating run. Without a save it reports success and loses the binding the moment TIA is
-    closed without one — and the symptom appears later as tags that "did not bind", sending
-    somebody after the binding code rather than the save.
-
-    **The pattern is what matters.** This is the third time this exact bug has been found in this
-    builder, each time only after it had a chance to destroy work: `Run()` cost an 80-minute build
-    to a TIA crash on 2026-08-27, `--import-only` was the same bug one branch over, and these three
-    were found by looking rather than by losing something. **Any new path that touches the project
-    ends with `SaveProject(project)`.** There is no case where a mutating pass should return without
-    one.
-
-    Worth noting the tell: a run that changes the project and prints no `[SAVE] Project saved.` line
-    has not saved. That line is the only evidence, and it is worth checking on any unfamiliar flag.
-
-## 4. The valve count saga — read this before touching counts again
-
-This went through several wrong turns; the final answer is solid but got there messily:
-- Original assumption: 88 valves (matches the original 88 pre-allocated slots from the spec).
-- A photographed/typed valve list draft suggested 89, with several ambiguous/corrected rows.
-- The client then sent an actual Excel (`Annex_B_IO_List_Full_Mapped.xlsx`) with **102 rows total**,
-  including a **13-valve Fuel Oil system** that was invisible in earlier screenshots.
-- **Client's explicit instruction (WhatsApp screenshot): "ignore all hidden ones [Fuel Oil valves],
-  in total there will be 88 valves."**
-- 102 − 13 (Fuel Oil) = 89. Of those 89, **CM89 has no DO/DI channel assignment at all** in the sheet —
-  it's a real valve (has a tag, a system, a RIO location) but isn't "finished" — its Location/Function
-  and I/O are undecided. Excluding it: **88 valves with working I/O = the client's confirmed number.**
-- This also means: **the interposing relay count (176, ordered for 88×2) was correct all along.** An
-  earlier "2 relays short" message sent to the client was based on a miscount and should be understood
-  as superseded — not urgent to correct with them, but don't repeat that number.
-- Zone split of the real 88: **AFT 27, ER 27, FWD 34** (+ CM89 pending, which would make FWD 35 once
-  it's finished).
-- "BILGE AND FIRE" as the ER screen's title is *correct*, not a leftover mistake — the Excel confirms
-  ER RIO genuinely carries Bilge valves (27) plus Fire main/pump valves (CM94-97, 4 of them, tagged
-  System="Bilge" but functionally fire-related) — a real, deliberate crossover, not a naming error.
-
-## 5. Non-obvious technical findings from this session (avoid re-discovering these)
-
-- **`HmiButton` has no alignment property at all** — confirmed via reflection. `MakeLiveText`'s `align`
-  parameter was always silently discarded (the helper `SetProp` swallows failures in an empty catch).
-  Any left/right-aligned live text must be built as `HmiTextBox` + `DynTag`, not `MakeLiveText`.
-- **`MakeTb`'s `VerticalTextAlignment` was set to `"Middle"`, which isn't a valid value** — the enum is
-  `{Top, Center, Bottom, Stretch}`. This silently failed (same empty-catch pattern) and left every
-  textbox in the project top-aligned instead of vertically centred, project-wide, until fixed this
-  session. Fixed in `MakeTb` itself, so it only affects screens rebuilt after the fix — `Screen_Alarms`
-  and possibly others not rebuilt since still have the old behaviour.
-- **A latent tag-binding bug**: 7 of the per-valve `Valves_DB.Valve[i].*` tag registrations in
-  `CreateSummaryHmiTags` were missing the `forceRefreshNewTags` argument that every other registration
-  passes. This meant `--fix-tags` silently skipped them for any *newly created* valve slot. Harmless for
-  slots 1-88 (created before that refresh mechanism existed, got their address on first creation), but
-  broke all 7 tags for every one of slots 89-96 until fixed. If slots are ever extended again, double
-  check this doesn't regress.
-- **Openness/C# assembly-loading gotcha (bit everyone on the new laptop)**: if `Main()` directly
-  references a type from a dynamically-resolved assembly (e.g. `TiaPortal.GetProcesses()`), the CLR
-  needs to resolve that assembly to JIT `Main()` itself — **before** `Main()`'s first statement
-  (subscribing `AppDomain.CurrentDomain.AssemblyResolve`) actually takes effect. Every real tool in
-  `src/` and `scratch_probe/` avoids this by keeping `Main()` to just the resolver hookup + a call to a
-  separate `Run()` method that contains the actual Siemens.Engineering-referencing code. Any new
-  one-off probe script MUST follow this shape or it will fail with a confusing
-  `FileNotFoundException` even when the DLL genuinely exists at the resolved path.
-- **`csc.exe` invoked from Git Bash mangles switches** — MSYS path conversion turns `/nologo` into
-  `C:/Program Files/Git/nologo` and the compile fails with CS2001. Always compile via PowerShell (see
-  `compile_builder.ps1` in the repo root) or the PowerShell tool directly, never Bash.
-- **A brand-new Windows account needs to be added to the local "Siemens TIA Openness" group** before
-  any Openness tool can attach — otherwise you get
-  `EngineeringSecurityException: ... is not member of the windows group 'Siemens TIA Openness'`.
-  `net localgroup "Siemens TIA Openness" "<username>" /add` from an elevated PowerShell. **Critically,
-  a full logoff/login (or reboot) is required afterward** — restarting just TIA Portal is not enough,
-  Windows bakes group membership into the session at login time.
-- **Windows 11 Home has no `lusrmgr.msc` / "Local Users and Groups" in Computer Management** — use the
-  `net localgroup` command instead, not the GUI, on Home-edition machines.
-- **TIA Portal's own PLC compile occasionally throws a transient
-  `EngineeringSecurityException: ... The operation has timed out`** on `Attach()` even when TIA is
-  fully healthy — confirmed via CPU-usage checks (TIA burning real CPU = genuinely working, not hung).
-  Always retry once before assuming something is actually broken.
-- **TIA Portal is delete-and-recreate per screen, not patch-in-place.** Any manual edit made directly
-  in TIA's screen editor gets wiped the next time that screen is rebuilt via the generator. All layout
-  changes must go into `src/GenerateHmiLayout.cs` / `src/MarineScreens.cs`, never the TIA UI directly
-  (the one standing exception: the Alarm Control's `Filter` property, which Openness cannot set at
-  all and must be re-entered by hand after every `Screen_Alarms` rebuild).
-- **DB start values via Openness use `<Subelement Path="N"><StartValue>'text'</StartValue></Subelement>`
-  as a child element**, not `StartValue="..."` as an XML attribute (the attribute form fails import
-  with "attribute not declared"). Verified working end-to-end this session for loading the valve
-  schedule into `Valve_Meta_DB`.
-- **Block `Export` via Openness fails outright if the target file already exists** ("The export cannot
-  be made because the file ... already exists") — delete the old export first, or the failure will
-  silently look like nothing changed if you don't check the actual error text.
-
-## 6. Machine/environment notes
-
-- This session moved from an old laptop (Windows account "Admin", project at
-  `C:\Users\Admin\Documents\Automation\valveDemo2`) to a new laptop (Windows account "abbas") because
-  the old laptop's TIA trial license expired mid-session (`STEP 7 Basic` license missing error).
-- New laptop setup is now confirmed working: TIA Portal V20 installed with STEP 7 Professional, WinCC
-  Unified, WinCC Unified Devices, and **TIA Portal Openness** (under the "Options" node in the
-  installer — not visible at the top-level component list, has to be expanded), Automation License
-  Manager, trial licensed, Openness group membership added and login-refreshed, verified working with
-  a minimal test project.
-- Repo remote: `https://github.com/AbbasHirani/PLC-HMI-Valve.git`. All work as of this handoff is
-  pushed to `main` (commits up to and including this file).
-- Recommended project path on the new laptop: **anywhere outside OneDrive**. OneDrive sync was ruled
-  out as the cause of the assembly-loading bug (the real cause was the `Main()`-JIT issue above), but
-  it's still worth avoiding for a TIA project given known sync-lock issues with actively-open project
-  files.
-- `scratch_probe/Siemens.Engineering.dll` (a convenience local copy used by some probe compile
-  commands) is **not tracked in git** and won't be present after a clone — recreate it with one copy
-  command from `C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\Siemens.Engineering.dll`
-  if any probe script's compile command references the local copy instead of the full Program Files
-  path.
-- Hundreds of untracked one-off `.cs`/`.exe`/`.log` files exist in the old laptop's working directory —
-  these are deliberately never committed (established convention in this project: scratch diagnostic
-  tools are ephemeral, not checked in). None of them are needed on the new laptop.
-
-## 6a. Testing real I/O against PLCSIM (worked out 2026-08-14, non-obvious)
-
-Proving the I/O chain without real hardware. Several intuitive approaches **do not work** — the
-working one is last, don't waste time re-deriving the dead ends:
-
-- **TIA watch-table "Modify" on `IO_Buffer_DB.DI[n]` — does not hold.** `FC_PhysicalIoCopy` overwrites
-  the whole buffer from the physical addresses every scan, so the modified value survives well under
-  a scan.
-- **TIA watch-table "Modify" on `%I2.0` — does not hold either.** The CPU refreshes the input process
-  image from hardware at the start of every scan, before user code runs. Modify is a one-shot write
-  between scans; the refresh immediately overwrites it.
-- **TIA Force table on `IO_Buffer_DB.DI[n]` — rejected outright.** S7-1200 only permits Force on
-  physical `%I`/`%Q`, not DB memory ("Address cannot be forced").
-- **TIA Force table on `%I2.0` — blocked by a monitoring restriction** ("Peripheral inputs can only
-  be monitored in expanded mode"). Not worth chasing.
-- ✅ **PLCSIM's own SIM table is the answer.** In the PLCSIM window (not TIA): left sidebar → New SIM
-  View → library panel → **+** on "SIM Table". Type the address (`I2.0`, no `%`) into the **Address**
-  column, set Display Format `Bool`, click the table's **▶** to start monitoring, then tick the
-  checkbox in **Monitor/Modify State** to drive the bit. This sets the *simulated hardware* state, so
-  the scan-start refresh reads the value you set instead of clobbering it. Values persist until
-  changed — deleting a row does **not** reset the bit to FALSE, it just stops showing it (this caused
-  real confusion once: a "stuck" fault was simply a still-TRUE input on a deleted row).
-
-Two gotchas that will otherwise look like bugs:
-- **`Valves_DB.Valve[i].Configured` resets to FALSE on every PLCSIM download** (it's NonRetain), and
-  `FC_IoMapper` skips any unconfigured valve entirely. Set it TRUE (watch table → Modify now) before
-  concluding anything is broken. This wasted a solid chunk of one session.
-- **Sequence editor**: rejected both `"Valves_DB".Valve[21].OpenCmd` and the bare address with
-  "Invalid Tag" — exact expected syntax never established. Watch table + SIM table cover everything
-  needed; not worth fighting.
-
-The full fault-case test procedure (12 scenarios: healthy open/closed, unhealthy, double-indication,
-local-mode lockout, command→arrival, fail-to-open/close timeouts, loss-of-position, unexpected
-movement, command conflict, reset-fault) was written out in chat on 2026-08-15 against CM79/slot 21.
-It is not reproduced here — regenerate it from `MV_Westerly_IO_Wiring_Schedule.xlsx` (any valve's six
-addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `CreateAlarms`.
-
-## 7. How to resume
-
 34. **[pending - COMMISSIONING ON REAL HARDWARE. Storage medium for logs.]**
     **Logging works, but where it writes differs between simulation and the real panel - and only
     the panel setting is part of the delivered system.**
@@ -1997,8 +1673,351 @@ addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `Cre
     (`System_Power_UPS_Fault`) should be **deleted** rather than left pretending to watch something
     nothing drives.
 
+43. **[CLOSED 2026-08-30. Cause confirmed by test, no code fix needed.]**
+    **Blank rows in the alarm list are a stale VIEW, not a stale alarm.**
+
+    Seen on the panel 2026-08-30: an active-alarm row with PRIORITY `14`, SYSTEM `BALLAST AFT`,
+    STATUS `RaisedCleared`, TIME `8/29/2026 6:38`, DURATION `0` — and **ALARM ID and
+    DESCRIPTION both empty.**
+
+    **The configuration is not at fault.** Probed live with `ProbeBlankAlarm.exe`:
+
+    ```
+    DISCRETE ALARMS: 721
+      blank NAME:      0
+      blank EventText: 0
+    ```
+
+    and the alarm it should have been reads correctly:
+
+    ```
+    V021_Unhealthy  class=ValveFault pri=14 origin='CM79' area='BALLAST AFT'
+                    tag='Valves_DB_W_Unhealthy_1' bit=4
+                    'CM79 reported Unhealthy status.'
+    ```
+
+    **How the two candidate causes were separated.** A runtime-language mismatch was the obvious
+    suspect, since every alarm carries text in exactly one language and the HMI compile does warn
+    about language configuration (item 41). It is ruled out by the ALARM ID column: that column is
+    bound to `Name` (`GenerateHmiLayout.cs:952`), and a name is never translated. A language fault
+    blanks DESCRIPTION and leaves ALARM ID populated. **Both** blank means the runtime cannot
+    resolve the row to any definition at all.
+
+    **What it is.** The alarm raised during the 2026-08-29 CM79 testing (slot 21 = AFT =
+    `BALLAST AFT`, ValveFault = priority 14), cleared instantly, and was never acknowledged — so it
+    correctly stayed in the ACTIVE list, which is ISA-18.2 behaviour, not a bug: a transient fault
+    must not vanish before anyone sees it. The HMI configuration was then rebuilt and re-downloaded.
+    The runtime keeps the alarm *instance* and the fields stored on it — priority, area, timestamps,
+    state, duration, all of which still render — but name and text are looked up from the loaded
+    configuration at display time, and the definition that instance pointed at is gone. What shows
+    on that row is exactly the subset that survives without a definition.
+
+    **What the tests actually showed — and where the first explanation was wrong.**
+
+    - **ACKNOWLEDGE ALL did NOT clear it.** The pending-ack count went 1 to 0, so the ack was
+      dispatched, but the row stayed with its ACK TIME still empty and its STATUS still
+      `RaisedCleared`. Compare row 2, a genuine WinCC alarm, which acknowledged normally and
+      showed `ACK TIME 8/30/2026 2:55`.
+    - **Switching to ALARM HISTORY and back to ACTIVE ALARMS cleared it immediately.**
+
+    That second result is what pins the cause. The phantom lived in the **AlarmControl's rendered
+    view**, not in the runtime's alarm store: switching tabs makes the control re-query its source,
+    the row is not in the result, and it goes. A persisted or orphaned *instance* would have
+    survived that.
+
+    So the fields behave exactly as expected once you know where it lives. Name and Alarm text are
+    resolved from the configuration when the row is drawn, and the definition they pointed at was
+    replaced by an HMI download while the row was on screen — hence both blank. Priority, area,
+    timestamp, state and duration had already been materialised into the row, so they still read.
+    The ack could be dispatched but could not update a row that is backed by nothing.
+
+    **The first write-up of this item said the cure was "acknowledge all alarms before every HMI
+    download".** That was wrong and is corrected in `HARDWARE_INSTALL_TROUBLESHOOTING.md` 1.6:
+    acknowledging does not touch it. The cure is to make the list rebuild — ALARM HISTORY and back,
+    or leave the screen and return. Recorded because the wrong version was committed first
+    (`53dc222`) and someone reading only that commit would carry the wrong habit onto the ship.
+
+    **Severity: low.** No persisted corruption, nothing to change about download practice, and it
+    clears itself the next time the list is rebuilt. Worth documenting only so nobody spends an
+    hour treating it as a broken alarm system.
+
+    **Still worth doing once, for a different reason:** force `Valves_DB.W_Unhealthy_1` bit 4 and
+    confirm a fresh row reads `V021_Unhealthy` / "CM79 reported Unhealthy status.". That proves the
+    alarm text path end-to-end in the runtime and independently retires the runtime-language worry
+    (item 41) for the alarm list.
+
+44. **[DONE 2026-08-30, patched into the live project. Needs a look on the panel.]**
+    **Command buttons drew on EMPTY table rows.**
+
+    Reported from the panel: FWD page 3 (7 of 14 rows used), BILGE page 2 (13 of 14) and CONFIG
+    page 6 of 6 (9 of 16) all drew full-strength OPEN / CLOSE and DISABLED buttons on their unused
+    rows — no CM number, no tag, no status, but a button.
+
+    **Never dangerous, and that was checked before anything else.** `AddSlotCmdScript`
+    (`MarineScreens.cs:464`) reads the slot's NO. tag and returns on zero, with a second guard on
+    `Configured` after it; the Config toggle's click handler does the same. A press on an empty row
+    writes nothing. The problem is that a button which looks pressable and does nothing teaches an
+    operator that buttons sometimes do not work — not a lesson worth teaching on a panel that
+    strokes ballast valves.
+
+    **No PLC change was needed — the signal already existed.** `FB_ValveLoop` writes
+    `<Zone>TblState := 9`, `TblNo := 0` and an empty `TblStateTxt` for an unused slot
+    (`temp_fb_valveloop.xml:870`, and `:1008` for Config). The STATUS cell already honoured code 9
+    through `TBL_CODES`, which is why it renders blank. The buttons simply never listened:
+
+    | Property | Mapped | On code 9 |
+    |---|---|---|
+    | BackColor | `{3}` / `{4}` | fell back to the button's white |
+    | ForeColor | `LOCK_CODES = {0..7}` | fell back to full green / red |
+    | BorderColor | **never mapped at all** | always green / red 1px |
+
+    **Fixed in BOTH places, and the duplication is the point.** `LOCK_CODES`, `FILL_OPEN_CODES` and
+    `FILL_CLOSE_CODES` gained code 9, a `BorderColor` map was added, and
+    `AddConfigToggleTextAndColor` now reads `Cfg_TblNo_<slot>` first and returns empty text and
+    transparent colours on zero. A new patch pass `PatchTableButtons` (`--only=TableButtons`)
+    applies the same thing to the live screens. **Item 17 is why both were needed:** `Authorization`
+    was once applied only by a repair pass over live objects, so every later zone-screen rebuild
+    silently wiped it — which really happened on 2026-08-15 and left 28 table command buttons
+    unprotected. A patch that is not mirrored in the builder is a fix with an expiry date.
+
+    **Done as a patch, not a rebuild**, on the user's suggestion — four screens' worth of full
+    rebuild to change three colour properties on ~100 existing buttons is not a good trade. The
+    pass deletes no screen and touches no artwork, tag, alarm or PLC block.
+
+    Result: `Screen_AftBallast 28/28`, `Screen_Bilge 28/28`, `Screen_FwdBallast 28/28`,
+    `Screen_Diagnostics 16/16` — **100 buttons patched**, every name matched, nothing silently
+    skipped. Project saved, HMI compiled **0 errors, 1 warning** (the pre-existing item 41 runtime
+    language warning, unrelated).
+
+    **Second pass, same day: blank was not enough.** Confirmed on the panel that the buttons had
+    gone invisible — and that they were still tappable, because a transparent button still takes
+    the tap. Inert (the slot guard returns on zero), but `MakeBtn` never sets `ShowFocusVisual`,
+    so a tap on a blanked row could still **flash a focus rectangle** on a row meant to be empty.
+    `MakeZoneTouch` already turns that off for exactly this reason, which is what made it worth
+    chasing rather than shrugging at.
+
+    **They cannot simply be deleted, and this is the part worth remembering.** Row 8's OPEN button
+    on FWD page 3 is the *same screen object* that shows CM70's OPEN button on page 1 — the table
+    is a 14-row window and the PLC swaps what sits behind it. Deleting it breaks paging on every
+    other page. The fix has to be a property that varies with state, like the colours do.
+
+    **`Visible`, not `Enabled`.** `Enabled = false` is the intuitive choice and is wrong here:
+    WinCC renders a disabled control in its own greyed style, which would override the transparent
+    colours and put the buttons back on screen as grey boxes. `Visible = false` is neither drawn
+    nor hit-tested and has no styling to fight. `ShowFocusVisual = false` set on all 100 buttons
+    at the same time.
+
+    **This is the project's FIRST `Visible` dynamization, and it works.** Offline reflection
+    confirmed `HmiButton.Visible` is a writable Boolean and `MappingTableEntryRange.Value` is typed
+    `Object`, so a map can carry a bool; the patch then reported
+    **"Visible maps accepted on every command button"** — the pass counts rejections explicitly
+    rather than letting them pass silently. That retires a long-standing assumption: the
+    station-offline banner carries a comment saying it used colour *"instead of assuming Visible
+    accepts one"*, and the Home zone tint and mimic flash were shaped the same way. **Do not go
+    back and convert those** — they work, and a colour map degrades to invisible rather than to
+    wrong — but hiding something outright is now a known-available option for new work.
+
+    The colour maps were kept as belt-and-braces: if a `Visible` map is ever rejected on some row,
+    that row still reads blank instead of showing a live-looking OPEN button.
+
+    Second run: `28/28`, `28/28`, `28/28`, `16/16` again, HMI **0 errors, 1 warning** (item 41
+    language warning, unrelated).
+
+    **VERIFIED on the panel 2026-08-30.** Unused rows read genuinely empty and no longer respond
+    to a tap; populated rows unchanged. Item closed.
+
+45. **[FIXED 2026-08-30. Read this before adding any new entry point to the builder.]**
+    **Three separate builder paths mutated the project and never saved it.**
+
+    Found while deleting the item 37 alarms: `--purge-alarms` deleted alarms and returned without
+    a `Save()`. Two purges had already run, so those deletions were sitting in TIA's memory only,
+    where one crash would have lost them silently — the tool having reported success.
+
+    Auditing the rest of the entry points found two more:
+
+    | Path | Mutates | Saved? |
+    |---|---|---|
+    | `Run()` (normal) | everything | yes — **fixed 2026-08-27** |
+    | `--import-only` | PLC blocks | yes — **fixed 2026-08-27**, returned before the save |
+    | `--purge-alarms` | deletes alarms | **no — fixed 2026-08-30** |
+    | `--fix-tags` | creates/rebinds HMI tags | **no — fixed 2026-08-30** |
+    | `--alarm-colors` | alarm class colours | **no — fixed 2026-08-30** |
+    | `--finish-login-auth` | Authorization | yes, always did |
+
+    **`--fix-tags` is the worst of the three.** It exists specifically to bind newly created tags to
+    their PLC addresses, and several items in this file name it as the required follow-up to any
+    tag-creating run. Without a save it reports success and loses the binding the moment TIA is
+    closed without one — and the symptom appears later as tags that "did not bind", sending
+    somebody after the binding code rather than the save.
+
+    **The pattern is what matters.** This is the third time this exact bug has been found in this
+    builder, each time only after it had a chance to destroy work: `Run()` cost an 80-minute build
+    to a TIA crash on 2026-08-27, `--import-only` was the same bug one branch over, and these three
+    were found by looking rather than by losing something. **Any new path that touches the project
+    ends with `SaveProject(project)`.** There is no case where a mutating pass should return without
+    one.
+
+    Worth noting the tell: a run that changes the project and prints no `[SAVE] Project saved.` line
+    has not saved. That line is the only evidence, and it is worth checking on any unfamiliar flag.
+
+## 4. The valve count saga — read this before touching counts again
+
+This went through several wrong turns; the final answer is solid but got there messily:
+- Original assumption: 88 valves (matches the original 88 pre-allocated slots from the spec).
+- A photographed/typed valve list draft suggested 89, with several ambiguous/corrected rows.
+- The client then sent an actual Excel (`Annex_B_IO_List_Full_Mapped.xlsx`) with **102 rows total**,
+  including a **13-valve Fuel Oil system** that was invisible in earlier screenshots.
+- **Client's explicit instruction (WhatsApp screenshot): "ignore all hidden ones [Fuel Oil valves],
+  in total there will be 88 valves."**
+- 102 − 13 (Fuel Oil) = 89. Of those 89, **CM89 has no DO/DI channel assignment at all** in the sheet —
+  it's a real valve (has a tag, a system, a RIO location) but isn't "finished" — its Location/Function
+  and I/O are undecided. Excluding it: **88 valves with working I/O = the client's confirmed number.**
+- This also means: **the interposing relay count (176, ordered for 88×2) was correct all along.** An
+  earlier "2 relays short" message sent to the client was based on a miscount and should be understood
+  as superseded — not urgent to correct with them, but don't repeat that number.
+- Zone split of the real 88: **AFT 27, ER 27, FWD 34** (+ CM89 pending, which would make FWD 35 once
+  it's finished).
+- "BILGE AND FIRE" as the ER screen's title is *correct*, not a leftover mistake — the Excel confirms
+  ER RIO genuinely carries Bilge valves (27) plus Fire main/pump valves (CM94-97, 4 of them, tagged
+  System="Bilge" but functionally fire-related) — a real, deliberate crossover, not a naming error.
+
+## 5. Non-obvious technical findings from this session (avoid re-discovering these)
+
+- **`HmiButton` has no alignment property at all** — confirmed via reflection. `MakeLiveText`'s `align`
+  parameter was always silently discarded (the helper `SetProp` swallows failures in an empty catch).
+  Any left/right-aligned live text must be built as `HmiTextBox` + `DynTag`, not `MakeLiveText`.
+- **`MakeTb`'s `VerticalTextAlignment` was set to `"Middle"`, which isn't a valid value** — the enum is
+  `{Top, Center, Bottom, Stretch}`. This silently failed (same empty-catch pattern) and left every
+  textbox in the project top-aligned instead of vertically centred, project-wide, until fixed this
+  session. Fixed in `MakeTb` itself, so it only affects screens rebuilt after the fix — `Screen_Alarms`
+  and possibly others not rebuilt since still have the old behaviour.
+- **A latent tag-binding bug**: 7 of the per-valve `Valves_DB.Valve[i].*` tag registrations in
+  `CreateSummaryHmiTags` were missing the `forceRefreshNewTags` argument that every other registration
+  passes. This meant `--fix-tags` silently skipped them for any *newly created* valve slot. Harmless for
+  slots 1-88 (created before that refresh mechanism existed, got their address on first creation), but
+  broke all 7 tags for every one of slots 89-96 until fixed. If slots are ever extended again, double
+  check this doesn't regress.
+- **Openness/C# assembly-loading gotcha (bit everyone on the new laptop)**: if `Main()` directly
+  references a type from a dynamically-resolved assembly (e.g. `TiaPortal.GetProcesses()`), the CLR
+  needs to resolve that assembly to JIT `Main()` itself — **before** `Main()`'s first statement
+  (subscribing `AppDomain.CurrentDomain.AssemblyResolve`) actually takes effect. Every real tool in
+  `src/` and `scratch_probe/` avoids this by keeping `Main()` to just the resolver hookup + a call to a
+  separate `Run()` method that contains the actual Siemens.Engineering-referencing code. Any new
+  one-off probe script MUST follow this shape or it will fail with a confusing
+  `FileNotFoundException` even when the DLL genuinely exists at the resolved path.
+- **`csc.exe` invoked from Git Bash mangles switches** — MSYS path conversion turns `/nologo` into
+  `C:/Program Files/Git/nologo` and the compile fails with CS2001. Always compile via PowerShell (see
+  `compile_builder.ps1` in the repo root) or the PowerShell tool directly, never Bash.
+- **A brand-new Windows account needs to be added to the local "Siemens TIA Openness" group** before
+  any Openness tool can attach — otherwise you get
+  `EngineeringSecurityException: ... is not member of the windows group 'Siemens TIA Openness'`.
+  `net localgroup "Siemens TIA Openness" "<username>" /add` from an elevated PowerShell. **Critically,
+  a full logoff/login (or reboot) is required afterward** — restarting just TIA Portal is not enough,
+  Windows bakes group membership into the session at login time.
+- **Windows 11 Home has no `lusrmgr.msc` / "Local Users and Groups" in Computer Management** — use the
+  `net localgroup` command instead, not the GUI, on Home-edition machines.
+- **TIA Portal's own PLC compile occasionally throws a transient
+  `EngineeringSecurityException: ... The operation has timed out`** on `Attach()` even when TIA is
+  fully healthy — confirmed via CPU-usage checks (TIA burning real CPU = genuinely working, not hung).
+  Always retry once before assuming something is actually broken.
+- **TIA Portal is delete-and-recreate per screen, not patch-in-place.** Any manual edit made directly
+  in TIA's screen editor gets wiped the next time that screen is rebuilt via the generator. All layout
+  changes must go into `src/GenerateHmiLayout.cs` / `src/MarineScreens.cs`, never the TIA UI directly
+  (the one standing exception: the Alarm Control's `Filter` property, which Openness cannot set at
+  all and must be re-entered by hand after every `Screen_Alarms` rebuild).
+- **DB start values via Openness use `<Subelement Path="N"><StartValue>'text'</StartValue></Subelement>`
+  as a child element**, not `StartValue="..."` as an XML attribute (the attribute form fails import
+  with "attribute not declared"). Verified working end-to-end this session for loading the valve
+  schedule into `Valve_Meta_DB`.
+- **Block `Export` via Openness fails outright if the target file already exists** ("The export cannot
+  be made because the file ... already exists") — delete the old export first, or the failure will
+  silently look like nothing changed if you don't check the actual error text.
+
+## 6. Machine/environment notes
+
+- This session moved from an old laptop (Windows account "Admin", project at
+  `C:\Users\Admin\Documents\Automation\valveDemo2`) to a new laptop (Windows account "abbas") because
+  the old laptop's TIA trial license expired mid-session (`STEP 7 Basic` license missing error).
+- New laptop setup is now confirmed working: TIA Portal V20 installed with STEP 7 Professional, WinCC
+  Unified, WinCC Unified Devices, and **TIA Portal Openness** (under the "Options" node in the
+  installer — not visible at the top-level component list, has to be expanded), Automation License
+  Manager, trial licensed, Openness group membership added and login-refreshed, verified working with
+  a minimal test project.
+- Repo remote: `https://github.com/AbbasHirani/PLC-HMI-Valve.git`. All work as of this handoff is
+  pushed to `main` (commits up to and including this file).
+- Recommended project path on the new laptop: **anywhere outside OneDrive**. OneDrive sync was ruled
+  out as the cause of the assembly-loading bug (the real cause was the `Main()`-JIT issue above), but
+  it's still worth avoiding for a TIA project given known sync-lock issues with actively-open project
+  files.
+- `scratch_probe/Siemens.Engineering.dll` (a convenience local copy used by some probe compile
+  commands) is **not tracked in git** and won't be present after a clone — recreate it with one copy
+  command from `C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\Siemens.Engineering.dll`
+  if any probe script's compile command references the local copy instead of the full Program Files
+  path.
+- Hundreds of untracked one-off `.cs`/`.exe`/`.log` files exist in the old laptop's working directory —
+  these are deliberately never committed (established convention in this project: scratch diagnostic
+  tools are ephemeral, not checked in). None of them are needed on the new laptop.
+
+## 6a. Testing real I/O against PLCSIM (worked out 2026-08-14, non-obvious)
+
+Proving the I/O chain without real hardware. Several intuitive approaches **do not work** — the
+working one is last, don't waste time re-deriving the dead ends:
+
+- **TIA watch-table "Modify" on `IO_Buffer_DB.DI[n]` — does not hold.** `FC_PhysicalIoCopy` overwrites
+  the whole buffer from the physical addresses every scan, so the modified value survives well under
+  a scan.
+- **TIA watch-table "Modify" on `%I2.0` — does not hold either.** The CPU refreshes the input process
+  image from hardware at the start of every scan, before user code runs. Modify is a one-shot write
+  between scans; the refresh immediately overwrites it.
+- **TIA Force table on `IO_Buffer_DB.DI[n]` — rejected outright.** S7-1200 only permits Force on
+  physical `%I`/`%Q`, not DB memory ("Address cannot be forced").
+- **TIA Force table on `%I2.0` — blocked by a monitoring restriction** ("Peripheral inputs can only
+  be monitored in expanded mode"). Not worth chasing.
+- ✅ **PLCSIM's own SIM table is the answer.** In the PLCSIM window (not TIA): left sidebar → New SIM
+  View → library panel → **+** on "SIM Table". Type the address (`I2.0`, no `%`) into the **Address**
+  column, set Display Format `Bool`, click the table's **▶** to start monitoring, then tick the
+  checkbox in **Monitor/Modify State** to drive the bit. This sets the *simulated hardware* state, so
+  the scan-start refresh reads the value you set instead of clobbering it. Values persist until
+  changed — deleting a row does **not** reset the bit to FALSE, it just stops showing it (this caused
+  real confusion once: a "stuck" fault was simply a still-TRUE input on a deleted row).
+
+Two gotchas that will otherwise look like bugs:
+- **`Valves_DB.Valve[i].Configured` resets to FALSE on every PLCSIM download** (it's NonRetain), and
+  `FC_IoMapper` skips any unconfigured valve entirely. Set it TRUE (watch table → Modify now) before
+  concluding anything is broken. This wasted a solid chunk of one session.
+- **Sequence editor**: rejected both `"Valves_DB".Valve[21].OpenCmd` and the bare address with
+  "Invalid Tag" — exact expected syntax never established. Watch table + SIM table cover everything
+  needed; not worth fighting.
+
+The full fault-case test procedure (12 scenarios: healthy open/closed, unhealthy, double-indication,
+local-mode lockout, command→arrival, fail-to-open/close timeouts, loss-of-position, unexpected
+movement, command conflict, reset-fault) was written out in chat on 2026-08-15 against CM79/slot 21.
+It is not reproduced here — regenerate it from `MV_Westerly_IO_Wiring_Schedule.xlsx` (any valve's six
+addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `CreateAlarms`.
+
+## 7. How to resume
+
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
 folders): open Claude Code in that folder and just say what you want to do next. Point it at this file
-first if it hasn't already read it. The immediate next actions in priority order are items 4 and 1 in
-section 3 (re-import the CM89 fix, then the discrete alarms pass) — both are mechanical, no open
-decisions needed. Item 5 (channel mapping) is the next real engineering task after that.
+first if it hasn't already read it.
+
+**Next actions, updated 2026-08-30.** (This paragraph previously pointed at items 4 and 1, both of
+which were finished on 2026-08-13 and 08-17 — re-check it whenever items close, or it sends the next
+reader at work that no longer exists.)
+
+Nothing code-shaped is currently doable without an answer from the user or the client. In rough
+priority order:
+
+1. **Item 40** — order spare I/O modules. Blocked only on the BOM being committed to this repo.
+   Cheap now, a mobilisation to fix later.
+2. **Items 42, 39, 14, 3** — bundle the outstanding client questions into ONE message: the 24 V
+   power architecture, the monitoring-relay question, the three hardware questions, and the seven
+   unclarified valve rows. They have been accumulating separately and should go together.
+3. **Item 38** — the panel buzzer. Needs a human in the TIA UI; Openness cannot set it (probed).
+4. **Item 35(e)** — editable travel times on the Config screen. Parked by the user 2026-08-30 on
+   the grounds that it also implies audit logging; note that the audit half is already built
+   (`GmpRelevant`), so the real cost is build time, not maintenance.
+5. **Item 9** — the fail-safe review. Several items now funnel into it (12, 37 bit 7, 39).
+
+On real hardware, in this order: item 41's download-and-connect check, item 27's three CPU numbers,
+item 34's log storage, then item 13's stopwatch times.
