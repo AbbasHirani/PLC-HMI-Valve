@@ -228,6 +228,14 @@ namespace ValveDemoHmiBuilder
         // codes[] and values[] are parallel: codes[k] is the tag value to match, values[k] the
         // colour/string to show. Explicit codes rather than array positions because the table needs
         // to map -1 (empty slot on a short last page), which an index-based map can't express.
+        // MakeBtn leaves ShowFocusVisual at its default, so a tap on a blanked row can draw a
+        // focus rectangle on a row that is meant to be empty. MakeZoneTouch already turns this
+        // off for the same reason.
+        static void NoFocusVisual(object btn)
+        {
+            try { btn.GetType().GetProperty("ShowFocusVisual").SetValue(btn, false, null); } catch {}
+        }
+
         static bool AddValueMap(object tagDyn, int[] codes, object[] values)
         {
             if (tagDyn == null) return false;
@@ -459,6 +467,19 @@ namespace ValveDemoHmiBuilder
         // falls back to the button's own border.
         static readonly int[] EMPTY_CODES        = { 9 };
         static readonly object[] EMPTY_TRANSPARENT = { M_TRANS };
+        // Transparent is not gone: the button still takes the tap, and MakeBtn never sets
+        // ShowFocusVisual, so an empty row could flash a focus rectangle on a tap - the same
+        // artifact MakeZoneTouch already disables itself. Visible:=false is neither drawn nor
+        // hit-tested, so it removes both.
+        // Visible, NOT Enabled. A disabled control is normally rendered in WinCC's own greyed
+        // style, which would override the transparent colours above and put the buttons back on
+        // screen as grey boxes. Visible has no styling to fight.
+        // The colour maps stay as belt-and-braces: if this map is ever rejected on some row, that
+        // row still reads blank instead of showing a live-looking OPEN button.
+        // NOTE: this is the project's FIRST Visible dynamization. The station-offline banner used
+        // colour "instead of assuming Visible accepts one" - caution, not a proven failure.
+        // MappingTableEntryRange.Value is typed Object (probed 2026-08-30), so it carries a bool.
+        static readonly object[] EMPTY_INVISIBLE = { false };
 
         // Click handler for a table slot. The slot doesn't know its valve at build time — that
         // depends on the page — so it resolves it at click time from the slot's live NO. tag
@@ -2130,6 +2151,11 @@ namespace ValveDemoHmiBuilder
                     // Blank the outline too on an empty slot, or the button is still a visible box.
                     AddValueMap(DynTag(openBtn,  "BorderColor", stateTag), EMPTY_CODES, EMPTY_TRANSPARENT);
                     AddValueMap(DynTag(closeBtn, "BorderColor", stateTag), EMPTY_CODES, EMPTY_TRANSPARENT);
+                    // ...and take the button out of hit-testing entirely on an empty slot.
+                    AddValueMap(DynTag(openBtn,  "Visible", stateTag), EMPTY_CODES, EMPTY_INVISIBLE);
+                    AddValueMap(DynTag(closeBtn, "Visible", stateTag), EMPTY_CODES, EMPTY_INVISIBLE);
+                    NoFocusVisual(openBtn);
+                    NoFocusVisual(closeBtn);
                     // Set HERE, in the build path, not by the --finish-login-auth repair pass.
                     // These buttons bypass the popup entirely, so without it a logged-out user can
                     // stroke any valve straight from the list. The repair pass set it on the live
@@ -2532,6 +2558,13 @@ namespace ValveDemoHmiBuilder
             Dyn(btn, "BorderColor",
                 JS_READ + "let no=r(Tags(\"" + noTag + "\").Read());\nreturn no ? 0xFF5A6478 : 0x00000000;",
                 "AutomaticTags");
+            // Same treatment as the zone tables: blank is not enough, the row must also stop
+            // taking taps and stop drawing a focus rectangle. Script rather than a value map
+            // here because the whole toggle is script-driven off a Bool source.
+            Dyn(btn, "Visible",
+                JS_READ + "let no=r(Tags(\"" + noTag + "\").Read());\nreturn no ? true : false;",
+                "AutomaticTags");
+            NoFocusVisual(btn);
         }
 
         // Resolves the absolute valve number from the row's live NO. tag at click time (same

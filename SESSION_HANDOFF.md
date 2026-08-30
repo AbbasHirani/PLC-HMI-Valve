@@ -902,8 +902,42 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     skipped. Project saved, HMI compiled **0 errors, 1 warning** (the pre-existing item 41 runtime
     language warning, unrelated).
 
+    **Second pass, same day: blank was not enough.** Confirmed on the panel that the buttons had
+    gone invisible — and that they were still tappable, because a transparent button still takes
+    the tap. Inert (the slot guard returns on zero), but `MakeBtn` never sets `ShowFocusVisual`,
+    so a tap on a blanked row could still **flash a focus rectangle** on a row meant to be empty.
+    `MakeZoneTouch` already turns that off for exactly this reason, which is what made it worth
+    chasing rather than shrugging at.
+
+    **They cannot simply be deleted, and this is the part worth remembering.** Row 8's OPEN button
+    on FWD page 3 is the *same screen object* that shows CM70's OPEN button on page 1 — the table
+    is a 14-row window and the PLC swaps what sits behind it. Deleting it breaks paging on every
+    other page. The fix has to be a property that varies with state, like the colours do.
+
+    **`Visible`, not `Enabled`.** `Enabled = false` is the intuitive choice and is wrong here:
+    WinCC renders a disabled control in its own greyed style, which would override the transparent
+    colours and put the buttons back on screen as grey boxes. `Visible = false` is neither drawn
+    nor hit-tested and has no styling to fight. `ShowFocusVisual = false` set on all 100 buttons
+    at the same time.
+
+    **This is the project's FIRST `Visible` dynamization, and it works.** Offline reflection
+    confirmed `HmiButton.Visible` is a writable Boolean and `MappingTableEntryRange.Value` is typed
+    `Object`, so a map can carry a bool; the patch then reported
+    **"Visible maps accepted on every command button"** — the pass counts rejections explicitly
+    rather than letting them pass silently. That retires a long-standing assumption: the
+    station-offline banner carries a comment saying it used colour *"instead of assuming Visible
+    accepts one"*, and the Home zone tint and mimic flash were shaped the same way. **Do not go
+    back and convert those** — they work, and a colour map degrades to invisible rather than to
+    wrong — but hiding something outright is now a known-available option for new work.
+
+    The colour maps were kept as belt-and-braces: if a `Visible` map is ever rejected on some row,
+    that row still reads blank instead of showing a live-looking OPEN button.
+
+    Second run: `28/28`, `28/28`, `28/28`, `16/16` again, HMI **0 errors, 1 warning** (item 41
+    language warning, unrelated).
+
     **Still to verify on the panel:** FWD page 3, BILGE page 2 and CONFIG page 6 — the unused rows
-    should now be genuinely empty, and the populated rows completely unchanged.
+    genuinely empty and now inert to a tap, with the populated rows completely unchanged.
 
 ## 4. The valve count saga — read this before touching counts again
 

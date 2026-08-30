@@ -559,8 +559,11 @@ namespace ValveDemoHmiBuilder
         // every later zone-screen rebuild silently wiped it - which really happened on 2026-08-15
         // and left 28 table command buttons unprotected. A patch that is not mirrored in the
         // builder is a fix with an expiry date.
+        static int s_visibleMapFails = 0;
+
         static void PatchTableButtons(HmiSoftware hmi)
         {
+            s_visibleMapFails = 0;
             Console.WriteLine();
             Console.WriteLine("[TableButtons] Blanking command buttons on empty table rows...");
 
@@ -602,6 +605,7 @@ namespace ValveDemoHmiBuilder
                     RemoveDyn(btn, "Text");
                     RemoveDyn(btn, "BackColor");
                     RemoveDyn(btn, "BorderColor");
+                    RemoveDyn(btn, "Visible");
                     AddConfigToggleTextAndColor(btn, r + 1);   // slot is 1-based
                     n++;
                 }
@@ -610,6 +614,11 @@ namespace ValveDemoHmiBuilder
             }
 
             Console.WriteLine("[TableButtons] " + total + " buttons patched.");
+            if (s_visibleMapFails > 0)
+                Console.WriteLine("[TableButtons] WARNING: " + s_visibleMapFails +
+                                  " Visible map(s) REJECTED - those buttons are blank but still tappable.");
+            else
+                Console.WriteLine("[TableButtons] Visible maps accepted on every command button.");
         }
 
         // Re-applies all three colour maps on one command button, including code 9 (empty slot)
@@ -622,12 +631,18 @@ namespace ValveDemoHmiBuilder
             RemoveDyn(btn, "BackColor");
             RemoveDyn(btn, "ForeColor");
             RemoveDyn(btn, "BorderColor");
+            RemoveDyn(btn, "Visible");
             AddValueMap(DynTag(btn, "BackColor", stateTag),
                         isOpen ? FILL_OPEN_CODES : FILL_CLOSE_CODES,
                         isOpen ? FILL_OPEN : FILL_CLOSE);
             AddValueMap(DynTag(btn, "ForeColor", stateTag),
                         LOCK_CODES, isOpen ? LOCK_OPEN_FORE : LOCK_CLOSE_FORE);
             AddValueMap(DynTag(btn, "BorderColor", stateTag), EMPTY_CODES, EMPTY_TRANSPARENT);
+            // Reported separately and counted, because this is the project's first Visible
+            // dynamization - if TIA rejects it the colour maps above still stand on their own.
+            if (!AddValueMap(DynTag(btn, "Visible", stateTag), EMPTY_CODES, EMPTY_INVISIBLE))
+                s_visibleMapFails++;
+            NoFocusVisual(btn);
             return true;
         }
 
