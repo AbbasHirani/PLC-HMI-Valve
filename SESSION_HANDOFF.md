@@ -66,8 +66,12 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
    Text and Origin now carry **CM numbers** (name stays `V0xx` as a stable internal id);
    `_Conflict` renamed `_DoubleInd` with corrected text; "in automatic mode" → "on remote command".
    See items 22 and 23 for the reasoning and the rename trap.
-2. **[partially done]** Visual render check. AFT zone + Home verified live in TIA/runtime 2026-08-14.
-   FWD (3 pages), Bilge, and Config (6 pages) still not eyeballed since the 89-slot resize.
+2. **[done 2026-08-30]** Visual render check. AFT zone + Home verified live 2026-08-14; **FWD,
+   Bilge and Config walked through on the panel 2026-08-30** — artwork present on all three,
+   overlays sitting on the pipework, pagination correct (FWD 3 pages, Bilge 2, Config 6/6 with 9
+   rows on the last), no clipped columns, CM numbers in order. The one defect found was command
+   buttons drawing on empty rows, which became item 44 and is fixed. This also closes what was
+   left of item 32, whose remaining work was exactly this look-over.
 3. **[pending]** Client still owes clarification on 7 rows: CM80, CM85, CM86, CM87, CM88, CM90 (marked
    "Tag to verify" / "Duplicate tag on mimic; verify" in their sheet) and CM89 (needs Location/Function
    — its I/O is now assigned, see item 5). **Plus, added 2026-08-14:** the client's Bilge drawing
@@ -135,8 +139,14 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
    **The old note here was wrong** — it claimed the Filter had to be re-entered by hand because
    Openness cannot set it. It is set in code (`GenerateHmiLayout.cs` ~line 696) and survives a
    rebuild; proven by the fact that the debug line immediately after the assignment reached the log.
-   The filter matters: without it WinCC's own runtime alarms (`PlcInStopAlarm`,
-   `PlcDisconnectedAlarm`, memory-space warnings) mix in with the valve alarms.
+   **Corrected 2026-08-30 — the filter is EMPTY, and this note was wrong about what it does.**
+   The live assignment is `alarmCtrl.Filter = "";` (`GenerateHmiLayout.cs:1042`; the "~line 696"
+   above is stale and now points at `EnsurePopupScreen`). Nothing is filtered out, and that is
+   confirmed on the panel: a WinCC `RemovableStorage` system alarm appears in the list alongside
+   the valve alarms. So WinCC's own runtime alarms (`PlcInStopAlarm`, `PlcDisconnectedAlarm`,
+   memory-space warnings) **do** reach the operator rather than being suppressed. Whether they
+   *should* share the list with valve alarms has never actually been decided — but decide it
+   knowing the current behaviour is "show everything", not "filtered".
    Note `--only=Alarms` also re-runs the full 632-alarm generation — there is no flag separating the
    screen from the alarm set. It is idempotent (Find-then-Create), just ~45 min of extra runtime.
 9. **[pending]** Fail-safe design review (what should each fault condition actually *do* to a valve —
@@ -936,8 +946,8 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     Second run: `28/28`, `28/28`, `28/28`, `16/16` again, HMI **0 errors, 1 warning** (item 41
     language warning, unrelated).
 
-    **Still to verify on the panel:** FWD page 3, BILGE page 2 and CONFIG page 6 — the unused rows
-    genuinely empty and now inert to a tap, with the populated rows completely unchanged.
+    **VERIFIED on the panel 2026-08-30.** Unused rows read genuinely empty and no longer respond
+    to a tap; populated rows unchanged. Item closed.
 
 ## 4. The valve count saga — read this before touching counts again
 
