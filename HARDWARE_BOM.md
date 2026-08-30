@@ -57,7 +57,7 @@ CPU **V4.0**, the three IMs **V6.2**, HMI **20.0.0.0**.
 
 ## 3. Discrepancies — act on these before ordering
 
-### 3.1 Two interposing relays short (176 supplied, 178 needed)
+### 3.1 Two interposing relays short (176 supplied, 178 needed) — RESOLVED 2026-08-30
 
 Every valve drives **two** outputs, open and close, through its own relay. `Valve_Channels_DB`
 carries **89 non-zero `OpenCmdChannel` and 89 non-zero `CloseCmdChannel` values** — verified by
@@ -74,6 +74,14 @@ This is the valve-count saga (section 4 of `SESSION_HANDOFF.md`) surfacing in th
 The client's instruction was "in total there will be 88 valves"; the real figure settled at **89**
 once the Fuel Oil rows were excluded, and the relay quantity was never revised to follow. Two
 relays is a trivial cost now and one un-commandable valve later.
+
+**Confirmed 2026-08-30: two extra will be ordered, bringing it to 178.**
+
+**Still worth deciding: 178 is exact, with no spare relay at all.** A relay is a consumable and
+the most likely item on this list to fail in service — a stuck or welded contact on a valve's open
+coil is a valve that will not open on command. Suggest **4–6 shelf spares beyond the 178**. They
+are cheap, they need no configuration, and the alternative is mobilising someone to the vessel for
+a part the size of a matchbox.
 
 ### 3.2 BaseUnits are missing entirely
 
@@ -147,7 +155,8 @@ Confirm which panel is actually being bought before anything else on this list.
 
 | | Item | Qty |
 |---|---|---|
-| 1 | Interposing relays — correct 176 to **178** | +2 |
+| 1 | ~~Interposing relays — correct 176 to **178**~~ **confirmed, +2 being ordered** | done |
+| 1b | Shelf spare relays beyond the 178 — open question | +4–6 |
 | 2 | BaseUnits for every I/O module | 36 + spares |
 | 3 | BusAdapter BA 2xRJ45 `6ES7 193-6AR00-0AA0` | 3 |
 | 4 | Server module `6ES7 193-6PA00-0AA0` | 3 |

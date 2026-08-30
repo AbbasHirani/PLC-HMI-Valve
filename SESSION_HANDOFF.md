@@ -1507,9 +1507,12 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     **BOM RECEIVED 2026-08-30 and cross-checked — see `HARDWARE_BOM.md`.** This paragraph used to
     say no parts list existed anywhere in the repo. It does now, and the check found six things:
 
-    - **Two relays short.** BOM lists **176** Phoenix interposing relays; `Valve_Channels_DB` has
-      **89 non-zero `OpenCmdChannel` and 89 non-zero `CloseCmdChannel`** values, counted not assumed,
-      so **178** are needed. 176 is 88 x 2 — the valve-count saga reaching the purchase order.
+    - **Two relays short — RESOLVED same day, two extra will be ordered.** BOM listed **176**
+      Phoenix interposing relays; `Valve_Channels_DB` has **89 non-zero `OpenCmdChannel` and 89
+      non-zero `CloseCmdChannel`** values, counted not assumed, so **178** are needed. 176 is
+      88 x 2 — the valve-count saga reaching the purchase order. Still open: 178 is exact with no
+      spare relay, and a relay is the most likely thing on the list to fail in service; 4-6 shelf
+      spares suggested.
     - **BaseUnits missing entirely.** 36 modules need 36 BaseUnits; none on the BOM, and none
       modelled in the project either, so neither source catches it alone.
     - **Bus adapters and server modules missing.** 3 x `6ES7 193-6AR00-0AA0` and
