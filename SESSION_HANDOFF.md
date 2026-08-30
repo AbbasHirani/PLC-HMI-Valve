@@ -383,7 +383,12 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
       valves (CM86-CM90) — suggestive, not assumed. If those do sit physically aft, the schedule's
       `System` column disagrees with physical position, which matters because the PLC zone split
       (AFT = slots 1-27) was derived from `System`, not from position on the drawing.
-    - **No Bilge illustration exists** — that is 27 valves, as many as AFT.
+    - ~~**No Bilge illustration exists** — that is 27 valves, as many as AFT.~~
+      **RESOLVED 2026-08-18, confirmed on the panel 2026-08-30.** `Bilge.png` was drawn and
+      imported, `BILGE_DIAGRAM` places all 27 overlays on it, and Home carries a second
+      `HOME_BILGE_DIAGRAM`. Do not put this to the client — it is done. The table above also names
+      the OLD artwork (`AFT zone1.png`, `FWD Zone1.png`, `Full.png`); the live names are
+      `AFT zone`, `FWD Zone`, `Bilge` and the two Home drawings (item 32).
     - **64 boxes drawn vs 62 ballast valves** (27+35): two unaccounted for.
     - **CM numbers are baked into the PNGs as pixels**, and 62 of 64 currently read `CM00`.
       Recommendation: strip labels from the artwork and have the HMI draw them as text from
