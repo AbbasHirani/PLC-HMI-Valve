@@ -1320,6 +1320,48 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     instances** — so if the acoustic setting lives there too, all 632 alarms can be given sound
     without an alarm regeneration.
 
+    **Step 2 UPDATE 2026-08-31 — the buzzer is almost certainly NOT an alarm-class setting.**
+
+    The 2026-08-29 probe searched only for the word "Acoustic". That was narrow enough to be worth
+    redoing, so `ProbeSound.exe` re-ran it across **eleven** terms - acoustic, sound, buzz, audib,
+    audio, signal, horn, beep, tone, siren, annunci - over every type in every Siemens assembly.
+
+    **Nothing HMI-audio-related exists.** The 36 matches are all unrelated hardware
+    (`SoundVelocityUnit` is an ultrasonic sensor, `PowerConfigSirenOrSignalLamp` belongs to a
+    specific HW module), and the `HmiButton*` hits are a false positive - "But**tonE**ventType"
+    contains "tone".
+
+    More usefully, the full alarm-class surface was dumped:
+
+    ```
+    HmiAlarmClass            AcknowledgedClearedState, AcknowledgedState, ClearedState, RaisedState,
+                             CommonAlarmClass, Id, IsSystem, Log, Name, Parent, Priority, StateMachine
+    HmiRaisedState  (and the other three)   BackColor, Flashing, Parent, TextColor
+    ```
+
+    Twelve properties on the class, four on each state, **none of them sound**.
+
+    **Why this now says something about the TIA UI too, not just Openness.** The Alarm classes
+    table (screenshot 2026-08-31) shows Name, State machine, Priority, Log, ID, four
+    Background/Text colour pairs and Common alarm class - which maps **1:1 onto those 12
+    properties**. The UI is presenting the same model, so there is very likely no hidden acoustic
+    column either. That is different evidence from "Openness cannot see it", and it is worth the
+    distinction: item 34's alarm-log storage device really is UI-only and invisible to Openness, so
+    absence from the API alone would not have been conclusive.
+
+    **`HMI_1 -> Runtime settings -> Alarms` is ruled out** by the same screenshot - that page holds
+    Controller alarms and diagnostics plus State texts, and nothing about sound.
+
+    **So of the three places named below, two are now eliminated.** What remains is the MTP1500's
+    own Control Panel - a device-level setting that cannot be checked until the panel is in hand.
+
+    **THE DECISION THIS FORCES, and it cannot wait for commissioning:** either rely on a Control
+    Panel buzzer setting existing (unverifiable until hardware arrives), or commit now to the
+    **hardwired sounder on a spare DQ**. The sounder needs a channel and wiring, so it has to be
+    decided **before the cabinet is built** - it is not a commissioning task. There are 10 free DQ
+    channels per station, so the option costs nothing today and is a mobilisation later.
+    Raise it with the hardware team alongside item 40.
+
     **Step 2 — decide which classes sound.** Mirror the existing colour/flash tiering, which was
     already reasoned out against ISA-18.2 / EEMUA 191 and should not be re-litigated:
 
@@ -1969,7 +2011,9 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     **What is blocked:** any change to `FB_ValveLoop`, the DBs, or the FCs. That includes item 39's
     `Healthy`-gate fix and anything arising from item 9.
 
-    **Fix:** install/activate the STEP 7 licence via Automation License Manager. The old laptop lost
+    **Fix STARTED 2026-08-31 — the user has initiated the STEP 7 licence.** Re-verify by running
+    any builder pass and confirming the seven `LicenseNotFoundException` lines are gone before
+    trusting a PLC change. Install/activate via Automation License Manager. The old laptop lost
     its trial mid-session for the same class of reason (section 6), so treat licence state as
     something to verify at the start of a session rather than assume.
 
