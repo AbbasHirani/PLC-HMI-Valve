@@ -2075,6 +2075,59 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     the run with one clear line rather than repeating a seven-paragraph stack trace and continuing as
     if nothing happened. Not built yet.
 
+47. **[BLOCKER for the mapping submission, found 2026-08-31. DO NOT run the builder until
+    resolved — `ImportPlcBlocks` would make it real.]**
+    **Two independent slot -> CM mappings exist and they disagree on 54 of 89 slots.**
+
+    Found while verifying the I/O mapping before submission. Full write-up in
+    **`MAPPING_VERIFICATION.md`**; the asserted mapping is **`MAPPING_VERIFIED.csv`** (89 rows:
+    CM / tag / system / location / function / station / client RIO / 6 channels / 6 PLC addresses).
+
+    | Source | Used by | Slot 1 | Slot 21 | Slot 28 |
+    |---|---|---|---|---|
+    | `HOME_DIAGRAM` (`MarineScreens.cs`) | `CmForSlot()` -> **all 718 alarm texts** | CM25 | CM79 | CM01 |
+    | `Valve_Meta_DB.CmNo[]` (repo copy) | **every screen table, popup, Config** | CM01 | CM21 | CM25 |
+
+    The repo's `temp_valve_meta_db.xml` has the **AFT and BILGE blocks swapped**. Slots 55-89 agree
+    because FWD is identical either way.
+
+    **`HOME_DIAGRAM` is the correct one**, on three independent checks: 0 of 89 slots mismatch the
+    client's `System` column against the PLC zone split (the repo DB: 54); 0 of 89 mismatch the
+    client's `RIO Location` column; and it matches live behaviour — the 2026-08-29 CM79 test drove
+    `%I12.0-12.3` (DI 81-84 = slot 21) and the panel raised **CM79**, and the BILGE screen
+    (slots 28-54) shows Bilge valves, which only holds if slot 28 is CM01.
+
+    **Why it is dangerous, not cosmetic.** `ImportPlcBlocks` runs unconditionally at the start of
+    every builder run. It is only failing today because of the missing STEP 7 licence (item 46).
+    **The moment that licence is restored, the next builder run imports this file and swaps 54
+    valves' identities.** Channels live in `Valve_Channels_DB` and would not move, so the panel
+    would label slot 1 "CM01" while its channels still drive the valve the client calls CM25 —
+    **an operator pressing OPEN on a valve labelled CM01 would open CM25.** Nothing on screen would
+    reveal it, except that the alarm list (which uses `HOME_DIAGRAM`) would name a different valve
+    than the table for the same slot.
+
+    **Sequence to resolve:**
+    1. Restore the STEP 7 licence (item 46) and **compile the PLC** — it is currently inconsistent
+       and `--export-block` fails with *"Inconsistent blocks and PLC data types (UDT) cannot be
+       exported"*.
+    2. `HmiBuilder.exe --export-block=Valve_Meta_DB`, compare `CmNo[1..89]` to `MAPPING_VERIFIED.csv`.
+    3. Match -> **replace `temp_valve_meta_db.xml` with the export**; the repo copy is the wrong one.
+    4. No match -> **stop.** The live project has the same swap and 54 valves are mislabelled today.
+
+    **Root cause to fix afterwards:** `Valve_Meta_DB` and `HOME_DIAGRAM` are two hand-maintained
+    lists of the same fact with nothing comparing them. Either generate the DB from `HOME_DIAGRAM`
+    or add a build-time assertion that they agree. A 54-slot divergence survived undetected.
+
+    **Everything else in the mapping PASSED** — 534 channel assignments with 0 zeros, 0 duplicates,
+    0 out-of-range and 0 cross-station violations; every valve's 4 DI and 2 DQ contiguous; station
+    assignment matching the client's `RIO Location` on all 89; address arithmetic spanning
+    `%I2.0-%I47.3` and `%Q2.0-%Q26.5` as expected.
+
+    **Also raise with the client before submitting:** their `IO Summary` sheet says 101 valves and
+    34 Ballast Fwd, while their `Valve list` sheet has 102 rows and 35 — their own file contradicts
+    itself. And 11 in-scope valves are marked `Not Found` by them (channels are reserved for all
+    11, so if any do not exist those channels simply go unused — the safe direction).
+
 ## 4. The valve count saga — read this before touching counts again
 
 This went through several wrong turns; the final answer is solid but got there messily:
