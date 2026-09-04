@@ -1298,12 +1298,12 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     Net effect: **a ballast, bilge and fire valve system with no audible annunciation whatsoever.**
     Beyond the operational problem, expect a surveyor to ask how alarms are annunciated.
 
-    ~~**Decision (user, 2026-08-27): use the MTP1500's built-in buzzer.** Confirmed by the user that
-    the panel has one. A hardwired sounder on a spare DQ was the alternative and is not being taken.~~
-    **SUPERSEDED 2026-08-31 — see the vendor-doc check in the header. Siemens' specification for
-    `6AV2128-3QB06-0AX1` lists no audio output and no buzzer, so the built-in-buzzer plan has no
-    documented basis. The hardwired sounder is now the recommendation, and there are 10 free DQ
-    channels per station (item 35's channel audit) to take it.**
+    **Decision (user, 2026-08-27): use the MTP1500's built-in buzzer.** Confirmed by the user, and
+    **confirmed against Siemens' product datasheet 2026-08-31** (`Acoustics: Buzzer Yes,
+    Speaker No`). A hardwired sounder on a spare DQ was the alternative; it stays worth doing for
+    HMI-independent annunciation, and there are 10 free DQ channels per station (item 35's channel
+    audit) so the option costs nothing today. **This item briefly recorded that the panel had no
+    buzzer — that was wrong, see the correction in the header.**
 
     **Step 1 — recover the API answer that was already paid for.** `InspectAcousticSignal.exe` exists
     in the repo, built 2026-08-01, written to search the Siemens DLLs for acoustic-signal types and
@@ -1322,48 +1322,57 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     instances** — so if the acoustic setting lives there too, all 632 alarms can be given sound
     without an alarm regeneration.
 
-    **VENDOR-DOC CHECK 2026-08-31 — THE PREMISE OF THIS WHOLE ITEM LOOKS WRONG.**
-    **The MTP1500 does not appear to have an alarm buzzer at all.**
+    **THE PANEL HAS A BUZZER. Confirmed from Siemens' product datasheet 2026-08-31.**
 
-    This item has said since 2026-08-27: *"Decision (user): use the MTP1500's built-in buzzer.
-    Confirmed by the user that the panel has one."* Siemens' own documentation does not support that.
+    ```
+    Type of output
+      Acoustics
+        - Buzzer    Yes
+        - Speaker   No
+    ```
 
-    Checked against the official technical specification for
-    **`6AV2128-3QB06-0AX1` / MTP1500 Unified Comfort**:
+    Source: the SIOS product data sheet for `6AV2128-3QB06-0AX1`
+    (`support.industry.siemens.com/cs/pd/1544976?pdti=td`). So the 2026-08-27 decision to use the
+    built-in buzzer stands, and the hardware supports it.
 
-    - **Interfaces are: 1 x RS422/485 SUB-D, 2 x PROFINET RJ45, 4 x USB 3.1 Gen 1 Type A.**
-      **No audio output, no line out, no speaker, no headphone jack.** Read twice from the spec.
-    - **No buzzer or acoustic signal transmitter is listed anywhere** in the technical
-      specification.
-    - The only sound reference in the whole device manual is **"Touch sound"**, a Control Panel
-      system property (operating instructions ~p.90). That is key-click feedback — it implies a
-      small internal piezo exists, but it is not an alarm annunciator and there is no setting tying
-      it to alarms.
+    **CORRECTION — an earlier version of this item claimed the opposite, and it was wrong.** It
+    said "the MTP1500 does not appear to have an alarm buzzer at all" and recommended abandoning
+    the buzzer plan. That was written from the `docs.tia.siemens.cloud` *technical specifications*
+    page, which lists **interfaces only** (RS422/485, PROFINET, USB) and has no Acoustics section
+    at all — and its silence was read as absence. **Reading a gap as evidence**, which is the same
+    error that produced the wrong SIPLUS and panel-resolution conclusions on the BOM two days
+    earlier. The lesson is now recorded twice in this file: *the absence of a fact in a partial
+    source is not a fact.* Use the full SIOS product data sheet, not the docs-site spec page.
 
-    Combined with what was already proven locally, all four doors are now shut:
+    **What that leaves genuinely open: how to make the buzzer sound on an alarm.** The hardware is
+    there; the route to drive it is still not found. Ruled out so far:
 
     | Route | Verdict |
     |---|---|
-    | Openness API | no audio property exists (11-term probe) |
+    | Openness API | no audio property anywhere (11-term probe over every type) |
     | Alarm class in the TIA UI | 12 properties, all colour/priority/log — matches the API 1:1 |
     | `Runtime settings -> Alarms` | no sound option (screenshot 2026-08-31) |
-    | Panel hardware spec | **no audio output, no buzzer listed** |
+    | **Panel hardware** | **buzzer present** — so the route exists somewhere |
 
-    **Honest limits of this check.** The Siemens support forum threads returned 403 and the full
-    operating-instructions PDF exceeded the fetch limit, so this is *"not documented in the
-    specifications that could be read"* rather than *"proven impossible"*. There is a Siemens
-    YouTube item titled "WinCC Unified Comfort Panel: Play a sound on the Panel", so somebody has
-    made **a** sound happen — plausibly via a USB audio device, or the touch piezo, or on Unified
-    **PC** runtime rather than a panel. Worth five minutes of somebody's time, but **not something
-    to hang a ballast alarm on.**
+    Still to check, in order of likelihood:
+    1. **The panel's own Control Panel.** It carries a "Touch sound" system property, so the device
+       settings are where sound lives. Needs the physical panel.
+    2. **A WinCC Unified runtime script API.** Classic Comfort panels had a `SetAcousticSignal`
+       system function; whether Unified exposes an equivalent to JavaScript is unconfirmed.
+    3. **Alarm-class "Common alarm class" / state machine** interaction — the one column in the
+       alarm-class table not yet accounted for.
 
-    **RECOMMENDATION, now firm: build the hardwired sounder.** It was previously the fallback; it
-    should be the plan. It is independent of the HMI, so it still sounds if the panel hangs or
-    loses its connection; it is what a surveyor expects; and 10 free DQ channels per station mean
-    it costs nothing today. **It needs a channel and wiring, so it must be decided BEFORE the
-    cabinet is built** — this is not a commissioning task, and retrofitting it means opening a
-    built cabinet on a vessel. Raise it with the hardware team alongside item 40 and Q5-Q9 of the
-    client question set.
+    **Design note for whichever route wins.** The original beep lived in a *screen* script, and
+    screen scripts only run while their screen is displayed — one of the three reasons it was
+    useless. Whatever drives the buzzer must live somewhere that runs regardless of the displayed
+    screen: a **scheduled/cyclic task**, not a screen dynamization. Do not repeat that mistake.
+
+    **The hardwired sounder stays on the table and still has to be decided before the cabinet is
+    built.** Even with a working panel buzzer, a sounder is independent of the HMI — it still
+    sounds if the panel hangs, loses its connection or is powered down — and it is what a surveyor
+    expects on a ballast system. 10 free DQ channels per station, so it costs nothing today and is
+    a mobilisation later. Worth raising with the hardware team alongside item 40 regardless of how
+    the buzzer question resolves.
 
     **Step 2 UPDATE 2026-08-31 — the buzzer is almost certainly NOT an alarm-class setting.**
 
