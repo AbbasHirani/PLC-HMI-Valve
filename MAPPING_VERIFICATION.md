@@ -11,24 +11,36 @@ addresses.
 
 ---
 
-## VERDICT
+## VERDICT — the mapping is VERIFIED against the live project and the client's file
 
-**The mapping itself is correct.** Channels, stations and the client's RIO assignment all
-reconcile with zero discrepancies.
-
-**But it cannot be certified as submitted-ready yet**, for one reason: the live `Valve_Meta_DB`
-could not be read, and a copy of it in this repo is wrong. Details in §5.
+The PLC was compiled clean (0 errors, 0 warnings) on 2026-08-31, which allowed the live
+`Valve_Meta_DB` to be exported and compared directly. **Everything reconciles with zero
+discrepancies.**
 
 | # | Check | Result |
 |---|---|---|
-| 1 | Valve set = the client's 89 in-scope valves | **PASS** — no missing, no extra |
+| 1 | Valve set = the client's 89 in-scope valves | **PASS** — no missing, no extra, no duplicates |
 | 2 | Channel integrity (534 assignments) | **PASS** — 0 zeros, 0 duplicates, 0 out-of-range |
 | 3 | Channel blocks contiguous per valve | **PASS** — 4 DI consecutive, 2 DQ consecutive, all 89 |
 | 4 | No channel crosses a station boundary | **PASS** — 0 violations |
 | 5 | Station assignment vs client `RIO Location` | **PASS** — 0 mismatches of 89 |
 | 6 | PLC address arithmetic | **PASS** — spans `%I2.0-%I47.3`, `%Q2.0-%Q26.5` |
-| 7 | Slot → CM mapping | **FAIL in this repo** — see §5 |
-| 8 | Client file internal consistency | **2 defects** — see §6 |
+| 7 | **Live** `Valve_Meta_DB` CM numbers | **PASS** — 0 differences vs the asserted mapping |
+| 8 | **Live** Valve Tag vs client Excel | **PASS** — 0 mismatches of 89 |
+| 9 | **Live** System vs client Excel | **PASS** — 0 mismatches of 89 |
+| 10 | Live zone blocks contiguous | **PASS** — Aft 1-27, Bilge 28-54, Fwd 55-89 |
+| 11 | Client file internal consistency | **2 defects in THEIR file** — see §6 |
+
+Live export vs the asserted mapping:
+
+```
+LIVE vs HOME_DIAGRAM   : 0 differences
+LIVE vs repo meta file : 54 differences   <- the repo copy was the wrong one
+```
+
+**The repo's stale `temp_valve_meta_db.xml` has been replaced with the live export** (structurally
+identical: 29 members, same names, same types). Repo, live project and alarm naming now all agree.
+The landmine described in §5 is defused.
 
 ---
 
@@ -65,7 +77,7 @@ cross-station violations: 0
 No valve's channels straddle two stations. This is what `FC_IoMapper`'s index-range guard depends
 on. Free channels match item 40's independent audit exactly.
 
-## 5. THE ONE REAL PROBLEM — slot → CM
+## 5. RESOLVED — the slot → CM divergence (kept, because the root cause is still open)
 
 **There are two independent slot → CM mappings in this system, and nothing checks them against
 each other:**
@@ -102,16 +114,16 @@ OPEN on a valve labelled CM01 would open CM25. On a ballast system that is a ser
 mis-operation, and nothing on screen would reveal it — except that the alarm list, which uses
 `HOME_DIAGRAM`, would name a different valve than the table for the same slot.
 
-### What must happen before any builder run
+### How it was resolved, 2026-08-31
 
-1. Restore the STEP 7 licence (item 46) and **compile the PLC** — it is currently inconsistent
-   (§7), which is why the live DB could not be exported.
-2. `HmiBuilder.exe --export-block=Valve_Meta_DB` and compare `CmNo[1..89]` against
-   `MAPPING_VERIFIED.csv`.
-3. If the live DB matches: **replace `temp_valve_meta_db.xml` with the export.** The repo copy is
-   the wrong one, not the project.
-4. If it does not match: stop. The live project has the same swap and 54 valves are mislabelled on
-   the panel today.
+1. STEP 7 licence restored, **PLC compiled clean** (0 errors, 0 warnings).
+2. `HmiBuilder.exe --export-block=Valve_Meta_DB` succeeded.
+3. **The live DB matched the asserted mapping exactly — 0 differences** (slot 1 = CM25,
+   slot 21 = CM79, slot 28 = CM01), and differed from the repo copy on 54 slots.
+4. **The repo copy was replaced with the live export.** It was the wrong one, not the project.
+   The stale version is preserved outside the repo for reference.
+
+So the panel has been correct all along; only the repo's import source was wrong.
 
 **Longer term:** `Valve_Meta_DB` and `HOME_DIAGRAM` should not be two hand-maintained lists.
 Either generate the DB from `HOME_DIAGRAM`, or add a build-time assertion that they agree. Nothing
@@ -150,27 +162,38 @@ eleven**, so if any turn out not to exist, those channels are simply unused — 
 needed. That is the safe direction. The unsafe direction is the reverse: a valve that exists but is
 not in the schedule, which is Q2.
 
-## 7. What could not be checked, and why
+## 7. The blocker that briefly stopped this, now cleared
 
-**The live `Valve_Meta_DB` could not be read.** Export failed with:
+The first attempt to export the live `Valve_Meta_DB` failed with:
 
 ```
 Inconsistent blocks and PLC data types (UDT) cannot be exported.
 ```
 
-The PLC program is in an inconsistent state and needs compiling, which needs the STEP 7 licence
-(item 46). Note the failed imports from that licence gap may have contributed to the inconsistency;
-either way a successful PLC compile should clear it.
+The PLC was in an inconsistent state and needed compiling, which needed the STEP 7 licence
+(item 46). Both were resolved on 2026-08-31 — licence restored, PLC compiled 0 errors 0 warnings —
+and the export then succeeded.
 
-**Everything in §1-§6 is independent of that** — it was checked against the repo's channel DB, the
-builder source and the client's Excel, none of which need TIA.
+Worth keeping in mind for next time: **a project that will not export is telling you it has not
+been compiled**, and on this project that has twice traced back to licensing rather than to the
+code.
 
 ---
 
 ## Recommendation
 
-**Do not submit until §5 step 2 is done.** The mapping is right; what is unproven is that the
-*project* holds the right one, and the check takes minutes once the licence is in.
+**The mapping is verified and safe to submit.** `MAPPING_VERIFIED.csv` is the artefact: 89 rows,
+every one reconciled against the live PLC data block and the client's own schedule.
 
-`MAPPING_VERIFIED.csv` is the mapping being asserted, and is suitable as the submission artefact
-once that confirmation lands.
+**Two things to put to the client alongside it**, neither of which changes our mapping:
+
+1. Their `IO Summary` sheet contradicts their `Valve list` sheet (101 vs 102 valves, 34 vs 35
+   Ballast Fwd). Ask which is authoritative before anyone signs.
+2. Eleven in-scope valves are marked `Not Found` in their own file. Channels are reserved for all
+   eleven, so if any prove not to exist those channels simply go unused — no re-addressing. Flag
+   it so the reservation is a recorded decision rather than an assumption.
+
+**One engineering task remains open** and is worth doing before the next change to either list:
+`Valve_Meta_DB` and `HOME_DIAGRAM` are still two hand-maintained copies of the same fact with
+nothing comparing them. A 54-slot divergence survived undetected between them. Either generate one
+from the other, or add a build-time assertion that they agree.

@@ -2075,8 +2075,21 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     the run with one clear line rather than repeating a seven-paragraph stack trace and continuing as
     if nothing happened. Not built yet.
 
-47. **[BLOCKER for the mapping submission, found 2026-08-31. DO NOT run the builder until
-    resolved — `ImportPlcBlocks` would make it real.]**
+47. **[RESOLVED 2026-08-31, same day. The mapping is VERIFIED and safe to submit; the repo's
+    stale meta file has been replaced with the live export. Root cause still open — see the end.]**
+
+    **Outcome:** STEP 7 licence restored, PLC compiled **0 errors 0 warnings**, live
+    `Valve_Meta_DB` exported and compared. **The live project was correct all along** — 0
+    differences against the asserted mapping (slot 1 = CM25, slot 21 = CM79, slot 28 = CM01), and
+    54 differences against the repo's copy. The repo's `temp_valve_meta_db.xml` was the wrong file
+    and has been **replaced with the live export** (structurally identical: 29 members, same names,
+    same types). Repo, live project and alarm naming now all agree.
+
+    **Full verification against the live DB and the client's Excel: 0 mismatches on every field** —
+    CM numbers, Valve Tags, Systems, and station vs the client's `RIO Location`, across all 89.
+    Zone blocks contiguous: Ballast Aft 1-27, Bilge 28-54, Ballast Fwd 55-89.
+
+    The original finding follows, kept because the root cause is not fixed.
     **Two independent slot -> CM mappings exist and they disagree on 54 of 89 slots.**
 
     Found while verifying the I/O mapping before submission. Full write-up in
