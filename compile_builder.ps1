@@ -5,7 +5,36 @@ $ErrorActionPreference = "Stop"
 Set-Location "c:\Users\abbas\OneDrive\Documents\Automation\valveDemo2"
 
 $csc  = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-$dll  = "C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20\Siemens.Engineering.dll"
+# Where Siemens.Engineering.dll lives. This was a single hardcoded C:\Program Files path until
+# 2026-08-31, when the project moved to a machine with TIA installed on D:\Siemens and every
+# compile in this repo broke with "Metadata file could not be found". Discover it instead:
+# the running TIA process is the most trustworthy source, since it is the instance we attach to.
+function Find-OpennessDll {
+    $roots = @()
+    if ($env:VALVEDEMO_OPENNESS) { $roots += $env:VALVEDEMO_OPENNESS }
+    Get-Process -Name Siemens.Automation.Portal -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+            $bin = Split-Path $_.Path -Parent          # ...\Portal V20\Bin
+            $roots += (Join-Path (Split-Path $bin -Parent) "PublicAPI\V20")
+        } catch { }
+    }
+    $roots += "D:\Siemens\Portal V20\PublicAPI\V20"
+    $roots += "C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20"
+    foreach ($r in $roots) {
+        $candidate = if ($r -like "*Siemens.Engineering.dll") { $r } else { Join-Path $r "Siemens.Engineering.dll" }
+        if (Test-Path $candidate) { return $candidate }
+    }
+    return $null
+}
+
+$dll = Find-OpennessDll
+if (-not $dll) {
+    Write-Output "COMPILE_RESULT: FAILED (Siemens.Engineering.dll not found)"
+    Write-Output "  Looked under the running TIA process, D:\Siemens and C:\Program Files\Siemens."
+    Write-Output "  Set VALVEDEMO_OPENNESS to the folder holding Siemens.Engineering.dll and retry."
+    exit 1
+}
+Write-Output "Openness DLL: $dll"
 
 $out = & $csc /nologo /target:exe /out:"HmiBuilder.exe" /reference:"$dll" `
     "src\GenerateHmiLayout.cs" "src\MarineScreens.cs" 2>&1

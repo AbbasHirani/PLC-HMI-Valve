@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Diagnostics;
 using System.Drawing;
 using Siemens.Engineering;
 using Siemens.Engineering.HW;
@@ -85,13 +86,45 @@ namespace ValveDemoHmiBuilder
         {
             int i = args.Name.IndexOf(',');
             string n = i == -1 ? args.Name : args.Name.Substring(0, i);
-            string[] dirs = {
-                @"C:\Program Files\Siemens\Automation\Portal V20\PublicAPI\V20",
-                @"C:\Program Files\Siemens\Automation\Portal V20\Bin\PublicAPI",
-                @"C:\Program Files\Siemens\Automation\Portal V20\Bin"
-            };
-            foreach (var d in dirs) { string p = Path.Combine(d, n + ".dll"); if (File.Exists(p)) return Assembly.LoadFrom(p); }
+            foreach (var d in OpennessDirs()) { string p = Path.Combine(d, n + ".dll"); if (File.Exists(p)) return Assembly.LoadFrom(p); }
             return null;
+        }
+
+        // Where the Openness assemblies live. This used to be three hardcoded C:\Program Files
+        // paths, which stopped working the moment the project moved to a machine with TIA on
+        // D:\Siemens (2026-08-31) - the builder compiled and then failed to load a single Siemens
+        // type at runtime. Discovery order is deliberate: most specific and most trustworthy first.
+        private static string[] OpennessDirs()
+        {
+            var dirs = new List<string>();
+
+            // 1. Explicit override, for an install in a place nothing here anticipates.
+            string env = Environment.GetEnvironmentVariable("VALVEDEMO_OPENNESS");
+            if (!string.IsNullOrEmpty(env)) dirs.Add(env);
+
+            // 2. Derived from the RUNNING TIA process. This is the only source that cannot be
+            //    wrong, because it is the very instance we are about to attach to:
+            //    ...\Portal V20\Bin\Siemens.Automation.Portal.exe -> ...\Portal V20\PublicAPI\V20
+            try {
+                foreach (var proc in Process.GetProcessesByName("Siemens.Automation.Portal")) {
+                    try {
+                        string bin  = Path.GetDirectoryName(proc.MainModule.FileName);
+                        string root = Path.GetDirectoryName(bin);
+                        dirs.Add(Path.Combine(root, @"PublicAPI\V20"));
+                        dirs.Add(Path.Combine(root, @"Bin\PublicAPI"));
+                        dirs.Add(bin);
+                    } catch { }   // a 32-bit or protected process refuses MainModule; skip it
+                }
+            } catch { }
+
+            // 3. Known install roots, newest machine first.
+            foreach (var root in new[] { @"D:\Siemens\Portal V20",
+                                         @"C:\Program Files\Siemens\Automation\Portal V20" }) {
+                dirs.Add(Path.Combine(root, @"PublicAPI\V20"));
+                dirs.Add(Path.Combine(root, @"Bin\PublicAPI"));
+                dirs.Add(Path.Combine(root, "Bin"));
+            }
+            return dirs.ToArray();
         }
 
         static void Main(string[] args)
@@ -363,6 +396,7 @@ namespace ValveDemoHmiBuilder
             // an illustration, its live valve overlays and a 14-row table.
             if (Want(only, "StripLegend")) PatchStripLegend(hmi);
             if (Want(only, "TableButtons")) PatchTableButtons(hmi);
+            if (Want(only, "AlarmBeep")) PatchAlarmBeep(hmi);
 
             // AlarmColumns-only: patch columns on the EXISTING AlarmView without deleting the screen.
             // Run this after Pass-2 alarm additions (--only=DiscreteAlarms) to re-apply column config.
@@ -571,6 +605,73 @@ namespace ValveDemoHmiBuilder
         // and left 28 table command buttons unprotected. A patch that is not mirrored in the
         // builder is a fix with an expiry date.
         static int s_visibleMapFails = 0;
+
+
+        // ── Patch: strip the dead localhost "beep" from Screen_Alarms ───────────────────
+        // Item 38 step 4. Verified LIVE in the project 2026-08-31 by ProbeAlarmBeep.exe, which is
+        // the whole reason this is a patch and not a no-op: the BUILDER's source had already been
+        // cleaned, but Screen_Alarms is only rebuilt by the slow --only=Alarms pass, so the
+        // original survived on the panel. Reading it was the difference between fixing this and
+        // believing it was already fixed.
+        //
+        // What it was: a setInterval firing fetch('http://127.0.0.1:8081/beep/') every 1.5 s.
+        // Three independent faults, any one of which made it useless:
+        //   - nothing serves 127.0.0.1:8081; on the panel that address is the panel itself, and
+        //     this project installs nothing on that port. Written against a dev laptop.
+        //   - catch(e){} swallows every failure, so it looked like working code for months.
+        //   - screen scripts only run while their screen is displayed, so it could only ever
+        //     attempt to sound while the operator was already looking at the alarm list - backwards
+        //     for an annunciator, whose entire job is to fetch somebody who is NOT looking.
+        //
+        // Removing it does not lose an audible alarm, because there has never been one. It removes
+        // code that reads like there is. The real annunciator is the MTP1500's own buzzer, which is
+        // NOT reachable through Openness (probed, acoustic_probe.log) and needs a human in the TIA
+        // UI - the rest of item 38.
+        //
+        // The TotalFaults script is EDITED, not deleted: it also renders "ACTIVE FAULTS: n", which
+        // must survive. Internal_PrevFaultCount existed only to give this script its 0->n edge and
+        // has no other reader in the generator, so its write goes too.
+        static void PatchAlarmBeep(HmiSoftware hmi)
+        {
+            Console.WriteLine();
+            Console.WriteLine("[AlarmBeep] Stripping the dead localhost beep from Screen_Alarms...");
+
+            var sc = FindScreen(hmi, "Screen_Alarms");
+            if (sc == null) { Console.WriteLine("  [WARN] Screen_Alarms not found - nothing done."); return; }
+
+            // The count label, rebuilt WITHOUT the beep and without the PrevFaultCount bookkeeping.
+            var lbl = FindItemByName(sc, "TotalFaults");
+            if (lbl == null) {
+                Console.WriteLine("  [WARN] TotalFaults not found.");
+            } else {
+                RemoveDyn(lbl, "Text");
+                Dyn(lbl, "Text",
+                    "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
+                    "let n = readTag(Tags(\"Valves_DB_TotalFault\").Read()) || 0;\n" +
+                    "return \"ACTIVE FAULTS: \" + n;",
+                    "T1s");
+                Console.WriteLine("  TotalFaults: beep removed, count rendering kept.");
+            }
+
+            // ACKNOWLEDGE ALL still cleared a timer that nothing sets any more.
+            var ack = FindItemByName(sc, "Btn_AckAll") as HmiButton;
+            if (ack == null) {
+                Console.WriteLine("  [WARN] Btn_AckAll not found.");
+            } else {
+                AddScriptEvent(ack,
+                    "try {\n" +
+                    "  HMIRuntime.Alarming.GetActiveAlarms(HMIRuntime.Language).then(function(alarms) {\n" +
+                    "    for (var i = 0; i < alarms.length; i++) {\n" +
+                    "      try { HMIRuntime.Alarming.Alarms(alarms[i].Name).Acknowledge(); } catch(e) {}\n" +
+                    "    }\n" +
+                    "  });\n" +
+                    "} catch(e) {}");
+                Console.WriteLine("  Btn_AckAll: orphaned clearInterval removed, acknowledge-all kept.");
+            }
+
+            Console.WriteLine("[AlarmBeep] Done. NOTE: there is still NO audible alarm - that is the");
+            Console.WriteLine("[AlarmBeep] rest of item 38 and needs the panel buzzer set in the TIA UI.");
+        }
 
         static void PatchTableButtons(HmiSoftware hmi)
         {
@@ -973,14 +1074,6 @@ namespace ValveDemoHmiBuilder
                 cDyn.ScriptCode =
                     "function readTag(v) { return (v !== null && typeof v === \"object\" && \"Value\" in v) ? v.Value : v; }\n" +
                     "let n = readTag(Tags(\"Valves_DB_TotalFault\").Read()) || 0;\n" +
-                    "let prev = readTag(Tags(\"Internal_PrevFaultCount\").Read()) || 0;\n" +
-                    "if (prev == 0 && n > 0) {\n" +
-                    "  if (!globalThis._beepTimer) globalThis._beepTimer = setInterval(function() { try { fetch('http://127.0.0.1:8081/beep/'); } catch(e){} }, 1500);\n" +
-                    "}\n" +
-                    "if (prev > 0 && n == 0) {\n" + 
-                    "  if (globalThis._beepTimer) { clearInterval(globalThis._beepTimer); globalThis._beepTimer = null; }\n" +
-                    "}\n" +
-                    "Tags(\"Internal_PrevFaultCount\").Write(n);\n" +
                     "return \"ACTIVE FAULTS: \" + n;";
                 cDyn.Trigger.Type = (TriggerType)Enum.Parse(typeof(TriggerType), "T1s");
             } catch {}
@@ -1009,8 +1102,11 @@ namespace ValveDemoHmiBuilder
             // (16 + 1888 = 1904, the same 1920-16px right margin every other screen uses; 1904-300=1604)
             var btnAck = MakeBtn(sc, "Btn_AckAll", 1604, 230, 300, 46, "ACKNOWLEDGE ALL", M_YELLOW, M_TEXT, M_BORDER, 1, 14, true);
             SetStr(btnAck, "Authorization", "Operate");
+            // No beep-timer teardown here any more: the localhost beep it cleared was removed
+            // from this generator, and stripped from the live project by PatchAlarmBeep
+            // (item 38 step 4, 2026-08-31). Nothing sets that timer, so clearing it was dead
+            // code pointing at a feature that never worked. There is still NO audible alarm.
             AddScriptEvent(btnAck,
-                "if (globalThis._beepTimer) { clearInterval(globalThis._beepTimer); globalThis._beepTimer = null; }\n" +
                 "try {\n" +
                 "  HMIRuntime.Alarming.GetActiveAlarms(HMIRuntime.Language).then(function(alarms) {\n" +
                 "    for (var i = 0; i < alarms.length; i++) {\n" +

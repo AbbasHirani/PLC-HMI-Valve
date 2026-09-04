@@ -1913,6 +1913,41 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     Worth noting the tell: a run that changes the project and prints no `[SAVE] Project saved.` line
     has not saved. That line is the only evidence, and it is worth checking on any unfamiliar flag.
 
+46. **[BLOCKER for all PLC work on this machine, found 2026-08-31.]**
+    **`STEP 7 Basic` license is missing — every PLC block import fails.**
+
+    Any builder run that reaches `ImportPlcBlocks` now fails all seven blocks:
+
+    ```
+    [PLC] IMPORT FAILED: FC_IoMapper - LicenseNotFoundException:
+      Error when calling method 'Import' of type 'PlcBlockComposition'.
+      Necessary license 'STEP 7 Basic' is missing.
+    ```
+
+    Affects `Valves_DB`, `FB_ValveLoop`, `Valve_Meta_DB`, `UDT_Valve_Config`, `Valve_Channels_DB`,
+    `IO_Buffer_DB`, `FC_IoMapper`, `FC_PhysicalIoCopy`.
+
+    **Nothing is damaged.** An import that fails leaves the existing block untouched, so the project
+    is exactly as it was. The risk is not corruption, it is **silently believing a PLC change landed
+    when it did not** — which is precisely what would have happened before 2026-08-28, when these
+    `catch` blocks printed a hardcoded guess (`"PLC is online or block exists"`) instead of the real
+    exception. That one-line change is what made this legible.
+
+    **What still works:** everything HMI-side. Screens, patches, tags, alarms, and every read-only
+    probe attach and run normally. `--only=AlarmBeep`, `--only=TableButtons` and the rest are
+    unaffected apart from the noisy failed imports at the start of every run.
+
+    **What is blocked:** any change to `FB_ValveLoop`, the DBs, or the FCs. That includes item 39's
+    `Healthy`-gate fix and anything arising from item 9.
+
+    **Fix:** install/activate the STEP 7 licence via Automation License Manager. The old laptop lost
+    its trial mid-session for the same class of reason (section 6), so treat licence state as
+    something to verify at the start of a session rather than assume.
+
+    **Cheap guard worth adding:** `ImportPlcBlocks` could detect `LicenseNotFoundException` and stop
+    the run with one clear line rather than repeating a seven-paragraph stack trace and continuing as
+    if nothing happened. Not built yet.
+
 ## 4. The valve count saga — read this before touching counts again
 
 This went through several wrong turns; the final answer is solid but got there messily:
@@ -1987,6 +2022,61 @@ This went through several wrong turns; the final answer is solid but got there m
   silently look like nothing changed if you don't check the actual error text.
 
 ## 6. Machine/environment notes
+
+### SECOND MACHINE MOVE, 2026-08-31 — read this first if nothing will compile or attach
+
+The project moved again. Four separate things broke at once and each produced a different,
+misleading error. In the order they bite:
+
+**1. TIA is on `D:`, not `C:`.** The install is `D:\Siemens\Portal V20\`, not
+`C:\Program Files\Siemens\Automation\Portal V20\`. Roughly **148 `.cs` files plus
+`compile_builder.ps1` hardcoded the old path**, so every compile died with
+`error CS0006: Metadata file ... could not be found`.
+
+*Fixed properly rather than by swapping one hardcoded path for another.* `compile_builder.ps1`
+and `GenerateHmiLayout.cs`'s `ResolveAssembly` now **discover** the DLL, in this order:
+`VALVEDEMO_OPENNESS` env override → the **running TIA process's own install directory** (the only
+source that cannot be wrong, since it is the instance being attached to) → known roots, `D:` first.
+New helper **`compile_tool.ps1`** does the same for one-off probes:
+`.\compile_tool.ps1 ProbeSomething.cs`. Use it instead of pasting a path into the next probe.
+The 148 legacy probes were deliberately NOT touched — they are ephemeral and most will never run
+again.
+
+**2. The Windows account was not in the local `Siemens TIA Openness` group.** The group existed
+(TIA creates it) but was empty, so every tool failed at `LocationProvider.Validation()` with
+`Cannot load assembly. Check your openness environment` and exit code 82.
+
+Fix, from an **elevated** PowerShell, then **log out and back in** — Windows bakes group membership
+into the logon token, so restarting TIA is not enough:
+```
+Add-LocalGroupMember -Group "Siemens TIA Openness" -Member "<domain>\<user>"
+```
+Verify it actually reached the token with `whoami /groups | findstr Openness`, not just with
+`Get-LocalGroupMember` — the group can list the user while the current session still predates it.
+
+**3. THE ONE THAT WASTED THE MOST TIME: a stray `Siemens.Engineering.dll` in the repo root.**
+After the group was fixed, everything still failed with the identical error. Cause: a loose copy of
+`Siemens.Engineering.dll` sat next to the executables. **.NET probes the application directory
+BEFORE `AssemblyResolve` ever fires**, so every tool loaded that copy and the resolver was never
+reached. Openness validates that its assembly came from a genuine install, and a loose copy fails
+that check.
+
+It was the *same version* (`2000.0.9501.1`) as the real one, so a version comparison proves nothing.
+It was harmless on the old laptop because it had been copied from that machine's own install; it
+became fatal here only because the real install moved to `D:`. Moved to `_shadowed_dlls/`.
+**If Openness fails with a correct group and a correct path, look for a stray DLL next to the exe
+before anything else.**
+
+**4. `STEP 7 Basic` license is MISSING on this machine.** All seven PLC block imports fail with
+`LicenseNotFoundException: ... Necessary license 'STEP 7 Basic' is missing.` See item 46 — this is a
+live blocker for any PLC-side work, and it does not stop HMI-side work.
+
+Worth noting what made #4 legible at all: the builder's import `catch` blocks used to print a
+hardcoded guess, `"(Skipping X re-import - PLC is online or block exists)"`. That was replaced with
+`Root(ex)` on 2026-08-28. Without that change this would have read as a benign skip and the missing
+licence would have been found much later, probably by something failing on the ship.
+
+
 
 - This session moved from an old laptop (Windows account "Admin", project at
   `C:\Users\Admin\Documents\Automation\valveDemo2`) to a new laptop (Windows account "abbas") because
