@@ -1214,8 +1214,38 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     `[8]` FALSE together and confirm the other seven **stay** where they were — that is the regression
     test for the sentinel fix, and it fails today.
 
-38. **[pending — THERE IS NO AUDIBLE ALARM. Step 1 answered 2026-08-29: the buzzer is NOT
-    reachable through Openness.]**
+38. **[STEPS 1 and 4 DONE. THERE IS STILL NO AUDIBLE ALARM — steps 2 and 3 need a human in the
+    TIA UI, and that is the whole remaining item.]**
+
+    **Step 4 DONE 2026-08-31 — the dead localhost beep is gone from the live project.**
+    Verified by reading the project with `ProbeAlarmBeep.exe`, not by trusting a log:
+    **2 scripts → 1 → 0**.
+
+    **This had to be checked rather than assumed, and that is the lesson.** The BUILDER's source had
+    already been cleaned at some earlier point, so a reader of `GenerateHmiLayout.cs` would conclude
+    the beep was gone. It was not: `Screen_Alarms` is only rebuilt by the slow `--only=Alarms` pass,
+    so the original was still live on the panel, in two places — `TotalFaults` (set the timer) and
+    `Btn_AckAll` (cleared it).
+
+    Removed by a new patch pass, `--only=AlarmBeep`, and also removed from the builder source so a
+    future `--only=Alarms` cannot reintroduce it. `TotalFaults` was **edited, not deleted** — it also
+    renders "ACTIVE FAULTS: n", which survives; the `Internal_PrevFaultCount` bookkeeping that existed
+    only to give the beep its 0→n edge went with it.
+
+    **A near miss worth recording.** The first run of the patch printed
+    `Btn_AckAll: orphaned clearInterval removed` — and had not removed it. `AddScriptEvent` calls
+    `CreateTappedHandler`, which *creates* a handler; the button already had one, so `Create` threw,
+    the exception was swallowed into a `[ScriptEvent ERR]` line, and **the success message printed
+    unconditionally regardless of the outcome**. Only re-probing the project caught it. Fixed two
+    ways: a new `RewriteExistingEventScript` helper overwrites the existing handler instead of
+    creating a second one, and the patch now reports what actually happened rather than what it
+    attempted. **Any patch that writes to an event handler needs the same treatment.**
+
+    **Removing the beep did NOT remove a working alarm — there has never been one.** It removed code
+    that reads as though there is, which is the real hazard: an auditor, or this project six months
+    on, would see a beep timer and assume annunciation exists.
+
+
 
     **Probe result, recorded this time.** `InspectAcousticSignal.exe` re-run 2026-08-29 and
     its output committed as `acoustic_probe.log`. It scans the Siemens assemblies for any
@@ -1306,15 +1336,14 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     acoustic setting is tied to the unacknowledged state — the same `RaisedState` /
     `AcknowledgedState` split the flashing already uses.
 
-    **Step 4 — remove the localhost beep.** Note it is *inside* the script that also renders
-    "ACTIVE FAULTS: n", so the dynamization is edited, not deleted. `Internal_PrevFaultCount` exists
-    only to give that script its 0→n edge and becomes unused once the beep goes — check for other
-    readers before removing the tag.
+    ~~**Step 4 — remove the localhost beep.**~~ **DONE 2026-08-31, see the header.** The tag
+    `Internal_PrevFaultCount` is now written by nothing and read by nothing; it is still created by
+    `CreateSummaryHmiTags` and was left in place rather than deleted, since removing a live HMI tag
+    for tidiness is not worth a rebuild. Delete it if the tag set is ever regenerated anyway.
 
-    **Build cost:** this touches one script on `Screen_Alarms`, and `--only=Alarms` is the ~45-minute
-    rebuild that also regenerates all 632 alarms and carries the COM deadlock risk documented in
-    `BuildAlarmScreen`. Do it as a targeted patch instead — `PatchNav` and `PatchAlarmColumns` are the
-    existing pattern for reaching into one screen and rewriting one thing in place.
+    **Build cost:** done as a targeted patch (`--only=AlarmBeep`), exactly as this note recommended —
+    `--only=Alarms` is the ~45-minute rebuild that also regenerates every alarm and carries the COM
+    deadlock risk documented in `BuildAlarmScreen`. The patch touches two items on one screen.
 
     **Verification:** raise a valve fault with the panel showing **Home**, not the alarm screen, and
     confirm the buzzer sounds. That is the exact case today's code fails. Then acknowledge without

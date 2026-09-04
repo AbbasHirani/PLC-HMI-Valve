@@ -654,19 +654,32 @@ namespace ValveDemoHmiBuilder
             }
 
             // ACKNOWLEDGE ALL still cleared a timer that nothing sets any more.
+            //
+            // AddScriptEvent CANNOT be used here. It calls CreateTappedHandler, which *creates* a
+            // handler, and this button already has one - so Create throws and the script is left
+            // untouched. That is exactly what happened on the first run of this patch (2026-08-31):
+            // the log printed "[ScriptEvent ERR] Exception has been thrown by the target of an
+            // invocation" and then, because the success line printed unconditionally, claimed the
+            // removal had worked. It had not. Caught only by re-probing the project instead of
+            // trusting the log - which is the argument for verifying every patch this way.
+            //
+            // Rewrite the EXISTING handler's ScriptCode instead, and report what actually happened.
             var ack = FindItemByName(sc, "Btn_AckAll") as HmiButton;
             if (ack == null) {
                 Console.WriteLine("  [WARN] Btn_AckAll not found.");
             } else {
-                AddScriptEvent(ack,
+                string ackJs =
                     "try {\n" +
                     "  HMIRuntime.Alarming.GetActiveAlarms(HMIRuntime.Language).then(function(alarms) {\n" +
                     "    for (var i = 0; i < alarms.length; i++) {\n" +
                     "      try { HMIRuntime.Alarming.Alarms(alarms[i].Name).Acknowledge(); } catch(e) {}\n" +
                     "    }\n" +
                     "  });\n" +
-                    "} catch(e) {}");
-                Console.WriteLine("  Btn_AckAll: orphaned clearInterval removed, acknowledge-all kept.");
+                    "} catch(e) {}";
+                if (RewriteExistingEventScript(ack, ackJs))
+                    Console.WriteLine("  Btn_AckAll: orphaned clearInterval removed, acknowledge-all kept.");
+                else
+                    Console.WriteLine("  [WARN] Btn_AckAll: could NOT rewrite its event script - beep teardown still present.");
             }
 
             Console.WriteLine("[AlarmBeep] Done. NOTE: there is still NO audible alarm - that is the");
@@ -756,6 +769,30 @@ namespace ValveDemoHmiBuilder
                 s_visibleMapFails++;
             NoFocusVisual(btn);
             return true;
+        }
+
+        // Overwrites the script on an item's EXISTING event handler. Needed wherever a handler is
+        // already present: the Create<T>-based AddScriptEvent throws on a second handler rather
+        // than replacing the first, and swallows the exception into a log line.
+        // Returns false when there is nothing to rewrite, so callers can report honestly.
+        static bool RewriteExistingEventScript(object item, string js)
+        {
+            try {
+                var ep = item.GetType().GetProperty("EventHandlers");
+                if (ep == null) return false;
+                var evs = ep.GetValue(item, null) as IEnumerable;
+                if (evs == null) return false;
+                foreach (var e in evs) {
+                    try {
+                        object scriptObj = e.GetType().GetProperty("Script").GetValue(e, null);
+                        var scp = scriptObj.GetType().GetProperty("ScriptCode");
+                        if (scp == null || !scp.CanWrite) continue;
+                        scp.SetValue(scriptObj, js, null);
+                        return true;
+                    } catch { }
+                }
+            } catch (Exception ex) { Console.WriteLine("  [RewriteEvent ERR] " + Root(ex)); }
+            return false;
         }
 
         static object FindItemByName(HmiScreen sc, string name)
