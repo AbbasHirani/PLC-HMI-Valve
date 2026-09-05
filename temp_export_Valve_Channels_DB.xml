@@ -2,7 +2,7 @@
 <Document>
   <Engineering version="V20" />
   <DocumentInfo>
-    <Created>2026-08-29T09:13:25.674568Z</Created>
+    <Created>2026-09-04T18:35:18.9056852Z</Created>
     <ExportSetting>WithDefaults</ExportSetting>
     <InstalledProducts>
       <Product>
@@ -27,6 +27,10 @@
       </OptionPackage>
       <Product>
         <DisplayName>WinCC Basic/Comfort/Advanced</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>WinCC Professional</DisplayName>
         <DisplayVersion>V20</DisplayVersion>
       </Product>
       <Product>

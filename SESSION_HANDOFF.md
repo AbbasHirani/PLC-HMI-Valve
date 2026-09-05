@@ -2331,6 +2331,71 @@ movement, command conflict, reset-fault) was written out in chat on 2026-08-15 a
 It is not reproduced here — regenerate it from `MV_Westerly_IO_Wiring_Schedule.xlsx` (any valve's six
 addresses) plus the seven alarm conditions listed in `GenerateHmiLayout.cs` `CreateAlarms`.
 
+## 6b. 2026-09-05 session — AFT module reorder, full PLC-code mapping audit, BaseUnit/power-feed question
+
+**AFT module physical order fixed to match MID/FWD, survived a crash-and-redo.** AFT's rack had DI
+and DQ modules interleaved (`DI_1, DQ_1, DI_2...DI_7, DQ_2, DQ_3, DQ_4`) while MID and FWD were
+cleanly grouped (all DI, then all DQ). Confirmed via Siemens' own docs this is legal either way
+(TIA keeps independent address counters per I/O type, so interleaving never affected addresses) —
+reordered anyway for consistency/readability. **First attempt was lost to a laptop crash** (last save
+predated the reorder); redone and this time verified by reading the real `PositionNumber` back from
+the live project after saving: `Pos 1-7 = DI ST_1..7, Pos 8-11 = DQ ST_1..4, Pos 12 = Server` — matches
+MID/FWD. Also renamed the AFT interface module from a stale `ET200SP_AFT_TEST` to `ET200SP_AFT` (pure
+cosmetic, confirmed via live re-read, survived the crash fine since it was saved earlier).
+
+**Full re-verification after the crash, not just a re-check of what was touched:** re-exported live
+`Valve_Meta_DB` and `Valve_Channels_DB` fresh and diffed all 89 slots × 9 fields against
+`MAPPING_VERIFIED.csv` — zero mismatches, zero duplicates, zone blocks still contiguous.
+
+**Closed the one link in the mapping chain that had never actually been checked: the PLC's own
+executable code, not just its data.**
+- Decoded `FC_PhysicalIoCopy`'s real SCL statements (368 DI + 208 DQ = 576 total) by cross-referencing
+  the block's obfuscated `Tag__<n>` references against the PLC's Default tag table's `LogicalAddress`
+  values, then checked every one by machine against the `2 + (n-1)div8 . (n-1)mod8` formula.
+  **576/576 exact matches, full coverage, zero duplicates.**
+- Confirmed `Main`'s stale `FC_PhysicalIoCopy` header comment ("NOT YET WIRED INTO Main[OB1]", dated
+  2026-08-08) is just outdated documentation — exported live `Main` and confirmed it does call
+  `FC_PhysicalIoCopy`, `FC_IoMapper`, and `FB_ValveLoop`. Not a real gap, just a comment nobody updated.
+- Read `FC_IoMapper`'s actual per-field routing and confirmed none of the six channel arrays cross:
+  `OpenFbChannel->OpenFB`, `ClosedFbChannel->ClosedFB`, `HealthyChannel->Healthy`,
+  `LocalModeChannel->LocalMode`, `OpenCmdChannel->OpenValve`, `CloseCmdChannel->CloseValve`. Also
+  found its `stationDown` guard independently hardcodes the same 1-27/28-54/55-89 zone split already
+  verified everywhere else — a fourth independent place agreeing on the same boundaries.
+- One honest non-issue noted: `Main`'s call order (`FB_ValveLoop` before `FC_PhysicalIoCopy`/
+  `FC_IoMapper`) means status/commands lag by roughly one scan cycle. Standard PLC pattern, irrelevant
+  for motorized valves that take seconds to move, does not affect which valve gets which channel.
+
+**BaseUnit / potential-group (Light vs Dark) investigated — confirmed it is completely unrelated to
+the mapping.** Checked live: every AFT DI module (`ST_1`-`ST_7`) is individually set to "Enable new
+potential group" (Light — its own separate power feed each), every DQ module (`ST_1`-`ST_4`) is set
+to "Use potential group of the left module" (Dark — daisy-chains off DI ST_7's feed). Also confirmed
+the `BaseUnit` order-number field itself is blank on every module in AFT — TIA's own tooltip says this
+is optional and only matters for the TIA Selection Tool, does not affect device operation. Net: **7
+separate DI power feeds is unusual for identical standard modules and probably worth simplifying to
+one shared feed like the DQ side — but this is a wiring/reliability trade-off (fewer feeds = less
+wiring but a bigger single point of failure) for the hardware team to decide, not something that
+touches channel numbers, addresses, or the CM mapping in any way.** BaseUnit part numbers (36 needed
+across all 3 stations) are still not on the BOM — same gap as the original BOM audit found.
+
+**Mapping deliverables extended, not just re-verified:**
+- `MAPPING_VERIFIED.csv` gained `DI_ModuleSlot`/`DI_ModuleType`/`DI_ModuleOrderNo` and
+  `DQ_ModuleSlot`/`DQ_ModuleType`/`DQ_ModuleOrderNo` columns (computed from the live rack layout,
+  spot-checked against CM25/CM79/CM01/CM27/CM90). Module type includes the actual `ST_n` instance
+  (e.g. `DI 16x24VDC ST_6`), not just the generic catalog name.
+- Its original `slot` column renamed to `PLC_ValveSlot` — it was being read as "the module's hardware
+  slot" when it's actually the valve's own PLC array index (`Valve_Meta_DB[slot]`); the real hardware
+  slot is the new `DI_ModuleSlot`/`DQ_ModuleSlot` columns. Same underlying data, just disambiguated.
+- New file **`WIRING_TERMINAL_SHEET.csv`**: one row per physical terminal (576 rows: 534 in-use +
+  42 spare, matching the station spare-capacity figures exactly), sorted Station -> Module (rack
+  order) -> Terminal 1-16, so a field electrician can work straight down the sheet the same way they'd
+  move across a real panel, instead of hunting through 89 valve-per-row entries. `MAPPING_VERIFIED.csv`
+  stays the authoritative engineering record; this is the field-facing companion.
+
+Note on tooling: the exported/live-attach probes intermittently fail with the known
+`LocationProvider.Validation()` error whenever a stray `Siemens.Engineering.dll` ends up sitting next
+to a freshly compiled exe (happened again in `scratch_probe/` this session) — same root cause as
+before, fixed the same way (move it into `_shadowed_dlls/`).
+
 ## 7. How to resume
 
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache
@@ -2346,6 +2411,11 @@ priority order:
 
 1. **Item 40** — order spare I/O modules. Blocked only on the BOM being committed to this repo.
    Cheap now, a mobilisation to fix later.
+1a. **New, 2026-09-05** — ask the hardware team: confirm whether AFT's 7 DI modules should stay on
+   7 separate power feeds (current config) or be simplified to 1 shared feed like the DQ side. Also
+   still need real BaseUnit part numbers for all 36 modules across the 3 stations for the BOM — the
+   `BaseUnit` field is confirmed blank in TIA (harmless — Siemens says it's cosmetic/optional) but the
+   physical part still has to be bought. Neither of these affects the mapping/BOM valve count.
 2. **Items 42, 39, 14, 3** — bundle the outstanding client questions into ONE message: the 24 V
    power architecture, the monitoring-relay question, the three hardware questions, and the seven
    unclarified valve rows. They have been accumulating separately and should go together.
