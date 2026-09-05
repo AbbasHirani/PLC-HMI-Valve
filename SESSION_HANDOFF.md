@@ -1924,7 +1924,7 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     alarm text path end-to-end in the runtime and independently retires the runtime-language worry
     (item 41) for the alarm list.
 
-44. **[DONE 2026-08-30, patched into the live project. Needs a look on the panel.]**
+44. **[CLOSED 2026-08-30 — verified directly on the physical panel same day, not just patched.]**
     **Command buttons drew on EMPTY table rows.**
 
     Reported from the panel: FWD page 3 (7 of 14 rows used), BILGE page 2 (13 of 14) and CONFIG
