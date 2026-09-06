@@ -122,16 +122,18 @@
             IF &quot;Valve_Channels_DB&quot;.HealthyChannel[#i] &gt; 0 THEN
                 &quot;Valves_DB&quot;.Valve[#i].Healthy := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.HealthyChannel[#i]];
             END_IF;
-            // Double-indication safety trip, re-applied here on purpose: FB_ValveLoop already
-            // checks this earlier in the same scan, but for a real-channel valve this Healthy
-            // write above runs AFTER that check and would silently undo it - a real valve with
-            // both limit switches made (physically impossible, a wiring/sensor fault) would show
-            // Healthy=TRUE if the real Healthy channel itself doesn't happen to also be false.
-            // Found by reasoning through the watch-table test 2026-08-14, not observed live (that
-            // test only forced OpenFB, never both at once) - fixing before it's ever hit for real.
-            IF &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
-                &quot;Valves_DB&quot;.Valve[#i].Healthy := FALSE;
-            END_IF;
+            // Double-indication check, re-evaluated here on purpose: FB_ValveLoop computes it
+            // earlier in the same scan, but the feedback refresh above runs AFTER that check,
+            // so FB_ValveLoop is always working from last scan's OpenFB/ClosedFB. Re-running it
+            // here against the values just read makes PositionFault same-scan accurate.
+            // Safe to write twice because it is an ASSIGNMENT, not a latch - the later write
+            // simply wins, and it is the one with the fresher data.
+            //
+            // Until 2026-09-06 this wrote Healthy := FALSE instead, to stop the raw DI read
+            // above from silently undoing FB_ValveLoop's trip. That worked, but it overwrote
+            // the actuator's own health contact with a computed conclusion - so one physical
+            // event raised two alarms and the second one blamed the wrong component. Item 12.
+            &quot;Valves_DB&quot;.PositionFault[#i] := &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB;
             IF &quot;Valve_Channels_DB&quot;.LocalModeChannel[#i] &gt; 0 THEN
                 &quot;Valves_DB&quot;.Valve[#i].LocalMode := &quot;IO_Buffer_DB&quot;.DI[&quot;Valve_Channels_DB&quot;.LocalModeChannel[#i]];
             END_IF;

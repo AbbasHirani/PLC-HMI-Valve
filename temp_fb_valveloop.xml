@@ -295,7 +295,8 @@
             // sustained "run" output (OpenValve/CloseValve) for FC_IoMapper to drive to the real
             // DQ, latched until the real limit switch confirms arrival (see the block right after
             // this one) or a timeout gives up (Section 2, real-valve branch).
-            IF NOT &quot;Valves_DB&quot;.Valve[#i].LocalMode AND &quot;Valves_DB&quot;.Valve[#i].Healthy THEN
+            IF NOT &quot;Valves_DB&quot;.Valve[#i].LocalMode AND &quot;Valves_DB&quot;.Valve[#i].Healthy
+               AND NOT &quot;Valves_DB&quot;.PositionFault[#i] THEN
                 // Interlock: Ignore if both commands pressed simultaneously
                 IF &quot;Valves_DB&quot;.Valve[#i].OpenCmd AND &quot;Valves_DB&quot;.Valve[#i].CloseCmd THEN
                     &quot;Valves_DB&quot;.Valve[#i].OpenCmd := FALSE;
@@ -348,7 +349,8 @@
             IF &quot;Valve_Channels_DB&quot;.OpenFbChannel[#i] &gt; 0 THEN
                 IF &quot;Valves_DB&quot;.Valve[#i].OpenFB THEN &quot;Valves_DB&quot;.Valve[#i].OpenValve := FALSE; END_IF;
                 IF &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN &quot;Valves_DB&quot;.Valve[#i].CloseValve := FALSE; END_IF;
-                IF &quot;Valves_DB&quot;.Valve[#i].LocalMode OR NOT &quot;Valves_DB&quot;.Valve[#i].Healthy THEN
+                IF &quot;Valves_DB&quot;.Valve[#i].LocalMode OR NOT &quot;Valves_DB&quot;.Valve[#i].Healthy
+                   OR &quot;Valves_DB&quot;.PositionFault[#i] THEN
                     &quot;Valves_DB&quot;.Valve[#i].OpenValve := FALSE;
                     &quot;Valves_DB&quot;.Valve[#i].CloseValve := FALSE;
                 END_IF;
@@ -446,9 +448,17 @@
             END_IF;
 
             // 3. Failsafe Double Indication Fault Check
-            IF &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
-                &quot;Valves_DB&quot;.Valve[#i].Healthy := FALSE; // Trip Fault
-            END_IF;
+            // Both limit switches made at once is physically impossible - a wiring or
+            // sensor fault. This used to force Healthy := FALSE, but Healthy is a
+            // VALVE-OWNED signal: the actuator's own health contact. Overwriting it with
+            // our conclusion meant one event raised BOTH _DoubleInd and _Unhealthy, and
+            // the second ("CMxx reported Unhealthy status") was false - it sent a
+            // technician to the actuator when the fault is in the limit switches.
+            // Split into its own flag 2026-09-06 (item 12). Healthy is now read-only
+            // everywhere; FC_IoMapper's raw DI read is its only writer in the program.
+            // Plain assignment, NOT a latch: the condition is either physically present
+            // or it is not, and it must clear itself when the limits stop conflicting.
+            &quot;Valves_DB&quot;.PositionFault[#i] := &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB;
 
             // 3a. Alarm conditions E (Loss of Position) and F (Unexpected Movement) — both
             // derived from the exact same OpenFB/ClosedFB pair used everywhere else; the only
@@ -531,7 +541,7 @@
             // Fault reason, most specific first. Double indication is tested before Healthy because
             // it is what FORCES Healthy false — checking Healthy first would mask the real cause
             // behind a generic &quot;unhealthy&quot;.
-            IF &quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB THEN
+            IF &quot;Valves_DB&quot;.PositionFault[#i] THEN
                 &quot;Valves_DB&quot;.FaultCode[#i] := 2;
             ELSIF &quot;Valves_DB&quot;.DirFault[#i] THEN
                 &quot;Valves_DB&quot;.FaultCode[#i] := 7;
@@ -565,7 +575,7 @@
                 &quot;Valves_DB&quot;.DispCode[#i] := &quot;Valves_DB&quot;.PosCode[#i];        // position
             END_IF;
 
-            IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy OR (&quot;Valves_DB&quot;.Valve[#i].OpenFB AND &quot;Valves_DB&quot;.Valve[#i].ClosedFB)
+            IF NOT &quot;Valves_DB&quot;.Valve[#i].Healthy OR &quot;Valves_DB&quot;.PositionFault[#i]
                OR &quot;Valves_DB&quot;.TimeoutOpenAlarm[#i] OR &quot;Valves_DB&quot;.TimeoutCloseAlarm[#i]
                OR &quot;Valves_DB&quot;.UnexpMove[#i] OR &quot;Valves_DB&quot;.PosLostTmr[#i].Q
                OR &quot;Valves_DB&quot;.DirFault[#i] THEN
@@ -1031,6 +1041,7 @@
         &quot;Valves_DB&quot;.SelLocalMode  := &quot;Valves_DB&quot;.Valve[#sel].LocalMode;
         &quot;Valves_DB&quot;.SelConfigured := &quot;Valves_DB&quot;.Valve[#sel].Configured;
         &quot;Valves_DB&quot;.SelDirFault   := &quot;Valves_DB&quot;.DirFault[#sel];
+        &quot;Valves_DB&quot;.SelPositionFault := &quot;Valves_DB&quot;.PositionFault[#sel];
         &quot;Valves_DB&quot;.SelCmdPos     := &quot;Valves_DB&quot;.CmdPos[#sel];
         &quot;Valves_DB&quot;.SelPosCode    := &quot;Valves_DB&quot;.PosCode[#sel];
         &quot;Valves_DB&quot;.SelFaultCode  := &quot;Valves_DB&quot;.FaultCode[#sel];
@@ -1042,6 +1053,7 @@
         &quot;Valves_DB&quot;.SelLocalMode  := FALSE;
         &quot;Valves_DB&quot;.SelConfigured := FALSE;
         &quot;Valves_DB&quot;.SelDirFault   := FALSE;
+        &quot;Valves_DB&quot;.SelPositionFault := FALSE;
         &quot;Valves_DB&quot;.SelCmdPos     := 0;
         &quot;Valves_DB&quot;.SelPosCode    := 0;
         &quot;Valves_DB&quot;.SelFaultCode  := 0;

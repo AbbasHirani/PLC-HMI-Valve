@@ -195,6 +195,13 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
     </Member>
+    <Member Name="PositionFault" Datatype="Array[1..89] of Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+    </Member>
     <!-- Last commanded position: 0 = none since startup, 1 = OPEN, 2 = CLOSE. Set when a command
          is accepted, never cleared on arrival - it is the operator's intent, not a live state, so
          the HMI can show COMMANDED vs ACTUAL whenever the two disagree. That comparison is what
@@ -647,6 +654,7 @@
       </AttributeList>
     </Member>
     <Member Name="SelDirFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
+    <Member Name="SelPositionFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="SelCmdPos" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="SelPosCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />
     <Member Name="SelFaultCode" Datatype="Int" Remanence="NonRetain" Accessibility="Public" />

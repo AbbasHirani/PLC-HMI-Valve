@@ -1816,7 +1816,13 @@ namespace ValveDemoHmiBuilder
                 // every press. The lock must mirror what the PLC will actually accept, or the
                 // operator gets no explanation for a button that does nothing.
                 "let healthy = readTag(Tags(\"Valves_DB_SelHealthy\").Read());\n" +
-                "let locked = local || !cfg || !healthy;\n";
+                // PositionFault added 2026-09-06 with item 12's split. The PLC guard is
+                // NOT LocalMode AND Healthy AND NOT PositionFault; before the split the third
+                // term did not exist because double indication was folded into Healthy. Missing
+                // it here would put the buttons back in the exact state test C3 caught: fully
+                // lit while the PLC silently discards every press.
+                "let posfault = readTag(Tags(\"Valves_DB_SelPositionFault\").Read());\n" +
+                "let locked = local || !cfg || !healthy || posfault;\n";
             try {
                 var bDyn = btn.Dynamizations.Create<ScriptDynamization>("BackColor");
                 bDyn.ScriptCode = guard + "return locked ? 0xFF2A2E38 : " + string.Format("0x{0:X8}", activeBackColor) + ";";
@@ -2185,7 +2191,14 @@ namespace ValveDemoHmiBuilder
                 string zoneArea = (i <= 27) ? "BALLAST AFT" : (i <= 54) ? "BILGE-ER" : "BALLAST FWD";
 
                 // Pass 1: High priority alarms
-                CreateDiscreteAlarm(hmi, vId + "_Unhealthy", "ValveFault", cm + " reported Unhealthy status.", dbName + "_W_Unhealthy_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
+                // Text sharpened 2026-09-06 (item 12). W_Unhealthy is packed from NOT Healthy, and
+                // since the split Healthy is ONLY the actuator's own health contact - the PLC no
+                // longer writes it. Before the split, a double-indication fault forced Healthy
+                // false too, so this alarm ALSO raised on it saying "reported Unhealthy status":
+                // a statement the actuator never made, pointing a technician at the actuator when
+                // the fault is in the limit switches. Now it means one thing and says it.
+                // Renamed text only - the alarm NAME (V0xx_Unhealthy) is unchanged, so no purge.
+                CreateDiscreteAlarm(hmi, vId + "_Unhealthy", "ValveFault", cm + " actuator FAULT (health signal lost).", dbName + "_W_Unhealthy_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
                 // W_Conflict is packed from OpenFB AND ClosedFB (FB_ValveLoop ~L545), i.e. DOUBLE
                 // INDICATION - not a command conflict. The old text said "Open and Close requested",
                 // which sent a technician looking at the command path when the actual fault is a
@@ -2287,6 +2300,11 @@ namespace ValveDemoHmiBuilder
             CreateSummaryTag(hmi, "Valves_DB_SelIdx",        "Valves_DB.SelIdx",        "Int",  forceRefreshNewTags);
             CreateSummaryTag(hmi, "Valves_DB_SelState",      "Valves_DB.SelState",      "Int",  forceRefreshNewTags);
             CreateSummaryTag(hmi, "Valves_DB_SelHealthy",    "Valves_DB.SelHealthy",    "Bool", forceRefreshNewTags);
+            // SelHealthy is now the RAW actuator health contact and nothing else (item 12,
+            // 2026-09-06). The double-indication conclusion moved to its own flag, so the popup
+            // needs both to reproduce the PLC's command guard. One tag, not 89 - nothing
+            // per-valve on the HMI needs it; the mimic reads DispCode and the tables StateCode.
+            CreateSummaryTag(hmi, "Valves_DB_SelPositionFault", "Valves_DB.SelPositionFault", "Bool", forceRefreshNewTags);
             CreateSummaryTag(hmi, "Valves_DB_SelLocalMode",  "Valves_DB.SelLocalMode",  "Bool", forceRefreshNewTags);
             CreateSummaryTag(hmi, "Valves_DB_SelConfigured", "Valves_DB.SelConfigured", "Bool", forceRefreshNewTags);
             CreateSummaryTag(hmi, "Valves_DB_SelCmdPos",    "Valves_DB.SelCmdPos",     "Int",  forceRefreshNewTags);
