@@ -82,24 +82,32 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
    from that drawing entirely. Also unresolved: the drawing's title block reads **M/V GROTON
    (IMO 9246310)**, not MV Westerly. **Bilge physical wiring should not be finalised until answered.**
 
-   **Added 2026-08-16 — TWO TIMING FIGURES NEEDED PER VALVE, for all 89.** Both are currently
-   one-size-fits-all constants that were only ever right for the simulation, and both cause real
-   misbehaviour on real hardware if wrong. Ask the client for each valve, or measure at commissioning:
+   **Added 2026-08-16 — TWO TIMING FIGURES NEEDED PER VALVE, for all 89.**
 
-   - **Full travel time** (seat to seat, each direction). Drives `TravelTimeout`, hardcoded at
-     **8 s** today (`FB_ValveLoop`, the `TimerOpen`/`TimerClose` PT). Because the output is
-     *maintained*, a value shorter than real travel does not merely raise a nuisance alarm — it
-     **de-energises the solenoid and stops the valve mid-stroke**. See item 13.
-   - **Seat-break time** — how long the valve holds its *starting* limit switch after the actuator
-     begins to drive. Drives the direction/limit discrepancy grace, hardcoded at **5 s** today
-     (`DirTmr` PT). If the grace is shorter than the real seat-break time, **every normal stroke
-     raises a false direction fault**. A large DN400 butterfly can hold its limit switch for
-     several seconds. See item 18.
+   > **Corrected 2026-09-06.** The text below used to say these were "hardcoded at 8 s / 5 s" and
+   > that a wrong travel value would "stop the valve mid-stroke". **That has not been true since
+   > item 35 landed on 2026-08-29.** Both are now per-valve `Retain` arrays in `Valve_Channels_DB`
+   > (`TravelTimeout[1..89]`, `SeatBreakGrace[1..89]`, verified live 2026-09-06 as 89 × `T#60s`
+   > and 89 × `T#10s`), read by `FB_ValveLoop` with a zero guard. **The storage is built and
+   > tested — only the numbers are missing.** Do not re-derive the old danger from stale text.
 
-   Rule of thumb until real numbers exist: travel timeout = measured travel x ~1.5; grace =
-   measured seat-break x ~2, and always well under the travel timeout. Verified live 2026-08-16 that
-   the grace does fire at exactly 5 s as designed — the figure is correct, it is the *sizing* that is
-   unknown.
+   What is actually outstanding, and what it costs:
+
+   - **The 178 real figures** (89 valves × travel + seat-break). Ask the client, or measure at
+     commissioning. Until then every valve runs on the generous defaults.
+   - **The Config-screen entry fields** so the numbers can be typed at the panel instead of
+     re-importing the DB — item 35's remaining half, HMI work, not blocked on anyone.
+
+   **The defaults are deliberately biased safe, and that bias has a cost.** `T#60s` / `T#10s` were
+   chosen so a missing number is *harmless* rather than dangerous — no false direction faults, no
+   solenoid dropping mid-stroke. The trade is that genuine failures are detected **late**: a valve
+   that should stroke in 15 s and jams raises nothing for 60 s, and a genuinely mis-wired actuator
+   is not caught for 10 s. So the system is currently safe but is **not yet doing useful travel
+   diagnosis**. That is the real reason to chase the numbers — not the mid-stroke halt, which is
+   already designed out.
+
+   Rule of thumb when the real numbers arrive: travel timeout = measured travel × ~1.5; grace =
+   measured seat-break × ~2, and always well under the travel timeout.
 
    **Also added 2026-08-16, from cross-checking the client's own design P&ID against their schedule
    (aft/ER portion only — the forward half of the PDF has no tag text to check against):**
