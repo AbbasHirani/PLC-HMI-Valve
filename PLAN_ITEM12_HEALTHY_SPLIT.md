@@ -153,8 +153,8 @@ of places to look.
 
 | Risk | Assessment |
 |---|---|
-| **Retentive data loss.** A structural DB change forces a download with re-initialization | **Small.** Of 132 members in `Valves_DB`, exactly one is `Retain`: `ConfiguredRet`. All 89 of its start values are already FALSE in the offline project. Cost = re-enabling whatever valves were on for bench testing (three taps of Configure-All) |
-| **Full download = PLC STOP** | Free right now. The panel is on a bench, valves are not wired, nothing is aboard. This is *why the work should happen now* — every one of these risks gets more expensive after install |
+| **Retentive data loss.** A structural DB change forces a download with re-initialization | **Small, and irrelevant to testing.** Of 132 members in `Valves_DB`, exactly one is `Retain`: `ConfiguredRet`. All 89 of its start values are already FALSE in the offline project. In PLCSIM this is a non-issue — `Configured` resets on every download anyway and is set from a watch table. On the panel it costs three taps of Configure-All |
+| **Full download = PLC STOP** | Does not apply to validation: the whole test plan runs against PLCSIM, so nothing real stops. Applies only at commissioning, and the panel is on a bench with nothing wired |
 | **Alarm regeneration.** Changing `_Unhealthy`'s text means regenerating and re-downloading the panel | Precedent: the `_Conflict` → `_DoubleInd` rename required deleting the old alarms first. Expect the same |
 | **One-scan lag** on the command guard — `PositionFault` is computed in §3 and read at L158 next scan | **Not a regression.** The `Healthy` trip had exactly the same lag. Re-confirm in test anyway |
 | **Stale sources** | Handled. Live export taken 2026-09-06 and verified token-identical to the repo copy before any edit. Note `src/UpdatePlcBlocks.cs` still has the pre-machine-move hardcoded path `C:\Users\Admin\...` and needs fixing before use |
@@ -163,16 +163,40 @@ of places to look.
 
 ## 7. Test plan
 
-Watch table, one real-channel valve (CM79) and one simulated valve.
+**This needs no hardware.** PLCSIM covers the logic and HMI Runtime simulation covers everything
+the operator sees — including the alarm list, which is where this item's whole claim lands. The
+panel is needed to *commission* this, not to *validate* it.
+
+- PLCSIM drives the real `%I` addresses via its **SIM table** (see §6a of `SESSION_HANDOFF.md` —
+  TIA watch-table Modify and Force both fail here, don't re-derive the dead ends).
+- HMI Runtime simulation raises genuine alarms on this laptop; confirmed working 2026-08-21, alarm
+  history populated and the logging database grew on disk.
+- **Setup gotcha:** `Valves_DB.Valve[i].Configured` resets FALSE on every PLCSIM download and
+  `FC_IoMapper` skips unconfigured valves. Set it TRUE first or everything looks broken. This
+  already cost a session once.
+
+Test valve **CM79 = slot 21**: `I12.0` OpenFB, `I12.1` ClosedFB, `I12.2` Healthy, `I12.3` Local,
+`Q7.0/Q7.1` commands. Its alarm bit is **word 1, bit 4**.
 
 | # | Test | Expected |
 |---|---|---|
-| 1 | Force both limits on the real valve | **Exactly one alarm** (`_DoubleInd`). `PositionFault` TRUE. `Healthy` **unchanged**, still tracking the real DI. `FaultCode` = 2, `StateCode` = 1. Popup reads DOUBLE INDICATION. OPEN/CLOSE greyed |
-| 2 | Then also force the real Healthy DI false | `_Unhealthy` raises **as well** — two distinct, correct alarms. `FaultCode` stays 2 (double-indication still wins) |
-| 3 | Release both limits | `PositionFault` self-clears, `_DoubleInd` clears, buttons re-enable |
-| 4 | Repeat test 1 on the simulated valve (channel 0) | No longer latches unhealthy forever — the §2.2 trap is gone |
-| 5 | Command a valve while `PositionFault` is true | Refused **and discarded**, not queued. The 2026-08-15 latched-command regression must not come back |
-| 6 | Normal open/close stroke, real valve | Unaffected |
+| 1 | SIM table: `I12.0` **and** `I12.1` TRUE | **Alarm list shows exactly ONE row** — "CM79 Double indication - both limit switches made." No actuator-FAULT row beside it. `PositionFault[21]`=TRUE, `Healthy` **still TRUE** (tracking `I12.2`), `FaultCode`=2, `StateCode`=1, `W_Conflict[1]`bit4=TRUE, **`W_Unhealthy[1]`bit4=FALSE** |
+| 2 | Then also set `I12.2` FALSE | `_Unhealthy` raises **as well**, reading "CM79 actuator FAULT (health signal lost)" — two distinct, correct alarms. `FaultCode` stays 2 (double indication still wins) |
+| 3 | `I12.2` TRUE, clear both limits | `PositionFault` self-clears, `_DoubleInd` clears, buttons re-enable |
+| 4 | Repeat test 1 on a simulated valve (channel 0) | No longer latches unhealthy forever — the §2.2 trap is gone |
+| 5 | Press OPEN in the popup while `PositionFault` is true | Buttons greyed; command refused **and discarded**, not queued. The 2026-08-15 latched-command regression must not come back |
+| 6 | Normal open/close stroke, real-channel valve | Unaffected |
+
+Test 1 is the entire item in one observation. Before this change it produced **two** alarm rows,
+the second one blaming the actuator for a limit-switch fault.
+
+**Ignore in simulation:** the "Storage medium not available" system alarm is correct on a laptop
+with no USB-X61 and is unrelated to this work.
+
+### What genuinely waits for the panel
+
+Only commissioning: the download to real hardware, and re-enabling `Configured` there. Neither
+validates the change — they deploy it.
 
 ---
 
@@ -181,18 +205,21 @@ Watch table, one real-channel valve (CM79) and one simulated valve.
 Steps 1-8 are reversible on the laptop. Only step 9 touches the panel.
 
 1. Re-export `FB_ValveLoop`, `FC_IoMapper`, `Valves_DB`; verify against this plan — **done 2026-09-06**
-2. Record the current `Configured` pattern
-3. Commit this plan **before** any change
-4. `Valves_DB` — add the 2 members
-5. `FB_ValveLoop` (6 edits), `FC_IoMapper` (1 edit)
-6. **Compile the PLC.** Stop here if it does not compile clean
-7. `src/GenerateHmiLayout.cs` (3 edits), regenerate HMI tags + alarms
-8. **Compile the HMI**
-9. Download PLC (with reinit) + HMI to the panel
-10. Restore `Configured`, verify against step 2
-11. Run the 7 tests above
-12. Commit, update item 12 in `SESSION_HANDOFF.md` to done with the test evidence
+2. Commit this plan **before** any change — **done, `00b5f75`**
+3. `Valves_DB` — add the 2 members — **done**
+4. `FB_ValveLoop` (6 edits), `FC_IoMapper` (1 edit) — **done**
+5. **Compile the PLC** — **done, 0 errors 0 warnings**
+6. `src/GenerateHmiLayout.cs` (3 edits), regenerate tags + popup + alarms — **done**
+7. **Compile the HMI** — **done, 0 errors** (1 pre-existing warning, item 41's language mismatch)
+8. Verify in-project with `scratch_probe/VerifyItem12.exe` — **done, all checks pass**
+9. **Start PLCSIM (Ctrl+Shift+X) and download** — *next*
+10. Set `Valves_DB.Valve[21].Configured` TRUE (see the §7 gotcha)
+11. **Start HMI Runtime simulation**
+12. Run the 6 tests in §7
+13. Commit, mark item 12 done in `SESSION_HANDOFF.md` with the test evidence
 
-**Scheduling:** do this with item 9's fail-safe review, which has to answer "what should each fault
-actually *do* to a valve" anyway — and `PositionFault` versus `Healthy` is precisely one of those
-answers. Not during the hardware wiring window.
+Steps 9-12 need no hardware. Only deployment to the real panel does, and that is commissioning
+work, not part of validating this change.
+
+**Scheduling:** the *decision* this touches — what a fault should actually do to a valve — belongs
+with item 9's fail-safe review. The change itself is already built and can be validated now.
