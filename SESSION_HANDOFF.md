@@ -193,7 +193,8 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     with real hardware — unplug a station's PROFINET cable and watch the panel go red. Until it is
     built, consider greying the panel or labelling it "not monitored" so nobody trusts a false OK.
 
-12. **[BUILT 2026-09-06, compiles clean, NOT yet downloaded or panel-tested.]**
+12. **[DONE 2026-09-06 — built, compiled, and VALIDATED in PLCSIM + HMI Runtime simulation.
+    Remaining work is deployment to the panel at commissioning, which does not re-open the design.]**
     **`Healthy` split into the raw signal and a computed `PositionFault`.**
     Full plan and reasoning: `PLAN_ITEM12_HEALTHY_SPLIT.md`. Commits `00b5f75` (plan), `d9a1554`
     (implementation).
@@ -235,10 +236,34 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     text, `_DoubleInd` is still distinct, and all 4 popup scripts reading `SelHealthy` also read
     `SelPositionFault`.
 
-    **Still to do — needs the panel:** download PLC (with reinit) + HMI, restore `Configured`
-    (only `ConfiguredRet` is retentive, and its start values are all FALSE offline, so this is
-    three taps of Configure-All), then run the 7 watch-table tests in §7 of the plan. The one that
-    matters: force both limits and confirm **one** alarm appears, not two.
+    **Validated live 2026-09-06 in PLCSIM + HMI Runtime simulation on CM79 (slot 21, alarm word 1
+    bit 4).** No hardware needed — an earlier draft of this item claimed it did, which was wrong
+    twice over: PLCSIM drives the distributed-I/O process image (item 11) and Runtime simulation
+    raises real alarms on the laptop (see item 34's 2026-08-21 note).
+
+    | Test | Result |
+    |---|---|
+    | Both limits made | **ONE alarm.** `W_Conflict[1]`=`16#0010`, `W_Unhealthy[1]`=`16#0000`, `Valve[21].Healthy` **stayed TRUE**, `FaultCode`=2, `StateCode`=1 |
+    | Then Healthy DI false | Second alarm raises **as well** — both words `16#0010`, texts "Double indication - both limit switches made" and "actuator FAULT (health signal lost)". `FaultCode` **stayed 2** (double indication is the more specific cause) |
+    | Clear the condition | Both alarms `RaisedCleared` on their own, `PositionFault` FALSE, both words `16#0000`. No Reset Fault needed |
+    | Command while faulted | Buttons greyed by `SelPositionFault`; command refused **and discarded** — did not fire on the next healthy scan (the 2026-08-15 latched-command regression stayed fixed) |
+    | Normal open stroke | Unaffected. `DirFault` and `FailOpen` also fired — correct responses to stepping limit switches by hand, not defects |
+
+    **The state in test 2 was impossible before this change** — one flag carried both meanings, so
+    an actuator fault and a limit-switch fault could never be separate facts. That is the item,
+    demonstrated.
+
+    **Not tested — and deliberately not forced:** the §2.2 sim-valve trap is unreachable in this
+    configuration. All 89 slots have real channels (`MAPPING_VERIFIED.csv`: zero valves with
+    `OpenFbChannel` or `HealthyChannel` = 0), so no valve can reach the latching path. Testing it
+    would mean zeroing a valve's channels in `Valve_Channels_DB` — the mapping just verified and
+    submitted to the hardware team. Not worth mutating the submission artefact for an unreachable
+    edge case. The fix remains worth having: it closes the trap if a valve is ever added without
+    channels assigned.
+
+    **Remaining:** deploy to the panel at commissioning (download with reinit, then re-enable
+    `Configured` — three taps of Configure-All, since only `ConfiguredRet` is retentive and its
+    start values are all FALSE offline). Deployment only; the design is settled.
 
     *(Already fixed earlier under the same principle: the HMI Reset Fault script no longer writes
     `OpenFB`/`ClosedFB`/`Healthy` — on a real valve that manufactured a phantom Unexpected Movement.

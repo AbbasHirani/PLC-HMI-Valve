@@ -212,14 +212,22 @@ Steps 1-8 are reversible on the laptop. Only step 9 touches the panel.
 6. `src/GenerateHmiLayout.cs` (3 edits), regenerate tags + popup + alarms — **done**
 7. **Compile the HMI** — **done, 0 errors** (1 pre-existing warning, item 41's language mismatch)
 8. Verify in-project with `scratch_probe/VerifyItem12.exe` — **done, all checks pass**
-9. **Start PLCSIM (Ctrl+Shift+X) and download** — *next*
-10. Set `Valves_DB.Valve[21].Configured` TRUE (see the §7 gotcha)
-11. **Start HMI Runtime simulation**
-12. Run the 6 tests in §7
-13. Commit, mark item 12 done in `SESSION_HANDOFF.md` with the test evidence
+9. **Start PLCSIM and download** — **done 2026-09-06**
+10. Set `Valves_DB.Valve[21].Configured` TRUE — **done**
+11. **Start HMI Runtime simulation** — **done**
+12. Run the tests in §7 — **done: 1, 2, 3, 5, 6 PASS; 4 not applicable (no channel-0 valve exists)**
+13. Commit, mark item 12 done in `SESSION_HANDOFF.md` with the evidence — **done**
 
-Steps 9-12 need no hardware. Only deployment to the real panel does, and that is commissioning
-work, not part of validating this change.
+**Item 12 is closed.** Everything above ran on the laptop; no hardware was needed at any point.
+What remains is deployment at commissioning — download with reinit and re-enable `Configured` —
+which deploys the change rather than validating it.
+
+Observed during testing, both correct and neither a defect:
+- Un-forcing a limit switch raises **Unexpected Movement**. A switch dropping with no command
+  running is exactly what alarm F exists to catch; a bench test cannot avoid looking like one.
+  It is latched by design and needs Reset Fault.
+- Stepping the limits by hand during a stroke raises **Direction/Limit Fault** (~10 s seat-break
+  grace) and then **Fail to Open** (travel timeout). Both are correct responses to a slow human.
 
 **Scheduling:** the *decision* this touches — what a fault should actually do to a valve — belongs
 with item 9's fail-safe review. The change itself is already built and can be validated now.
