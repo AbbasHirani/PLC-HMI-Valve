@@ -193,27 +193,58 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     with real hardware — unplug a station's PROFINET cable and watch the panel go red. Until it is
     built, consider greying the panel or labelling it "not monitored" so nobody trusts a false OK.
 
-12. **[pending — design decision, not urgent]** **`Healthy` does double duty and should probably be split.**
+12. **[BUILT 2026-09-06, compiles clean, NOT yet downloaded or panel-tested.]**
+    **`Healthy` split into the raw signal and a computed `PositionFault`.**
+    Full plan and reasoning: `PLAN_ITEM12_HEALTHY_SPLIT.md`. Commits `00b5f75` (plan), `d9a1554`
+    (implementation).
+
     Raised 2026-08-15 from the principle that the four feedbacks (`OpenFB`, `ClosedFB`, `LocalMode`,
     `Healthy`) are **valve-owned signals** — the valve reports its true physical state on them,
     including while it is being worked by hand in Local Mode — so the PLC must only ever read them,
-    never write them.
+    never write them. `FB_ValveLoop` ~L309 and `FC_IoMapper` ~L51 both broke that rule with the
+    double-indication trip (`IF OpenFB AND ClosedFB THEN Healthy := FALSE`).
 
-    Two places knowingly break that rule, both deliberately:
-    - `FB_ValveLoop` ~line 309 and `FC_IoMapper` ~line 106: the double-indication trip
-      (`IF OpenFB AND ClosedFB THEN Healthy := FALSE`) overwrites the actuator's genuine healthy
-      contact with a *computed* conclusion. It fails safe and is verified working (Test 4), but the
-      raw signal is lost — you cannot tell "the actuator says it is faulted" from "we decided it is
-      faulted because both limits are made".
-    - Cleaner design: leave `Healthy` untouched as the raw signal, carry the conclusion in a separate
-      `PositionFault` flag, and have `StateCode` consider both.
-    - **Why not done now:** `StateCode`, the alarm word packing (`W_Unhealthy`), and several HMI
-      bindings all read `Healthy` today, so it is a real refactor, not a rename. Deferred rather than
-      done days before an install. Decide with the client during the fail-safe review (item 9).
+    **What reading the live code turned up that the original item did not say:**
+    - `W_Conflict` and a `_DoubleInd` alarm **already existed** for double indication. So the trip
+      made every such event raise **two** alarms, and the second (`_Unhealthy`, "CMxx reported
+      Unhealthy status") was a statement the actuator never made — it sent a technician to the
+      actuator when the fault is in the limit switches. On a fault type that arrives in groups
+      (shared cable, wet junction box) that fed item 39's flood problem for no benefit.
+    - **A simulated valve latched unhealthy forever.** With no channel assigned nothing ever
+      restored `Healthy`; `ResetFault` deliberately won't write it, so the only escape was toggling
+      Configured off and on. Real valves self-heal every scan. Nobody had noticed the asymmetry.
+    - The job was **smaller** than the item implied: `StateCode` already OR'd the raw condition in
+      independently and `FaultCode` already tested it first, so the popup already printed DOUBLE
+      INDICATION rather than UNHEALTHY. Only the alarm half was broken. Three of the nine HMI
+      `Healthy` references are dead code with no callers.
 
-    *(Already fixed under the same principle: the HMI Reset Fault script no longer writes
+    **What was built:** `Valves_DB` +`PositionFault[1..89]` +`SelPositionFault` (132 → 134 members,
+    flat arrays matching `DirFault`/`UnexpMove` — the UDT holds valve-owned signals, the flat arrays
+    hold PLC-computed ones). 6 edits in `FB_ValveLoop`, 1 in `FC_IoMapper`, 3 in
+    `src/GenerateHmiLayout.cs`. One new HMI tag, not 89. `_Unhealthy` text is now
+    "CMxx actuator FAULT (health signal lost)"; the alarm NAME is unchanged, so unlike the
+    `_Conflict` → `_DoubleInd` rename this needs **no purge** of old alarms.
+
+    Behaviour-neutral by construction except for the duplicate alarm going away and the sim-valve
+    trap closing — every other edit substitutes an equivalent expression.
+
+    **Verified so far:** all three import sources compared token-for-token against fresh live
+    exports *before* editing (identical). PLC compiles 0 errors 0 warnings; HMI 0 errors. A
+    read-only probe (`scratch_probe/VerifyItem12.cs`) confirms the new tag is bound to
+    `Valves_DB.SelPositionFault` on `PLC_1`, all three sampled `_Unhealthy` alarms carry the new
+    text, `_DoubleInd` is still distinct, and all 4 popup scripts reading `SelHealthy` also read
+    `SelPositionFault`.
+
+    **Still to do — needs the panel:** download PLC (with reinit) + HMI, restore `Configured`
+    (only `ConfiguredRet` is retentive, and its start values are all FALSE offline, so this is
+    three taps of Configure-All), then run the 7 watch-table tests in §7 of the plan. The one that
+    matters: force both limits and confirm **one** alarm appears, not two.
+
+    *(Already fixed earlier under the same principle: the HMI Reset Fault script no longer writes
     `OpenFB`/`ClosedFB`/`Healthy` — on a real valve that manufactured a phantom Unexpected Movement.
-    And `FB_ValveLoop`'s first-scan init no longer seeds `Healthy` for real-channel valves.)*
+    And `FB_ValveLoop`'s first-scan init no longer seeds `Healthy` for real-channel valves. The one
+    remaining `Healthy :=` in each block is legitimate: the simulation-only first-scan init, and
+    `FC_IoMapper`'s raw DI read, which is now its only writer in the program.)*
 
 13. **[pending — BLOCKER for install. The BUILD half is now item 35; this item is the analysis.]**
     **The 8 s travel timeout is a simulation number and will stop
