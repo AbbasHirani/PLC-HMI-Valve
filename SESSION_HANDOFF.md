@@ -2093,8 +2093,18 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     Worth noting the tell: a run that changes the project and prints no `[SAVE] Project saved.` line
     has not saved. That line is the only evidence, and it is worth checking on any unfamiliar flag.
 
-46. **[BLOCKER for all PLC work on this machine, found 2026-08-31.]**
-    **`STEP 7 Basic` license is missing — every PLC block import fails.**
+46. **[RESOLVED — confirmed 2026-09-06 by the re-verification this item asks for. Licence is live;
+    PLC work is unblocked.]**
+
+    **Confirmed working 2026-09-06:** a full `--only=DiscreteAlarms` builder pass imported all
+    **eight** PLC blocks with `Import successful` on every one and **zero** `LicenseNotFoundException`
+    lines. Item 12's own changes were imported, compiled (0 errors, 0 warnings) and downloaded to
+    PLCSIM the same day, so the block-import path is proven end to end, not just the licence check.
+    The advice below still stands: verify licence state at the *start* of a session rather than
+    assume it. The "cheap guard" at the end is still unbuilt and still worth doing.
+
+    ~~**`STEP 7 Basic` license is missing — every PLC block import fails.**~~ *(Original analysis
+    follows, kept because the failure mode and its symptoms are worth recognising if it recurs.)*
 
     Any builder run that reaches `ImportPlcBlocks` now fails all seven blocks:
 
