@@ -1805,8 +1805,35 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
       only `HMI Operator`. HMI compile warnings 2 -> 1, the User-management one gone.
 
     **Still open:**
-    - **Runtime language mismatch** - the last remaining HMI compile warning. Cheap, and
-      worth doing because `##Text missing##` on the panel is still unexplained.
+    - **Runtime language mismatch** - the last remaining HMI compile warning.
+      **Investigated 2026-09-06 (`scratch_probe/ProbeLanguages.cs`, `ProbePlcLang.cs`). It is
+      cosmetic, and the original justification for doing it is gone.** Do not re-investigate; the
+      configuration was read directly and is recorded here:
+
+      | Side | Setting | Value |
+      |---|---|---|
+      | Project | active / editing / reference | **`en-US` only** - single-language project |
+      | HMI | `RuntimeSettings.LanguageAndFonts` | **`English (United States)`**, `Enable=True`, `Order=0` - one entry |
+      | PLC | `PLC_1.MultilingualSupport` (6 CPU display-language slots) | `de`, `en-US`, `fr`, `es`, `it`, `zh-CHS` - **all six mapped to project language `en-US`** |
+
+      **The two sides already agree** - the HMI asks for `en-US` and the PLC offers it. Nothing
+      fails to resolve because of this. The only visible oddity is that the CPU's display-language
+      **slot 1 is `de`** (the S7-1200 factory default ordering) while the HMI runtime is `en-US`,
+      which is the most likely thing TIA is comparing.
+
+      **The "worth doing because `##Text missing##` is unexplained" reason no longer applies.**
+      Item 43 traced `##Text missing##` to a stale AlarmControl *view*, not language. And item 43's
+      own suggested proof - force a `W_Unhealthy` bit and confirm a fresh row renders name and text -
+      was satisfied on 2026-09-06 during item 12's testing: a fresh `V021_Unhealthy` row displayed
+      "CM79 actuator FAULT (health signal lost)." in full. The alarm text path is proven end to end.
+
+      **Why it was NOT changed on the spot:** `MultilingualSupport` sits on the CPU device item, so
+      altering it needs a **hardware configuration download** to take effect - which is the very
+      next bullet, is gated on real hardware, and is described there as the single most likely way
+      this change breaks something. Slipping a cosmetic edit into that download untested is a bad
+      trade. **Do it as one deliberate step at commissioning:** set slot 1 to `en-US` in the TIA UI
+      (`PLC_1 -> Properties -> Multilingual support`), recompile, confirm the warning clears, then
+      download hardware config and verify the HMI reconnects.
     - **Download the hardware configuration, then confirm the HMI still connects.** The
       protection level is only live after a download, and this project runs on PLCSIM, which
       does not enforce access protection the way real hardware does - so **a pass under
