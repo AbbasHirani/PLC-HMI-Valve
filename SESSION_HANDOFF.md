@@ -72,15 +72,17 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
    rows on the last), no clipped columns, CM numbers in order. The one defect found was command
    buttons drawing on empty rows, which became item 44 and is fixed. This also closes what was
    left of item 32, whose remaining work was exactly this look-over.
-3. **[pending]** Client still owes clarification on 7 rows: CM80, CM85, CM86, CM87, CM88, CM90 (marked
-   "Tag to verify" / "Duplicate tag on mimic; verify" in their sheet) and CM89 (needs Location/Function
-   — its I/O is now assigned, see item 5). **Plus, added 2026-08-14:** the client's Bilge drawing
-   (`WB-121-P004`) doesn't reconcile with the Bilge valve list — tags in the schedule that aren't on
-   the drawing (CM01, CM04/05, CM11/12, CM13/14, CM23/24), tags on the drawing that aren't in the
-   schedule (10-001, 10-002, 10-006, 10-008, 10-009, 10-013..016, 10-019, 10-050..063), one class
-   mismatch (CM08 listed A1, drawing shows A2/A3), and all four Fire tags (CM94-97, `20-xxx`) absent
-   from that drawing entirely. Also unresolved: the drawing's title block reads **M/V GROTON
-   (IMO 9246310)**, not MV Westerly. **Bilge physical wiring should not be finalised until answered.**
+3. **[pending — per-valve TIMING figures only.]**
+
+   > **Scope narrowed 2026-09-06 at the user's instruction.** Everything this item used to carry
+   > about **CM numbers, valve tags, and schedule/drawing reconciliation** — the rows flagged
+   > "tag to verify", the Bilge drawing cross-check, the drawn-but-unscheduled valves, the
+   > unconfirmed boxes on the mimics — is **owned by the user directly with the client and is
+   > deliberately no longer tracked here.** Do not re-raise it, and do not rebuild the list.
+   > The full previous text is in git history if it is ever needed.
+   >
+   > What remains below is the timing question, which is an engineering input rather than a
+   > tag-identification one.
 
    **Added 2026-08-16 — TWO TIMING FIGURES NEEDED PER VALVE, for all 89.**
 
@@ -109,21 +111,10 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
    Rule of thumb when the real numbers arrive: travel timeout = measured travel × ~1.5; grace =
    measured seat-break × ~2, and always well under the travel timeout.
 
-   **Also added 2026-08-16, from cross-checking the client's own design P&ID against their schedule
-   (aft/ER portion only — the forward half of the PDF has no tag text to check against):**
-   - **Seven valves are drawn on the P&ID but appear nowhere in the 102-row schedule:**
-     `11-007/300`, `11-013/300`, `11-017/125`, `11-018/125`, `11-019/125`, `11-070/300`,
-     `11-090/200`. All drawn as EH valves with A-class codes, identical in kind to valves that *are*
-     listed. If they are in VRC scope the schedule is short by seven rows and the PLC needs more
-     than 89 slots.
-   - **CM51 looks like a digit transposition.** Schedule says `11-009-A1` at "Aft peak C"; the
-     drawing labels that valve **`11-090/200`**, and `11-009` appears nowhere on it.
-   - **The `System` column is not positional.** `CM77` = `11-014-A1` is filed as *Ballast Fwd* but
-     `11-014/300` sits in the engine room around Fr 50. `CM86`-`CM90` are likewise *Ballast Fwd* with
-     Location "Cross-over manifold" (midships). This matters because the PLC zone split
-     (AFT = slots 1-27) was derived from `System`, so a valve can appear on the wrong zone screen.
-   - Request a **tag-numbered forward half** of the P&ID so the FWD illustration can be verified the
-     same way instead of guessed.
+   *(The P&ID cross-check findings that used to sit here — drawn-but-unscheduled valves, the CM51
+   tag transposition, the non-positional `System` column, and the request for a tag-numbered
+   forward half — were removed 2026-09-06 along with the rest of the CM/tag scope. See the note at
+   the top of this item.)*
 4. **[done 2026-08-13]** CM89 SysName fix re-imported and verified live.
 5. **[done 2026-08-13]** `Valve_Channels_DB` populated — all 89 valves × 6 channels, assigned
    zone-to-station (AFT→`ET200SP_AFT`, ER→`MID`, FWD→`FWD`), 4 consecutive DI + 2 consecutive DQ per
@@ -794,8 +785,8 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     **unconfirmed** — leave them bare. A wrong overlay is worse than a missing one: it would bind a
     real valve's live state to the wrong symbol on a ballast system. Consequence to expect: the
     overlay count per screen will be LESS than that zone's valve count, and those valves will be
-    operable from the valve list but absent from the mimic until the client confirms numbering
-    (item 3 / item 19).
+    operable from the valve list but absent from the mimic until the numbering is confirmed
+    (the user handles that with the client directly — see the scope note on item 3).
 
     **Also in this pass — valve list buttons must disable on UNCONFIGURED**, the same way they already
     grey out when logged out (item 17). An unconfigured valve is skipped entirely by `FC_IoMapper`, so
@@ -837,8 +828,8 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     - The FWD forepeak `CM00` at (1735,242) is a **real valve the client's schedule does not
       contain**. The forepeak run goes 11-056 (CM45), 11-057 (CM46), 11-058 (CM47) and stops, and
       11-059 is absent from the schedule — so 11-059 is the likely tag, inferred from the numbering
-      gap, NOT read off the P&ID. If it is in scope the pool needs a 90th slot. Same family as the
-      seven other drawn-but-unscheduled valves in item 3.
+      gap, NOT read off the P&ID. If it is in scope the pool needs a 90th slot. Confirming that is
+      the user's, not tracked here.
 
 33. **[done]** **The direction/limit fault has an alarm.** `GenerateHmiLayout.cs:1883` creates
     `V###_DirFault` in class `ValveWarning`, bound to `W_DirFault_<w>` bit `(i-1)%16` - the packing

@@ -659,8 +659,9 @@ namespace ValveDemoHmiBuilder
         // to. The numbering points at 11-059: the forepeak run goes 11-056 (CM45), 11-057 (CM46),
         // 11-058 (CM47) and then stops, and 11-059 is absent from the schedule. Unconfirmed —
         // inferred from the gap, not read off the P&ID. If the client confirms it is in scope the
-        // pool needs a 90th slot. Same family as the seven other drawn-but-unscheduled valves
-        // (11-007, 11-013, 11-017, 11-018, 11-019, 11-070, 11-090) in handoff item 3.
+        // pool needs a 90th slot. Confirming the numbering is handled by the user directly with
+        // the client and is deliberately not tracked in SESSION_HANDOFF - see the scope note on
+        // item 3. This comment stays because it explains why THIS box gets no overlay.
         // An earlier revision of this artwork also carried a duplicate CM48 outside the hull at
         // (1732,419); it was never mapped here, and has since been removed from the drawing.
         static readonly DiagValve[] FWD_DIAGRAM = {
