@@ -270,9 +270,26 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     remaining `Healthy :=` in each block is legitimate: the simulation-only first-scan init, and
     `FC_IoMapper`'s raw DI read, which is now its only writer in the program.)*
 
-13. **[pending — BLOCKER for install. The BUILD half is now item 35; this item is the analysis.]**
-    **The 8 s travel timeout is a simulation number and will stop
-    every real valve mid-stroke.** Raised 2026-08-15 from the "how do the output commands work"
+13. **[NO LONGER A BLOCKER — downgraded 2026-09-06 to a COMMISSIONING TASK. The build half (item 35)
+    is complete; what is left is measuring 89 valves and typing the numbers in.]**
+
+    > **Why it stopped being a blocker.** The defect was never the *number* — it was that the number
+    > was compiled into the SCL with no way to change it. Item 35 replaced all three hardcoded `PT`
+    > arguments with per-valve `Retain` arrays in `Valve_Channels_DB`, seeded generously at `T#60s`
+    > / `T#10s` and guarded against zero. Nothing now stops a valve mid-stroke on a default: a
+    > missing number makes an alarm **late**, not dangerous.
+    >
+    > **What remains:** measure each valve's real travel and seat-break time at commissioning and
+    > enter them in the DB's **Start value** column (decision recorded in item 35 — no HMI editing
+    > fields are being built). Until then the system is safe but is not yet doing useful travel
+    > diagnosis: a valve that should stroke in 15 s and jams raises nothing for 60 s.
+    >
+    > The original analysis below is kept in full — it explains *why* maintained outputs make the
+    > timeout safety-relevant rather than cosmetic, which is the reasoning anyone setting these
+    > numbers needs to understand.
+
+    ~~**The 8 s travel timeout is a simulation number and will stop
+    every real valve mid-stroke.**~~ Raised 2026-08-15 from the "how do the output commands work"
     question. Context first, because the two facts only bite when combined:
 
     - **The command style is MAINTAINED, not pulsed** — and that is correct, confirmed against the
@@ -891,7 +908,29 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     e. **Sizing**: LogMaxSize is 20000 and the segment period is 30 days. Worth a sanity check
        against how many alarms 89 valves actually generate in service before handover.
 
-35. **[PLC half DONE and TESTED 2026-08-29. Remaining: the Config-screen entry fields.]**
+35. **[DONE. PLC half built and tested 2026-08-29; step (e), the HMI entry fields, was decided
+    AGAINST on 2026-09-06 — see below. Job B is complete.]**
+
+    > **Decision 2026-09-06 — no HMI editing fields will be built.** Travel and seat-break times are
+    > **commissioning data, not operating data**: measured once when the vessel is fitted out and
+    > essentially never changed again. They will be edited directly in `Valve_Channels_DB`'s
+    > **Start value** column in TIA and downloaded.
+    >
+    > This is the same call already made for the valve Name/Location fields, which were built,
+    > proven working, and then deliberately removed the same night for exactly this reason —
+    > reference data needing only a one-time edit belongs in TIA's DB editor, not in a runtime HMI
+    > screen. Building an editor here would repeat work already correctly discarded.
+    >
+    > **The workflow, and it must be Start values:** type the measured time into the **Start value**
+    > column, then download. The number then lives in the project and in git and survives every
+    > future download.
+    >
+    > **The failure mode to warn commissioning about:** changing *actual* values online (watch
+    > table, HMI) looks like it works and even survives a power cycle — because these arrays are
+    > `Retain`. But actual values are **not in the project**, so the next download with
+    > reinitialization silently resets all 89 back to `T#60s`. Surviving a power cycle proves
+    > `Retain` works; it does **not** prove the value is saved. If anyone does tune online, recover
+    > it before leaving: **Snapshot → Copy snapshots to start values → Save project.**
 
     **Built:** `TravelTimeout[1..89]` and `SeatBreakGrace[1..89]`, both `Time`, both `Retain`,
     in `Valve_Channels_DB` with start values `T#60s` / `T#10s`. All three hardcoded `PT`
@@ -932,13 +971,15 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     mechanism that accepts them. Job B has to happen regardless of whether Job A ever completes,
     and because it is a code change it cannot wait for the ship.
 
-    Confirmed still hardcoded 2026-08-27, exactly as item 13 describes:
+    ~~Confirmed still hardcoded 2026-08-27, exactly as item 13 describes:~~
+    **Superseded — all three were replaced by array reads on 2026-08-29 (see the header). The table
+    below is the pre-fix state, kept only so the original three sites can be identified.**
 
     | Value | Where | Drives |
     |---|---|---|
-    | `PT := T#8S` | `FB_ValveLoop`, TimerOpen | Fail-to-Open, and halts the valve |
-    | `PT := T#8S` | `FB_ValveLoop`, TimerClose | Fail-to-Close, and halts the valve |
-    | `PT := T#5S` | `FB_ValveLoop`, `DirTmr[#i]` | Direction/limit fault, and halts the valve |
+    | ~~`PT := T#8S`~~ | `FB_ValveLoop`, TimerOpen | Fail-to-Open, and halts the valve |
+    | ~~`PT := T#8S`~~ | `FB_ValveLoop`, TimerClose | Fail-to-Close, and halts the valve |
+    | ~~`PT := T#5S`~~ | `FB_ValveLoop`, `DirTmr[#i]` | Direction/limit fault, and halts the valve |
 
     **Design:**
 
