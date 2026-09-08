@@ -1151,7 +1151,51 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
 
     **Bits 4, 5 and 7 were deliberately KEPT.** They are implementable and merely unimplemented,
     which is a todo, not dead weight:
-    - **bit 4, I/O module** — needs OB82 created in the TIA UI plus module diagnostics enabled.
+    - **bit 4, I/O module** — **module diagnostics ENABLED 2026-09-06** (62 attributes across all
+      36 modules, `scratch_probe/EnableModuleDiag.cs`, PLC compiles 0/0). Still needs OB82 created
+      in the TIA UI — see the constraint below before writing it.
+
+      **Correcting a claim from an outside AI (checked against Siemens' own manuals, 2026-09-06):**
+      it was asserted that our `ST` modules "physically cannot" detect a wire break and that HF
+      modules would have to be bought, so OB82 would "sit empty forever". **That is wrong.** The
+      manual for our exact part number `6ES7131-6BH01-0BA0` (02/2019, p16) lists
+      `Diagnostics: Wire break — Disable/Enable` and `Diagnostics: No supply voltage L+ —
+      Disable/Enable` as configurable module parameters, and p23 states the module *"generates a
+      diagnostic interrupt at the following events: Wire break, Parameter assignment error,
+      Supply voltage missing"*. Confirmed in our own project: every module carries
+      `DiagnosticsWireBreak` and `DiagnosticsNoSupplyVoltage` attributes; DQ modules also carry
+      `DiagnosticsShortCircuitToGround` and `DiagnosticsShortCircuitToLplus`. They were simply all
+      `False`. So OB82 is real, useful work.
+
+      **What was enabled** (no field wiring change, no BOM change):
+      DI + DQ `DiagnosticsNoSupplyVoltage`; DQ `DiagnosticsShortCircuitToGround` and
+      `DiagnosticsShortCircuitToLplus`. Takes effect on the next **hardware** download.
+
+      **What was deliberately NOT enabled: `DiagnosticsWireBreak`.** It needs a **25-45 kΩ resistor
+      wired in parallel with every monitored contact** (manual p16). Enabling it without them makes
+      every open channel report a permanent wire break - the manual lists "channel not connected
+      (open)" as a cause of that fault. With ~356 DI channels that is a field-wiring decision for
+      the hardware team, and a **decide-before-cables-are-terminated** one: fitting resistors during
+      panel build is cheap, retrofitting them means opening every junction box on a vessel. Note the
+      parameter is **module scope** - all 16 channels of a module or none - though `Channel
+      activated` is per-channel, so genuinely spare channels can be switched off individually.
+
+      **CONSTRAINT before writing OB82 - read this first.**
+      1. **It cannot be tested in PLCSIM.** Item 11 established PLCSIM does not simulate
+         PROFINET-level events (station offline, module pulled, wire break); module diagnostics are
+         the same class. OB86 had to be verified by forcing `Diag_DB.AftLost` for exactly this
+         reason. OB82 can only be proven on the real panel by pulling a module or killing a feed.
+      2. **The `IOstate` bit semantics could not be verified** from any reachable Siemens source.
+         The interface is confirmed (`ioState` Word, `laddr` HW_ANY, `channel` UInt, `multiError`
+         Bool) but not what the bits mean. OB86's own comment warns precisely here: getting
+         incoming/outgoing backwards "would set the fault flag on recovery and clear it on failure -
+         a system that reports healthy precisely when it is not".
+
+      **Therefore the design must not depend on interpreting `IOstate`.** Recommended: **latch on
+      ANY OB82 event and clear only by explicit reset.** The failure direction is then a stale
+      fault, never a hidden one, and it matches how `UnexpMove` and `DirFault` already behave.
+      Record `laddr`, `channel`, `ioState` and `multiError` into `Diag_DB` raw, for diagnosis and
+      so the bit meanings can be *learned* from the real panel rather than guessed now.
     - **bit 5, Power/UPS** — blocked on item 42; there may be no UPS to monitor at all, in which
       case this one joins the deleted three.
     - **bit 7, HMI heartbeat** — buildable now, but what the PLC should *do* when the panel dies is
