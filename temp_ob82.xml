@@ -127,6 +127,12 @@
 
 "Diag_DB".ModuleFault := TRUE;
 
+// Hand the event to FB_ValveLoop rather than working out which module it was here.
+// The decode needs a 36-entry lookup, and this block cannot be triggered in PLCSIM -
+// so doing it here would ship untestable logic. In FB_ValveLoop the same decode can be
+// exercised from a watch table by writing a LADDR and setting this flag by hand.
+"Diag_DB".NewModuleEvent := TRUE;
+
 #id := #LADDR;
 "Diag_DB".LastModuleLaddr := #id;
 "Diag_DB".LastModuleIoState := #IO_State;

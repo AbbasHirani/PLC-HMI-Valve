@@ -221,6 +221,164 @@
         <MultiLanguageText Lang="en-US">TRUE if that event carried more than one error.</MultiLanguageText>
       </Comment>
     </Member>
+    <Member Name="NewModuleEvent" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Comment>
+        <MultiLanguageText Lang="en-US">Set by OB82, consumed by FB_ValveLoop. The decode deliberately lives in FB_ValveLoop, not OB82, so it can be tested from a watch table - OB82 itself cannot be triggered in PLCSIM.</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="ModuleLaddr" Datatype="Array[1..36] of UInt" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Comment>
+        <MultiLanguageText Lang="en-US">Hardware identifier of each I/O module, read from the PLC system constants 2026-09-10. Index order is RACK order: 1-11 AFT slots 1-11, 12-22 MID slots 1-11, 23-36 FWD slots 1-14. Held as DATA, not literals in SCL, for the same reason as Laddr_AFT/MID/FWD above. WARNING: re-adding a module in TIA reassigns these, and a shifted table would name the WRONG module - the unknown handler only catches a MISSING entry. Re-read the system constants after any hardware change. Note AFT is not contiguous (DQ ST_1 is 281, between the DI values) so a range check cannot substitute for this table.</MultiLanguageText>
+      </Comment>
+        <Subelement Path="1">
+          <StartValue>280</StartValue>
+        </Subelement>
+        <Subelement Path="2">
+          <StartValue>282</StartValue>
+        </Subelement>
+        <Subelement Path="3">
+          <StartValue>283</StartValue>
+        </Subelement>
+        <Subelement Path="4">
+          <StartValue>284</StartValue>
+        </Subelement>
+        <Subelement Path="5">
+          <StartValue>285</StartValue>
+        </Subelement>
+        <Subelement Path="6">
+          <StartValue>286</StartValue>
+        </Subelement>
+        <Subelement Path="7">
+          <StartValue>287</StartValue>
+        </Subelement>
+        <Subelement Path="8">
+          <StartValue>281</StartValue>
+        </Subelement>
+        <Subelement Path="9">
+          <StartValue>270</StartValue>
+        </Subelement>
+        <Subelement Path="10">
+          <StartValue>271</StartValue>
+        </Subelement>
+        <Subelement Path="11">
+          <StartValue>272</StartValue>
+        </Subelement>
+        <Subelement Path="12">
+          <StartValue>295</StartValue>
+        </Subelement>
+        <Subelement Path="13">
+          <StartValue>296</StartValue>
+        </Subelement>
+        <Subelement Path="14">
+          <StartValue>297</StartValue>
+        </Subelement>
+        <Subelement Path="15">
+          <StartValue>298</StartValue>
+        </Subelement>
+        <Subelement Path="16">
+          <StartValue>299</StartValue>
+        </Subelement>
+        <Subelement Path="17">
+          <StartValue>300</StartValue>
+        </Subelement>
+        <Subelement Path="18">
+          <StartValue>301</StartValue>
+        </Subelement>
+        <Subelement Path="19">
+          <StartValue>302</StartValue>
+        </Subelement>
+        <Subelement Path="20">
+          <StartValue>303</StartValue>
+        </Subelement>
+        <Subelement Path="21">
+          <StartValue>304</StartValue>
+        </Subelement>
+        <Subelement Path="22">
+          <StartValue>305</StartValue>
+        </Subelement>
+        <Subelement Path="23">
+          <StartValue>313</StartValue>
+        </Subelement>
+        <Subelement Path="24">
+          <StartValue>314</StartValue>
+        </Subelement>
+        <Subelement Path="25">
+          <StartValue>315</StartValue>
+        </Subelement>
+        <Subelement Path="26">
+          <StartValue>316</StartValue>
+        </Subelement>
+        <Subelement Path="27">
+          <StartValue>317</StartValue>
+        </Subelement>
+        <Subelement Path="28">
+          <StartValue>318</StartValue>
+        </Subelement>
+        <Subelement Path="29">
+          <StartValue>319</StartValue>
+        </Subelement>
+        <Subelement Path="30">
+          <StartValue>320</StartValue>
+        </Subelement>
+        <Subelement Path="31">
+          <StartValue>321</StartValue>
+        </Subelement>
+        <Subelement Path="32">
+          <StartValue>322</StartValue>
+        </Subelement>
+        <Subelement Path="33">
+          <StartValue>323</StartValue>
+        </Subelement>
+        <Subelement Path="34">
+          <StartValue>324</StartValue>
+        </Subelement>
+        <Subelement Path="35">
+          <StartValue>325</StartValue>
+        </Subelement>
+        <Subelement Path="36">
+          <StartValue>326</StartValue>
+        </Subelement>
+    </Member>
+    <Member Name="W_ModuleFault" Datatype="Array[0..2] of Word" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Comment>
+        <MultiLanguageText Lang="en-US">One LATCHED bit per I/O module. Module index i (1..36) is word (i-1)/16, bit (i-1) MOD 16 - the same packing the valve alarm words use. Cleared only by ModuleFaultAck.</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="UnknownModuleFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Comment>
+        <MultiLanguageText Lang="en-US">An OB82 event arrived whose LADDR is not in ModuleLaddr[]. Means the table is stale or an unexpected device reported. Never silently dropped.</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="UnknownModuleLaddr" Datatype="UInt" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Comment>
+        <MultiLanguageText Lang="en-US">The unrecognised identifier, so a stale table can be diagnosed.</MultiLanguageText>
+      </Comment>
+    </Member>
   </Section>
 </Sections></Interface>
       <IsOnlyStoredInLoadMemory>false</IsOnlyStoredInLoadMemory>

@@ -110,6 +110,8 @@
         <Member Name="seatPT" Datatype="Time" />
     <Member Name="winTick" Datatype="Bool" />
     <Member Name="doWindows" Datatype="Bool" />
+    <Member Name="modIdx" Datatype="Int" />
+    <Member Name="modFound" Datatype="Bool" />
   </Section>
   <Section Name="Constant" />
 </Sections></Interface>
@@ -241,9 +243,50 @@
     // Consequence to expect on the panel: a module fault stays raised after the module recovers,
     // until someone acknowledges it. That is the safe direction and it is the intended behaviour,
     // not a bug to fix by making this self-clearing.
+    // Decode WHICH module the last OB82 event came from. This runs here rather than inside
+    // OB82 on purpose: OB82 cannot be triggered in PLCSIM, so logic placed there ships
+    // untested. Here the whole decode can be exercised from a watch table - write a value
+    // into LastModuleLaddr, set NewModuleEvent, and watch the right bit appear.
+    //
+    // Linear search of 36 entries, once per event and not per scan. A range check would be
+    // shorter and WRONG: the AFT identifiers are not contiguous (its DQ ST_1 is 281, sitting
+    // between the DI values 280 and 282), so only an explicit table maps them correctly.
+    IF &quot;Diag_DB&quot;.NewModuleEvent THEN
+        &quot;Diag_DB&quot;.NewModuleEvent := FALSE;
+        #modFound := FALSE;
+        FOR #modIdx := 1 TO 36 DO
+            IF &quot;Diag_DB&quot;.ModuleLaddr[#modIdx] = &quot;Diag_DB&quot;.LastModuleLaddr THEN
+                #w := (#modIdx - 1) / 16;
+                #b := (#modIdx - 1) MOD 16;
+                &quot;Diag_DB&quot;.W_ModuleFault[#w] := &quot;Diag_DB&quot;.W_ModuleFault[#w]
+                    OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
+                #modFound := TRUE;
+            END_IF;
+        END_FOR;
+
+        // An identifier matching no module. Recorded rather than dropped, exactly as OB86 does
+        // for an unknown station: it means the table is stale after a hardware change, or a
+        // device reported that this block does not know about. Both are worth seeing.
+        IF NOT #modFound THEN
+            &quot;Diag_DB&quot;.UnknownModuleFault := TRUE;
+            &quot;Diag_DB&quot;.UnknownModuleLaddr := &quot;Diag_DB&quot;.LastModuleLaddr;
+            // Also raise it in the fault word. A WinCC discrete alarm needs a numeric tag
+            // and a bit number, so it cannot bind to the Bool above. The 36 modules end at
+            // word 2 bit 3, leaving bit 4 free for this. Keep the two in step.
+            &quot;Diag_DB&quot;.W_ModuleFault[2] := &quot;Diag_DB&quot;.W_ModuleFault[2] OR W#16#10;
+        END_IF;
+    END_IF;
+
+    // One acknowledge clears everything: the summary flag, all 36 per-module bits and the
+    // unknown flag. Per-module acknowledge was considered and rejected - a module fault is
+    // something a technician goes and fixes, not something an operator triages bit by bit.
     IF &quot;Diag_DB&quot;.ModuleFaultAck THEN
         &quot;Diag_DB&quot;.ModuleFault := FALSE;
         &quot;Diag_DB&quot;.ModuleFaultAck := FALSE;
+        &quot;Diag_DB&quot;.UnknownModuleFault := FALSE;
+        &quot;Diag_DB&quot;.W_ModuleFault[0] := W#16#0;
+        &quot;Diag_DB&quot;.W_ModuleFault[1] := W#16#0;
+        &quot;Diag_DB&quot;.W_ModuleFault[2] := W#16#0;
     END_IF;
     &quot;Valves_DB&quot;.HwHealthy[5] := NOT &quot;Diag_DB&quot;.ModuleFault;
 

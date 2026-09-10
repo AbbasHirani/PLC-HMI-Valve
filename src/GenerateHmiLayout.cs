@@ -2230,7 +2230,70 @@ namespace ValveDemoHmiBuilder
                 // actuator from a stuck limit switch, but the technician with a multimeter can.
                 CreateDiscreteAlarm(hmi, vId + "_DirFault", "ValveWarning", cm + " Direction / limit fault - check actuator and limit switch wiring.", dbName + "_W_DirFault_" + ((i-1)/16), (i-1)%16, cm, zoneArea);
             }
-            Console.WriteLine("  Created " + (VALVE_COUNT * 8 + 6) + " discrete alarms.");   // 89x8 + 6 system = 718
+
+            int modCount = CreateModuleAlarms(hmi);
+
+            Console.WriteLine("  Created " + (VALVE_COUNT * 8 + 6 + modCount) + " discrete alarms.");
+        }
+
+        // One alarm per physical I/O module - 36 of them - replacing the single
+        // "I/O Module fault detected" that named nothing.
+        //
+        // Why per-module and not per-station: the failure this most needs to describe is a
+        // potential group losing its 24 V, which takes SEVERAL modules at once. A per-station
+        // alarm would say "AFT" and leave the technician to work out whether it is one bad card
+        // or half the rack. Thirty-six alarms show the shape of the failure at a glance.
+        //
+        // Index order must match Diag_DB.ModuleLaddr[] exactly - rack order per station,
+        // DI modules then DQ modules - because FB_ValveLoop sets the bit by that index.
+        // Bit packing is the same as the valve words: word (i-1)/16, bit (i-1) MOD 16.
+        static int CreateModuleAlarms(HmiSoftware hmi)
+        {
+            // (station label, area, DI count, DQ count) - the layout used everywhere else in
+            // this project, and the same one the wiring sheet is generated from.
+            var stations = new[] {
+                new { Name = "AFT", Area = "BALLAST AFT", Di = 7, Dq = 4 },
+                new { Name = "MID", Area = "BILGE-ER",    Di = 7, Dq = 4 },
+                new { Name = "FWD", Area = "BALLAST FWD", Di = 9, Dq = 5 },
+            };
+
+            int idx = 0;
+            foreach (var st in stations)
+            {
+                for (int slot = 1; slot <= st.Di + st.Dq; slot++)
+                {
+                    idx++;
+                    bool isDi = slot <= st.Di;
+                    string module = isDi
+                        ? string.Format("DI 16x24VDC ST_{0}", slot)
+                        : string.Format("DQ 16x24VDC/0.5A ST_{0}", slot - st.Di);
+
+                    // Name carries station and slot so it sorts sensibly and stays stable;
+                    // the text carries the module type, which is what a technician looks for
+                    // on the DIN rail.
+                    string name = string.Format("Mod_{0}_S{1:D2}", st.Name, slot);
+                    string text = string.Format("{0} slot {1} ({2}) I/O module fault.", st.Name, slot, module);
+
+                    CreateDiscreteAlarm(hmi, name, "System", text,
+                        "Diag_DB_W_ModuleFault_" + ((idx - 1) / 16), (idx - 1) % 16,
+                        st.Name + " SLOT " + slot, st.Area);
+                }
+            }
+
+            // An identifier matching no module. Its own alarm rather than a silent drop: it means
+            // Diag_DB.ModuleLaddr[] is stale after a hardware change, and a stale table names the
+            // WRONG module - worse than naming none. See the comment on that array.
+            //
+            // Bound to a spare bit of the last fault word, not to the Bool. A discrete alarm needs
+            // a numeric tag plus a bit number; a Bool tag has no bit to point at. 36 modules end at
+            // word 2 bit 3, so bit 4 of that word is free and FB_ValveLoop sets it alongside the
+            // Bool. The Bool stays because it is what the diagnostics screen reads.
+            CreateDiscreteAlarm(hmi, "Mod_Unknown", "System",
+                "I/O module fault from an UNRECOGNISED module - Diag_DB.ModuleLaddr table may be stale.",
+                "Diag_DB_W_ModuleFault_2", 4, "I/O", "SYSTEM");
+
+            Console.WriteLine("    -> " + idx + " per-module alarms + 1 unknown-module alarm.");
+            return idx + 1;
         }
 
         static void CreateDiscreteAlarm(HmiSoftware hmi, string name, string className, string text, string triggerTag, int triggerBit, string origin, string area)
@@ -2329,6 +2392,15 @@ namespace ValveDemoHmiBuilder
                     CreateSummaryTag(hmi, "Valves_DB_W_" + cond + "_" + w, "Valves_DB.W_" + cond + "[" + w + "]", "UInt");
                 }
             }
+
+            // Per-module I/O fault words, written by FB_ValveLoop from OB82 events. Three words
+            // cover 36 modules. Added 2026-09-10 with item 37 bit 4 - before this there was one
+            // global "I/O Module fault detected" alarm that named nothing, which is no use when a
+            // potential group fails and takes several modules with it.
+            for (int w = 0; w < 3; w++)
+                CreateSummaryTag(hmi, "Diag_DB_W_ModuleFault_" + w, "Diag_DB.W_ModuleFault[" + w + "]", "UInt");
+            CreateSummaryTag(hmi, "Diag_UnknownModuleFault", "Diag_DB.UnknownModuleFault", "Bool");
+            CreateSummaryTag(hmi, "Diag_UnknownModuleLaddr", "Diag_DB.UnknownModuleLaddr", "UInt");
 
             Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 89 slots...");
             for (int i = 1; i <= VALVE_COUNT; i++) {
