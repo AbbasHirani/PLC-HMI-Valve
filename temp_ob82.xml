@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V20" />
+  <DocumentInfo>
+    <Created>2026-09-10T14:33:11.9642249Z</Created>
+    <ExportSetting>WithDefaults</ExportSetting>
+    <InstalledProducts>
+      <Product>
+        <DisplayName>Totally Integrated Automation Portal</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>TIA Portal Openness</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Version Control Interface</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>STEP 7 Professional</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>STEP 7 Safety</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>WinCC Basic/Comfort/Advanced</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>WinCC Professional</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>WinCC Unified</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+    </InstalledProducts>
+  </DocumentInfo>
+  <SW.Blocks.OB ID="0">
+    <AttributeList>
+      <HeaderAuthor />
+      <HeaderFamily />
+      <HeaderName />
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input">
+    <Member Name="IO_State" Datatype="Word" Accessibility="Public" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">IO state of the HW object</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="LADDR" Datatype="HW_ANY" Accessibility="Public" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Hardware identifier</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="Channel" Datatype="UInt" Accessibility="Public" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">Channel number</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="MultiError" Datatype="Bool" Accessibility="Public" Informative="true">
+      <Comment>
+        <MultiLanguageText Lang="en-US">=true if more than one error is present</MultiLanguageText>
+      </Comment>
+    </Member>
+  </Section>
+  <Section Name="Temp">
+    <Member Name="id" Datatype="UInt" />
+  </Section>
+  <Section Name="Constant" />
+</Sections></Interface>
+      <IsIECCheckEnabled>false</IsIECCheckEnabled>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>DiagnosticErrorInterrupt</Name>
+      <Namespace />
+      <Number>82</Number>
+      <ProgrammingLanguage>SCL</ProgrammingLanguage>
+      <SecondaryType>DiagnosticErrorInterrupt</SecondaryType>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>Called by the CPU when an I/O module reports a diagnostic. Latches Diag_DB.ModuleFault, which FB_ValveLoop turns into HwHealthy[5] and thence HwWord bit 4, driving the existing System_IO_Module_Fault alarm. Deliberately does not decode IO_State - see the body comment.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v4">
+  <Text UId="1">
+// Called by the CPU when an I/O module raises a diagnostic: its 24 V supply
+// failing, a DQ output short-circuited to L+ or to ground, a parameter error, or
+// a wire break where that is ever enabled. Those diagnostics were switched on
+// across all 36 modules on 2026-09-06 - they ship DISABLED, which is why nothing
+// would have reached this block even if it had existed earlier.
+//
+// WHY THIS BLOCK DOES NOT DECODE #IO_State
+//
+// The same OB fires when a fault APPEARS and again when it GOES AWAY, and
+// #IO_State is what separates the two. Its bit meanings could not be confirmed
+// from any reachable Siemens source, and this block cannot be tested here:
+// PLCSIM does not simulate module-level diagnostics, for the same reason it does
+// not simulate the station events OB86 handles (handoff item 11).
+//
+// Guessing the polarity would risk precisely the failure OB86's own comment
+// warns about - clearing the flag on failure and setting it on recovery, giving
+// a system that reports healthy exactly when it is not. So this block does not
+// guess. ModuleFault LATCHES on any event and clears only via ModuleFaultAck.
+//
+// The worst case is a stale fault sitting after a module has recovered: visible,
+// irritating, and safe. The opposite error is silent. UnexpMove and DirFault
+// already latch for the same reason.
+//
+// Everything is stored RAW and undecoded so the bit meanings can be LEARNED from
+// the real panel rather than guessed now: pull a module and read
+// LastModuleIoState, plug it back in and read it again. Two observations settle
+// what the documentation would not.
+
+"Diag_DB".ModuleFault := TRUE;
+
+#id := #LADDR;
+"Diag_DB".LastModuleLaddr := #id;
+"Diag_DB".LastModuleIoState := #IO_State;
+"Diag_DB".LastModuleChannel := #Channel;
+"Diag_DB".LastModuleMultiError := #MultiError;
+
+// Saturating, not wrapping. An Int rolling past 32767 into negative would read as
+// a different kind of fault to whoever is looking at it, and the exact count that
+// far out says nothing the latched flag has not already said. What the count is
+// genuinely for is spotting a module that is CHATTERING - rising steadily while
+// ModuleFault has never been cleared.
+IF "Diag_DB".ModuleEventCount &lt; 32767 THEN
+    "Diag_DB".ModuleEventCount := "Diag_DB".ModuleEventCount + 1;
+END_IF;
+  </Text>
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="8" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="9" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text />
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.OB>
+</Document>

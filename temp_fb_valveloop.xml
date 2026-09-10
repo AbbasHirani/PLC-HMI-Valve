@@ -230,6 +230,23 @@
     &quot;Valves_DB&quot;.HwHealthy[3] := NOT &quot;Diag_DB&quot;.MidLost;
     &quot;Valves_DB&quot;.HwHealthy[4] := NOT &quot;Diag_DB&quot;.FwdLost;
 
+    // I/O module diagnostics, from OB82 via Diag_DB - HwHealthy[5] is HwWord bit 4, which
+    // already drives the System_IO_Module_Fault alarm. Added 2026-09-10 (item 37 bit 4).
+    //
+    // The acknowledge is consumed BEFORE HwHealthy[5] is computed, so a reset clears the alarm
+    // in the same scan it is requested rather than leaving it up for one more. OB82 latches the
+    // flag and never clears it - deliberately, because it cannot tell a fault appearing from one
+    // going away without decoding IO_State, whose bit meanings are unconfirmed. See OB82.
+    //
+    // Consequence to expect on the panel: a module fault stays raised after the module recovers,
+    // until someone acknowledges it. That is the safe direction and it is the intended behaviour,
+    // not a bug to fix by making this self-clearing.
+    IF &quot;Diag_DB&quot;.ModuleFaultAck THEN
+        &quot;Diag_DB&quot;.ModuleFault := FALSE;
+        &quot;Diag_DB&quot;.ModuleFaultAck := FALSE;
+    END_IF;
+    &quot;Valves_DB&quot;.HwHealthy[5] := NOT &quot;Diag_DB&quot;.ModuleFault;
+
     FOR #i := 1 TO 89 DO
         // Keep the retentive mirror in step with the live flag, so whatever an engineer sets on
         // the Config screen survives the next blackout. One Bool copy per valve per scan.
