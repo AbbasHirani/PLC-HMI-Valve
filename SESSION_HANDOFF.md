@@ -1152,8 +1152,40 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
     **Bits 4, 5 and 7 were deliberately KEPT.** They are implementable and merely unimplemented,
     which is a todo, not dead weight:
     - **bit 4, I/O module** — **module diagnostics ENABLED 2026-09-06** (62 attributes across all
-      36 modules, `scratch_probe/EnableModuleDiag.cs`, PLC compiles 0/0). Still needs OB82 created
-      in the TIA UI — see the constraint below before writing it.
+      36 modules, `scratch_probe/EnableModuleDiag.cs`, PLC compiles 0/0). Original note: still needed OB82 created in the TIA UI.
+
+      **BUILT 2026-09-10 (commits `9848d76`, `9c6167e`):** OB82 latches `Diag_DB.ModuleFault` and
+      raises `NewModuleEvent`; `FB_ValveLoop` looks `LastModuleLaddr` up in the 36-entry
+      `ModuleLaddr` table and sets a bit in `W_ModuleFault[0..2]`. 36 per-module alarms plus
+      `Mod_Unknown` (755 alarms total). The flag-to-alarm chain passed in PLCSIM + Runtime on the
+      earlier single alarm. **The 36-entry decode has NOT been run in PLCSIM yet, and OB82 firing
+      for real can only be proven on the panel.** Everything needs a hardware download.
+
+      **What a module alarm can and cannot say - corrected 2026-11-05 from the DQ manual
+      (`6ES7132-6BH01-0BA0`, 01/2025).** The earlier claim that this names the exact terminal was
+      wrong. The datasheet (p30) lists wire break and both short circuits as "Module-wise" and
+      "for channel diagnostics: No". So the alarm gives station, slot and module type, NOT the
+      channel, and do not expect `LastModuleChannel` to hold a useful terminal until the panel
+      shows otherwise. Its Diag_DB comment ("narrows a fault to one terminal") overstates this.
+      The channel comes from the valve alarm plus `WIRING_TERMINAL_SHEET.csv`.
+
+      What one bad output channel does today:
+      | Fault on the output | Module alarm? | Valve alarm when commanded? |
+      |---|---|---|
+      | Output shorted to ground | Yes, only while the output is ON (manual p26) | Yes |
+      | Output shorted to 24 V | Yes, only while the output is OFF (manual p26) | Depends |
+      | Cut wire to the relay, dead relay coil | No - DQ wire break is off | Yes |
+      | Low voltage on one channel | No - the module does not measure it | Only if the valve fails to move |
+      | Relay contact or solenoid fault | No - beyond the module | Yes |
+      Valve alarm = Direction/limit fault and/or Fail to Open/Close. **An idle valve raises nothing
+      until it is next commanded.**
+
+      **Correction: the 25-45 kOhm resistor applies to DI modules only.** DQ wire break was left off
+      for the same stated reason, which was never checked. The DQ manual asks only that the load
+      sits in its 48 Ohm to 12 kOhm range (p29), and that an open channel is deactivated or given a
+      resistor (p26). So DQ wire break may work with no extra parts. **Open decision.** Check first:
+      real relay coil resistance, spare DQ channels switched off, and that the affected channel is
+      switched off when the fault occurs (p19). `EnableModuleDiag.cs` prints the old reason for DQ.
 
       **Correcting a claim from an outside AI (checked against Siemens' own manuals, 2026-09-06):**
       it was asserted that our `ST` modules "physically cannot" detect a wire break and that HF
