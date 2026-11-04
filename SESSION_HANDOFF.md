@@ -2639,6 +2639,26 @@ Note on tooling: the exported/live-attach probes intermittently fail with the kn
 to a freshly compiled exe (happened again in `scratch_probe/` this session) — same root cause as
 before, fixed the same way (move it into `_shadowed_dlls/`).
 
+## 6c. One-valve client demo (2026-11-05)
+
+The client wants a one-valve version proving all functions and alarms on the bare PLC, with no
+stations and no panel. The PLC in hand is `6ES7214-1AG40-0XB0`, firmware V04.05.01. That is the
+project article number but NOT the SIPLUS part on the BOM, so ask whether this unit is for the ship.
+
+**All demo work lives in a separate TIA project:** `Documents\AutomationalveDemo_OneValve`,
+outside this repo, so back it up separately. Sources are in `demo_one_valve/` and
+`src/DemoOneValve.cs`. Build with `HmiBuilder.exe --demo-one-valve=plc`, compile, then
+`--demo-one-valve=hmi`. That mode refuses any other project name. **Never run a normal HmiBuilder
+pass on the demo:** ImportPlcBlocks would put the real I/O block back.
+
+What differs from the real project: CM79 (slot 21) on `%I0.0-0.3` and `%Q0.0-0.1`, stations removed,
+`TravelTimeout[21]` 20 s, `ConfiguredRet[21]` and `SelIdx` preset, 4 screens, 8 alarms, 657 tags. PLC
+logic is otherwise the same, and the other 88 slots stay in the program, switched off.
+
+**Status:** compiles (PLC 0/0, HMI 0 errors) and `demo_one_valve/VerifyDemo.cs` passes. **Not yet run
+in PLCSIM, never run on the real PLC.** The laptop HMI simulation connecting to the real PLC is
+untested and is the first thing to try on the bench, along with work memory and scan time.
+
 ## 7. How to resume
 
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache

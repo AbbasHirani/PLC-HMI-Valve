@@ -8,3 +8,4 @@
 
 # Probe/tool binaries - the .cs sources ARE tracked, the builds are not.
 scratch_probe/*.exe
+demo_one_valve/*.exe

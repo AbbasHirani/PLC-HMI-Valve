@@ -37,7 +37,7 @@ if (-not $dll) {
 Write-Output "Openness DLL: $dll"
 
 $out = & $csc /nologo /target:exe /out:"HmiBuilder.exe" /reference:"$dll" `
-    "src\GenerateHmiLayout.cs" "src\MarineScreens.cs" 2>&1
+    "src\GenerateHmiLayout.cs" "src\MarineScreens.cs" "src\DemoOneValve.cs" 2>&1
 
 $out | ForEach-Object { Write-Output $_ }
 

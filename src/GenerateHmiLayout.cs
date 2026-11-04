@@ -165,6 +165,12 @@ namespace ValveDemoHmiBuilder
                 }
             }
             if (finishLoginAuth) { try { RunFinishLoginAuth(); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); } Console.WriteLine("\nDone."); return; }
+            foreach (var a in args)
+                if (a.StartsWith("--demo-one-valve=")) {
+                    try { RunDemoOneValve(a.Substring(17)); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); Environment.ExitCode = 1; }
+                    Console.WriteLine("\nDone.");
+                    return;
+                }
             if (purgeAlarmSuffix != null) { try { RunPurgeAlarms(purgeAlarmSuffix); } catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); } Console.WriteLine("\nDone."); return; }
             try { Run(only, fixTags, dumpTag, exportBlock, importOnly, alarmColorsOnly); }
             catch (Exception ex) { Console.WriteLine("\n[ERROR] " + ex); }
