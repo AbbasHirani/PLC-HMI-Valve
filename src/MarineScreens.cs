@@ -1473,7 +1473,7 @@ namespace ValveDemoHmiBuilder
             // "something is wrong", and CONFIG and AUDIT LOG stay together as the two screens an
             // operator has no routine reason to open.
             string[] labels  = { "&#x2302;  HOME", "&#x2693;  BALLAST AFT", "&#x1F4A7;  BILGE / ER",
-                                 "&#x2693;  BALLAST FWD", "&#x1F514;  ALARMS", "&#x2699;  DIAGNOSTICS",
+                                 "&#x2693;  BALLAST FWD", "&#x1F514;  FAULTS", "&#x2699;  DIAGNOSTICS",
                                  "&#x1F4C8;  CONFIG", "&#x1F4CB;  AUDIT LOG" };
             string[] targets = { "Screen_Home", "Screen_AftBallast", "Screen_Bilge", "Screen_FwdBallast",
                                  "Screen_Alarms", "Screen_SysDiag", "Screen_Diagnostics", "Screen_Login" };

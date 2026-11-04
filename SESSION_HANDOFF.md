@@ -1181,10 +1181,19 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
       now**, which replaces the 755 above. Unknown-module alarm clears only by reset.
 
       Verified: PLC 0 errors 0 warnings, HMI 0 errors, `scratch_probe/VerifyModuleFaults.cs` all pass.
-      **Not yet run:** the PLCSIM tests, using `TestModuleLaddr` + `TestModuleIoState` +
-      `TestModuleEvent` (16#0011 = fault, 16#0001 = healthy). The test trigger runs events one at a
-      time, so it cannot reproduce the original race; OB82 calling the FC directly removes the slot
-      that caused it. **Only the real panel can prove** OB82 fires and sends what the manual says.
+      **Tested 2026-11-05 in PLCSIM + Runtime.** A temporary self-test passed 14 of 14: set, clear,
+      "must not clear" on bits 0, 5 and 7, the unknown module, and word boundaries. Expected values
+      were written by hand from the table. Hand checks also passed: one alarm row naming the module,
+      self-clear, return on a new fault, reset button, and the press in the audit log. The self-test
+      was then removed from the project; to rerun it, see `scratch_probe/build_module_selftest.py`.
+      The test trigger runs events one at a time, so it cannot reproduce the original race; OB82
+      calling the FC directly removes the slot that caused it. **Only the real panel can prove** OB82
+      fires and sends what the manual says. Everything here needs a hardware download.
+
+      **Watch out:** the user renames things by hand in TIA, and a builder rebuild overwrites them
+      from code. On 2026-11-05 the user had renamed the ALARMS tab to FAULTS, and `--only=SysDiag` put
+      that one screen back. Fixed in the project and in `MarineScreens.cs`. Check for hand edits
+      before rebuilding a screen, and put them in the generator.
 
       **What a module alarm can and cannot say - corrected 2026-11-05 from the DQ manual
       (`6ES7132-6BH01-0BA0`, 01/2025).** The earlier claim that this names the exact terminal was
