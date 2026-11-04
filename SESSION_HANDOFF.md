@@ -1161,6 +1161,21 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
       earlier single alarm. **The 36-entry decode has NOT been run in PLCSIM yet, and OB82 firing
       for real can only be proven on the panel.** Everything needs a hardware download.
 
+      **`IOstate` meanings CONFIRMED 2026-11-05 from the Siemens S7-1200 manual page (screenshot from
+      the user), replacing "could not be verified" below:** bit 0 = 1 configuration correct, 0 no
+      longer correct; bit 4 = 1 error present such as a wire break, 0 no error; bit 5 = 1
+      configuration not correct, 0 correct again; bit 7 = 1 I/O access error. The manual's "(Bit 6 =
+      0 if there is no error)" sits under bit 7 and looks like a typo. Auto-clear is therefore
+      possible; not built yet, and it still needs proving on the panel.
+
+      **BUG in `9c6167e`, found by reading the code, not yet fixed or seen live:** OB82 hands over one
+      module at a time through `LastModuleLaddr` + `NewModuleEvent`, and `FB_ValveLoop` reads that
+      once per scan. If two modules report before it runs, the first is overwritten and gets no
+      alarm. That is the shared-supply failure the per-module alarms were built for. Planned fix:
+      decode directly in OB82 through one FC, with a test trigger so a watch table can run the same
+      FC. Clear a module only when bit 0 = 1 and bits 4, 5 and 7 = 0, and make `ModuleFault` true
+      when any module bit is set.
+
       **What a module alarm can and cannot say - corrected 2026-11-05 from the DQ manual
       (`6ES7132-6BH01-0BA0`, 01/2025).** The earlier claim that this names the exact terminal was
       wrong. The datasheet (p30) lists wire break and both short circuits as "Module-wise" and
