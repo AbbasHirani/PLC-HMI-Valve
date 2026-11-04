@@ -2230,9 +2230,19 @@ namespace ValveDemoHmiBuilder
                 "Screen.Items(\"SD_TabMatrix\").BackColor = 0xFF263242;\n" +
                 "Screen.Items(\"SD_TabBuffer\").BackColor = 0xFF0074BA;");
 
-            MakeTb(sc, "SD_Hint", 486, 226, 1418, 24,
+            MakeTb(sc, "SD_Hint", 486, 226, 1160, 24,
                    "Red or amber here means the station or module below it - walk to the rack and count along the slots.",
                    M_TRANS, M_MUTED, 0, "Left", 13, false);
+
+            // Module alarms normally clear themselves when the module recovers. This covers the
+            // unknown-module alarm, which has no event to clear it, and a missed clear event.
+            // Same login rule as OPEN and CLOSE; the tag is GmpRelevant, so each press is audited.
+            // On a module that is still broken it hides the alarm until that module next reports,
+            // which is why it sits next to the MODULE MATRIX that shows live status.
+            var btnReset = MakeBtn(sc, "SD_ResetModules", 1664, 214, 240, 46, "RESET MODULE FAULTS",
+                                   M_HDR, M_HDRTXT, M_BORDER, 1, 14, true);
+            SetStr(btnReset, "Authorization", "Operate");
+            AddScriptEvent(btnReset, "Tags(\"Diag_ModuleFaultAck\").Write(true);");
 
             // ── Controls placed LAST ──────────────────────────────────────────────────────
             // HmiAlarmControl deadlocks the Openness API if anything is created after it (see

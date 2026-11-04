@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Document>
+  <Engineering version="V20" />
+  <DocumentInfo>
+    <Created>2026-08-08T00:00:00.0000000Z</Created>
+    <ExportSetting>WithDefaults</ExportSetting>
+    <InstalledProducts>
+      <Product>
+        <DisplayName>Totally Integrated Automation Portal</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>TIA Portal Openness</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <OptionPackage>
+        <DisplayName>TIA Portal Version Control Interface</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>STEP 7 Professional</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <OptionPackage>
+        <DisplayName>STEP 7 Safety</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </OptionPackage>
+      <Product>
+        <DisplayName>WinCC Basic/Comfort/Advanced</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>WinCC Professional</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+      <Product>
+        <DisplayName>WinCC Unified</DisplayName>
+        <DisplayVersion>V20</DisplayVersion>
+      </Product>
+    </InstalledProducts>
+  </DocumentInfo>
+  <SW.Blocks.FC ID="0">
+    <AttributeList>
+      <AutoNumber>true</AutoNumber>
+      <HeaderAuthor />
+      <HeaderFamily />
+      <HeaderName />
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface><Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+  <Section Name="Input">
+    <Member Name="Laddr" Datatype="UInt" />
+    <Member Name="IoState" Datatype="Word" />
+  </Section>
+  <Section Name="Output" />
+  <Section Name="InOut" />
+  <Section Name="Temp">
+    <Member Name="idx" Datatype="Int" />
+    <Member Name="w" Datatype="Int" />
+    <Member Name="b" Datatype="Int" />
+    <Member Name="mask" Datatype="Word" />
+    <Member Name="found" Datatype="Bool" />
+    <Member Name="healthy" Datatype="Bool" />
+  </Section>
+  <Section Name="Constant" />
+</Sections></Interface>
+      <IsIECCheckEnabled>false</IsIECCheckEnabled>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>FC_ModuleEvent</Name>
+      <Namespace />
+      <ProgrammingLanguage>SCL</ProgrammingLanguage>
+      <SetENOAutomatically>false</SetENOAutomatically>
+      <UDABlockProperties />
+      <UDAEnableTagReadback>false</UDAEnableTagReadback>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>en-US</Culture>
+              <Text>NOT YET WIRED INTO Main[OB1] - built and compiles clean, but deliberately not called anywhere yet. Two things need to happen first: (1) confirm real physical %I/%Q addresses for the ET200SP DI/DQ modules - an address probe run 2026-08-08 found every DI/DQ module reporting StartAddress=-1, meaning either they are not actually seated in real rack slots or addresses simply are not assigned until a real download; needs visual confirmation in TIA's Device view before anything here can read real hardware. (2) FB_ValveLoop's own simulated OpenFB/ClosedFB writes (Section 1 "Motion Simulation") need a guard added so they skip any valve that has a real channel assigned here, otherwise the simulation will keep overwriting whatever this mapper writes. Until both are done, every valve stays on symbolic simulation exactly as today - this block is inert scaffolding, safe to have present without affecting the running demo.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v4">
+  <Text UId="1">
+// Applies one module diagnostic event to Diag_DB. Called directly by OB82 every time it fires,
+// and by FB_ValveLoop's test trigger, so a watch table exercises exactly the code the real
+// event runs. OB82 itself cannot be triggered in PLCSIM.
+//
+// It runs inside OB82 rather than later in the cycle because the earlier version passed one
+// module at a time through a single slot that FB_ValveLoop read once per scan. Two modules
+// reporting before that read lost the first one's alarm - and a shared 24 V feed failing is
+// precisely several modules reporting together.
+//
+// IOstate per the S7-1200 manual, diagnostic error interrupt OB, confirmed 2026-11-05:
+//     bit 0 = 1 configuration correct, 0 no longer correct
+//     bit 4 = 1 error present such as a wire break, 0 no error
+//     bit 5 = 1 configuration not correct, 0 correct again
+//     bit 7 = 1 I/O access error
+// A module clears only when every one of those says healthy. Anything else keeps the alarm up,
+// so an IOstate value the manual does not describe leaves a stale alarm rather than a hidden
+// fault. The reset button covers the stale case. NOT YET PROVEN against a real module failure.
+#healthy := #IoState.%X0 AND NOT #IoState.%X4 AND NOT #IoState.%X5 AND NOT #IoState.%X7;
+
+// Explicit table, not a range check: AFT's identifiers are not contiguous (its DQ ST_1 is 281,
+// between the DI values 280 and 282). Bit packing matches the valve words:
+// word (index-1)/16, bit (index-1) MOD 16.
+#found := FALSE;
+FOR #idx := 1 TO 36 DO
+    IF "Diag_DB".ModuleLaddr[#idx] = #Laddr THEN
+        #w := (#idx - 1) / 16;
+        #b := (#idx - 1) MOD 16;
+        #mask := SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
+        IF #healthy THEN
+            "Diag_DB".W_ModuleFault[#w] := "Diag_DB".W_ModuleFault[#w] AND NOT #mask;
+        ELSE
+            "Diag_DB".W_ModuleFault[#w] := "Diag_DB".W_ModuleFault[#w] OR #mask;
+        END_IF;
+        #found := TRUE;
+        EXIT;
+    END_IF;
+END_FOR;
+
+// A faulting identifier that matches no module: the table is stale after a hardware change, or
+// a device reported that this block does not know about. Word 2 bit 4 is free (the 36 modules
+// end at bit 3) and drives the Mod_Unknown alarm. There is no module bit to clear for it, so it
+// stays until the reset button. A healthy event from an unknown source raises nothing.
+IF NOT #found AND NOT #healthy THEN
+    "Diag_DB".UnknownModuleFault := TRUE;
+    "Diag_DB".UnknownModuleLaddr := #Laddr;
+    "Diag_DB".W_ModuleFault[2] := "Diag_DB".W_ModuleFault[2] OR W#16#10;
+END_IF;
+
+// Derived rather than set, so the summary flag drops by itself once the last module recovers.
+"Diag_DB".ModuleFault := "Diag_DB".W_ModuleFault[0] &lt;&gt; W#16#0
+                         OR "Diag_DB".W_ModuleFault[1] &lt;&gt; W#16#0
+                         OR "Diag_DB".W_ModuleFault[2] &lt;&gt; W#16#0;
+  </Text>
+</StructuredText></NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text />
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>en-US</Culture>
+                  <Text>Network 1</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+    </ObjectList>
+  </SW.Blocks.FC>
+</Document>

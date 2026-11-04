@@ -158,7 +158,7 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
       <Comment>
-        <MultiLanguageText Lang="en-US">LATCHED: an I/O module raised a diagnostic. Cleared only by ModuleFaultAck - never self-clearing, see OB82.</MultiLanguageText>
+        <MultiLanguageText Lang="en-US">TRUE while any bit in W_ModuleFault is set. Derived by FC_ModuleEvent; do not write it directly.</MultiLanguageText>
       </Comment>
     </Member>
     <Member Name="ModuleFaultAck" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
@@ -168,7 +168,7 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
       <Comment>
-        <MultiLanguageText Lang="en-US">Write TRUE to clear ModuleFault. FB_ValveLoop consumes and clears this.</MultiLanguageText>
+        <MultiLanguageText Lang="en-US">RESET MODULE FAULTS button writes TRUE. FB_ValveLoop clears all module alarms and this bit.</MultiLanguageText>
       </Comment>
     </Member>
     <Member Name="ModuleEventCount" Datatype="Int" Remanence="NonRetain" Accessibility="Public">
@@ -208,7 +208,7 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
       <Comment>
-        <MultiLanguageText Lang="en-US">Channel number from the most recent OB82 event - narrows a fault to one terminal.</MultiLanguageText>
+        <MultiLanguageText Lang="en-US">Channel number from the most recent OB82 event. The DQ datasheet lists diagnostics as module-wise, so this may not identify a terminal; check on the panel.</MultiLanguageText>
       </Comment>
     </Member>
     <Member Name="LastModuleMultiError" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
@@ -221,14 +221,34 @@
         <MultiLanguageText Lang="en-US">TRUE if that event carried more than one error.</MultiLanguageText>
       </Comment>
     </Member>
-    <Member Name="NewModuleEvent" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
+    <Member Name="TestModuleEvent" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
       <AttributeList>
         <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
       <Comment>
-        <MultiLanguageText Lang="en-US">Set by OB82, consumed by FB_ValveLoop. The decode deliberately lives in FB_ValveLoop, not OB82, so it can be tested from a watch table - OB82 itself cannot be triggered in PLCSIM.</MultiLanguageText>
+        <MultiLanguageText Lang="en-US">Set TRUE from a watch table to run FC_ModuleEvent with the two values below. FB_ValveLoop consumes it. OB82 cannot fire in PLCSIM.</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="TestModuleLaddr" Datatype="UInt" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Comment>
+        <MultiLanguageText Lang="en-US">Test only: the identifier to simulate.</MultiLanguageText>
+      </Comment>
+    </Member>
+    <Member Name="TestModuleIoState" Datatype="Word" Remanence="NonRetain" Accessibility="Public">
+      <AttributeList>
+        <BooleanAttribute Name="ExternalAccessible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalVisible" SystemDefined="true">true</BooleanAttribute>
+        <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
+      </AttributeList>
+      <Comment>
+        <MultiLanguageText Lang="en-US">Test only: the IOstate to simulate. 16#0011 = fault, 16#0001 = healthy.</MultiLanguageText>
       </Comment>
     </Member>
     <Member Name="ModuleLaddr" Datatype="Array[1..36] of UInt" Remanence="NonRetain" Accessibility="Public">
@@ -356,7 +376,7 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
       <Comment>
-        <MultiLanguageText Lang="en-US">One LATCHED bit per I/O module. Module index i (1..36) is word (i-1)/16, bit (i-1) MOD 16 - the same packing the valve alarm words use. Cleared only by ModuleFaultAck.</MultiLanguageText>
+        <MultiLanguageText Lang="en-US">One bit per I/O module. Module index i (1..36) is word (i-1)/16, bit (i-1) MOD 16; word 2 bit 4 is the unknown-module alarm. Set and cleared by FC_ModuleEvent, and cleared by ModuleFaultAck.</MultiLanguageText>
       </Comment>
     </Member>
     <Member Name="UnknownModuleFault" Datatype="Bool" Remanence="NonRetain" Accessibility="Public">
@@ -366,7 +386,7 @@
         <BooleanAttribute Name="ExternalWritable" SystemDefined="true">true</BooleanAttribute>
       </AttributeList>
       <Comment>
-        <MultiLanguageText Lang="en-US">An OB82 event arrived whose LADDR is not in ModuleLaddr[]. Means the table is stale or an unexpected device reported. Never silently dropped.</MultiLanguageText>
+        <MultiLanguageText Lang="en-US">A faulting OB82 event whose LADDR is not in ModuleLaddr. Means the table is stale or an unexpected device reported. Cleared by ModuleFaultAck.</MultiLanguageText>
       </Comment>
     </Member>
     <Member Name="UnknownModuleLaddr" Datatype="UInt" Remanence="NonRetain" Accessibility="Public">

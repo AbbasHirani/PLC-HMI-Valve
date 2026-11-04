@@ -88,7 +88,7 @@
           <MultilingualTextItem ID="2" CompositionName="Items">
             <AttributeList>
               <Culture>en-US</Culture>
-              <Text>Called by the CPU when an I/O module reports a diagnostic. Latches Diag_DB.ModuleFault, which FB_ValveLoop turns into HwHealthy[5] and thence HwWord bit 4, driving the existing System_IO_Module_Fault alarm. Deliberately does not decode IO_State - see the body comment.</Text>
+              <Text>Called by the CPU when an I/O module reports a diagnostic. FC_ModuleEvent sets or clears that module's bit in Diag_DB.W_ModuleFault, which drives its alarm.</Text>
             </AttributeList>
           </MultilingualTextItem>
         </ObjectList>
@@ -97,53 +97,30 @@
         <AttributeList>
           <NetworkSource><StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v4">
   <Text UId="1">
-// Called by the CPU when an I/O module raises a diagnostic: its 24 V supply
-// failing, a DQ output short-circuited to L+ or to ground, a parameter error, or
-// a wire break where that is ever enabled. Those diagnostics were switched on
-// across all 36 modules on 2026-09-06 - they ship DISABLED, which is why nothing
-// would have reached this block even if it had existed earlier.
+// Called by the CPU when an I/O module raises a diagnostic: its 24 V supply missing or low,
+// a DQ output short-circuited to L+ or to ground, a parameter error, or a wire break where
+// that is ever enabled. Those diagnostics ship DISABLED; they were switched on across all
+// 36 modules on 2026-09-06.
 //
-// WHY THIS BLOCK DOES NOT DECODE #IO_State
+// The same OB should fire when a fault appears and when it goes away, and #IO_State says which.
+// FC_ModuleEvent does the work immediately, on every call, so several modules reporting
+// together cannot overwrite one another.
 //
-// The same OB fires when a fault APPEARS and again when it GOES AWAY, and
-// #IO_State is what separates the two. Its bit meanings could not be confirmed
-// from any reachable Siemens source, and this block cannot be tested here:
-// PLCSIM does not simulate module-level diagnostics, for the same reason it does
-// not simulate the station events OB86 handles (handoff item 11).
-//
-// Guessing the polarity would risk precisely the failure OB86's own comment
-// warns about - clearing the flag on failure and setting it on recovery, giving
-// a system that reports healthy exactly when it is not. So this block does not
-// guess. ModuleFault LATCHES on any event and clears only via ModuleFaultAck.
-//
-// The worst case is a stale fault sitting after a module has recovered: visible,
-// irritating, and safe. The opposite error is silent. UnexpMove and DirFault
-// already latch for the same reason.
-//
-// Everything is stored RAW and undecoded so the bit meanings can be LEARNED from
-// the real panel rather than guessed now: pull a module and read
-// LastModuleIoState, plug it back in and read it again. Two observations settle
-// what the documentation would not.
-
-"Diag_DB".ModuleFault := TRUE;
-
-// Hand the event to FB_ValveLoop rather than working out which module it was here.
-// The decode needs a 36-entry lookup, and this block cannot be triggered in PLCSIM -
-// so doing it here would ship untestable logic. In FB_ValveLoop the same decode can be
-// exercised from a watch table by writing a LADDR and setting this flag by hand.
-"Diag_DB".NewModuleEvent := TRUE;
-
+// PLCSIM cannot trigger this block. Prove it on the real panel: cut a module's supply and
+// confirm its alarm raises, restore it and confirm the alarm clears.
 #id := #LADDR;
+"FC_ModuleEvent"(Laddr := #id, IoState := #IO_State);
+
+// Raw copy of the most recent event, for diagnosis. Reports only the LAST event - the per-module
+// bits are the record of what is faulted. The DQ datasheet lists its diagnostics as module-wise,
+// so do not expect Channel to identify a terminal until the panel shows otherwise.
 "Diag_DB".LastModuleLaddr := #id;
 "Diag_DB".LastModuleIoState := #IO_State;
 "Diag_DB".LastModuleChannel := #Channel;
 "Diag_DB".LastModuleMultiError := #MultiError;
 
-// Saturating, not wrapping. An Int rolling past 32767 into negative would read as
-// a different kind of fault to whoever is looking at it, and the exact count that
-// far out says nothing the latched flag has not already said. What the count is
-// genuinely for is spotting a module that is CHATTERING - rising steadily while
-// ModuleFault has never been cleared.
+// Saturating, not wrapping: an Int rolling negative would read as a different kind of fault.
+// A count rising steadily means a module is chattering.
 IF "Diag_DB".ModuleEventCount &lt; 32767 THEN
     "Diag_DB".ModuleEventCount := "Diag_DB".ModuleEventCount + 1;
 END_IF;

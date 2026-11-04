@@ -1168,13 +1168,23 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
       0 if there is no error)" sits under bit 7 and looks like a typo. Auto-clear is therefore
       possible; not built yet, and it still needs proving on the panel.
 
-      **BUG in `9c6167e`, found by reading the code, not yet fixed or seen live:** OB82 hands over one
-      module at a time through `LastModuleLaddr` + `NewModuleEvent`, and `FB_ValveLoop` reads that
-      once per scan. If two modules report before it runs, the first is overwritten and gets no
-      alarm. That is the shared-supply failure the per-module alarms were built for. Planned fix:
-      decode directly in OB82 through one FC, with a test trigger so a watch table can run the same
-      FC. Clear a module only when bit 0 = 1 and bits 4, 5 and 7 = 0, and make `ModuleFault` true
-      when any module bit is set.
+      **Lost-event bug in `9c6167e`: fixed 2026-11-05.** OB82 used to pass one module through a single
+      slot that `FB_ValveLoop` read once per scan, so two modules reporting before that read lost
+      the first alarm. Found by reading the code; never seen live.
+
+      **Auto-clear and reset BUILT 2026-11-05.** OB82 now calls `FC_ModuleEvent` on every event. A
+      module clears only when bit 0 = 1 and bits 4, 5 and 7 = 0; anything else keeps its alarm up.
+      `ModuleFault` is derived from the fault words. RESET MODULE FAULTS on the DIAGNOSTICS screen
+      (`Operate` login, audited) clears everything, and on a module still broken it hides the alarm
+      until that module next reports. The general `System_IO_Module_Fault` alarm was deleted because
+      every fault doubled up with the per-module line; `HwWord` bit 4 is still packed. **754 alarms
+      now**, which replaces the 755 above. Unknown-module alarm clears only by reset.
+
+      Verified: PLC 0 errors 0 warnings, HMI 0 errors, `scratch_probe/VerifyModuleFaults.cs` all pass.
+      **Not yet run:** the PLCSIM tests, using `TestModuleLaddr` + `TestModuleIoState` +
+      `TestModuleEvent` (16#0011 = fault, 16#0001 = healthy). The test trigger runs events one at a
+      time, so it cannot reproduce the original race; OB82 calling the FC directly removes the slot
+      that caused it. **Only the real panel can prove** OB82 fires and sends what the manual says.
 
       **What a module alarm can and cannot say - corrected 2026-11-05 from the DQ manual
       (`6ES7132-6BH01-0BA0`, 01/2025).** The earlier claim that this names the exact terminal was

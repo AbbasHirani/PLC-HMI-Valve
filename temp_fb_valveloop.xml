@@ -110,8 +110,6 @@
         <Member Name="seatPT" Datatype="Time" />
     <Member Name="winTick" Datatype="Bool" />
     <Member Name="doWindows" Datatype="Bool" />
-    <Member Name="modIdx" Datatype="Int" />
-    <Member Name="modFound" Datatype="Bool" />
   </Section>
   <Section Name="Constant" />
 </Sections></Interface>
@@ -232,54 +230,21 @@
     &quot;Valves_DB&quot;.HwHealthy[3] := NOT &quot;Diag_DB&quot;.MidLost;
     &quot;Valves_DB&quot;.HwHealthy[4] := NOT &quot;Diag_DB&quot;.FwdLost;
 
-    // I/O module diagnostics, from OB82 via Diag_DB - HwHealthy[5] is HwWord bit 4, which
-    // already drives the System_IO_Module_Fault alarm. Added 2026-09-10 (item 37 bit 4).
+    // I/O module diagnostics. OB82 calls FC_ModuleEvent directly, so a module's bit in
+    // Diag_DB.W_ModuleFault sets and clears from the module's own events. HwHealthy[5] mirrors the
+    // summary for HwWord bit 4; that bit no longer has an alarm of its own, because the per-module
+    // alarms name the module and a second general line for the same fault added nothing.
     //
-    // The acknowledge is consumed BEFORE HwHealthy[5] is computed, so a reset clears the alarm
-    // in the same scan it is requested rather than leaving it up for one more. OB82 latches the
-    // flag and never clears it - deliberately, because it cannot tell a fault appearing from one
-    // going away without decoding IO_State, whose bit meanings are unconfirmed. See OB82.
-    //
-    // Consequence to expect on the panel: a module fault stays raised after the module recovers,
-    // until someone acknowledges it. That is the safe direction and it is the intended behaviour,
-    // not a bug to fix by making this self-clearing.
-    // Decode WHICH module the last OB82 event came from. This runs here rather than inside
-    // OB82 on purpose: OB82 cannot be triggered in PLCSIM, so logic placed there ships
-    // untested. Here the whole decode can be exercised from a watch table - write a value
-    // into LastModuleLaddr, set NewModuleEvent, and watch the right bit appear.
-    //
-    // Linear search of 36 entries, once per event and not per scan. A range check would be
-    // shorter and WRONG: the AFT identifiers are not contiguous (its DQ ST_1 is 281, sitting
-    // between the DI values 280 and 282), so only an explicit table maps them correctly.
-    IF &quot;Diag_DB&quot;.NewModuleEvent THEN
-        &quot;Diag_DB&quot;.NewModuleEvent := FALSE;
-        #modFound := FALSE;
-        FOR #modIdx := 1 TO 36 DO
-            IF &quot;Diag_DB&quot;.ModuleLaddr[#modIdx] = &quot;Diag_DB&quot;.LastModuleLaddr THEN
-                #w := (#modIdx - 1) / 16;
-                #b := (#modIdx - 1) MOD 16;
-                &quot;Diag_DB&quot;.W_ModuleFault[#w] := &quot;Diag_DB&quot;.W_ModuleFault[#w]
-                    OR SHL(IN := W#16#1, N := INT_TO_UDINT(#b));
-                #modFound := TRUE;
-            END_IF;
-        END_FOR;
-
-        // An identifier matching no module. Recorded rather than dropped, exactly as OB86 does
-        // for an unknown station: it means the table is stale after a hardware change, or a
-        // device reported that this block does not know about. Both are worth seeing.
-        IF NOT #modFound THEN
-            &quot;Diag_DB&quot;.UnknownModuleFault := TRUE;
-            &quot;Diag_DB&quot;.UnknownModuleLaddr := &quot;Diag_DB&quot;.LastModuleLaddr;
-            // Also raise it in the fault word. A WinCC discrete alarm needs a numeric tag
-            // and a bit number, so it cannot bind to the Bool above. The 36 modules end at
-            // word 2 bit 3, leaving bit 4 free for this. Keep the two in step.
-            &quot;Diag_DB&quot;.W_ModuleFault[2] := &quot;Diag_DB&quot;.W_ModuleFault[2] OR W#16#10;
-        END_IF;
+    // Test trigger: runs the same FC the real event runs, from a watch table. Write
+    // TestModuleLaddr and TestModuleIoState, then set TestModuleEvent. OB82 cannot fire in PLCSIM.
+    IF &quot;Diag_DB&quot;.TestModuleEvent THEN
+        &quot;Diag_DB&quot;.TestModuleEvent := FALSE;
+        &quot;FC_ModuleEvent&quot;(Laddr := &quot;Diag_DB&quot;.TestModuleLaddr, IoState := &quot;Diag_DB&quot;.TestModuleIoState);
     END_IF;
 
-    // One acknowledge clears everything: the summary flag, all 36 per-module bits and the
-    // unknown flag. Per-module acknowledge was considered and rejected - a module fault is
-    // something a technician goes and fixes, not something an operator triages bit by bit.
+    // RESET MODULE FAULTS button. Needed for the unknown-module alarm, which has no event to clear
+    // it, and for a clear event that was missed. On a module that is STILL broken this hides the
+    // alarm until that module next reports, so check the MODULE MATRIX tab first.
     IF &quot;Diag_DB&quot;.ModuleFaultAck THEN
         &quot;Diag_DB&quot;.ModuleFault := FALSE;
         &quot;Diag_DB&quot;.ModuleFaultAck := FALSE;

@@ -2143,7 +2143,7 @@ namespace ValveDemoHmiBuilder
             // that CreateDiscreteAlarm must set explicitly, matching its class's value.
             _classPriorities = classPriorities;
 
-            // System Alarms on HwWord bits 0..8 - SIX of the nine, not nine.
+            // System Alarms on HwWord bits 0..8 - FIVE of the nine, not nine.
             //
             // Three were deleted 2026-08-30 (item 37) because they cannot fire BY CONSTRUCTION,
             // not merely because nothing writes them yet. This distinction is the whole point:
@@ -2167,16 +2167,19 @@ namespace ValveDemoHmiBuilder
             // the gaps would silently re-point the surviving alarms at the wrong bits, and the
             // three unused ones simply stay clear. Do not "tidy" that.
             //
-            // Bits 4, 5 and 7 below are NOT dead - they are implementable and merely unimplemented,
+            // Bit 4 (I/O module) lost its alarm 2026-11-05. The bit is still packed, but the 36
+            // per-module alarms from CreateModuleAlarms name the module, so a general line for
+            // the same fault only doubled every row. Removing the line here does not delete the
+            // alarm from an existing project: use --purge-alarms=System_IO_Module_Fault.
+            //
+            // Bits 5 and 7 below are NOT dead - they are implementable and merely unimplemented,
             // which is a todo, not dead weight. Keep them:
-            //   bit 4  I/O module   - needs OB82 created in the TIA UI + module diagnostics on
             //   bit 5  Power/UPS    - blocked on item 42; there may be no UPS to monitor at all
             //   bit 7  HMI heartbeat- buildable, but what the PLC should DO when the panel dies
             //                         is a fail-safe question and belongs with item 9
             CreateDiscreteAlarm(hmi, "System_Aft_RIO_Fault", "System", "Aft Ballast RIO station failure.", dbName + "_HwWord", 1, "RIO", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Bilge_RIO_Fault", "System", "Bilge/ER RIO station failure.", dbName + "_HwWord", 2, "RIO", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Fwd_RIO_Fault", "System", "Fwd Ballast RIO station failure.", dbName + "_HwWord", 3, "RIO", "SYSTEM");
-            CreateDiscreteAlarm(hmi, "System_IO_Module_Fault", "System", "I/O Module fault detected.", dbName + "_HwWord", 4, "I/O", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Power_UPS_Fault", "System", "Power/UPS fault detected.", dbName + "_HwWord", 5, "POWER", "SYSTEM");
             CreateDiscreteAlarm(hmi, "System_Heartbeat_Fault", "System", "HMI Heartbeat loss detected.", dbName + "_HwWord", 7, "HMI", "SYSTEM");
 
@@ -2233,7 +2236,7 @@ namespace ValveDemoHmiBuilder
 
             int modCount = CreateModuleAlarms(hmi);
 
-            Console.WriteLine("  Created " + (VALVE_COUNT * 8 + 6 + modCount) + " discrete alarms.");
+            Console.WriteLine("  Created " + (VALVE_COUNT * 8 + 5 + modCount) + " discrete alarms.");
         }
 
         // One alarm per physical I/O module - 36 of them - replacing the single
@@ -2286,8 +2289,8 @@ namespace ValveDemoHmiBuilder
             //
             // Bound to a spare bit of the last fault word, not to the Bool. A discrete alarm needs
             // a numeric tag plus a bit number; a Bool tag has no bit to point at. 36 modules end at
-            // word 2 bit 3, so bit 4 of that word is free and FB_ValveLoop sets it alongside the
-            // Bool. The Bool stays because it is what the diagnostics screen reads.
+            // word 2 bit 3, so bit 4 of that word is free and FC_ModuleEvent sets it alongside the
+            // Bool.
             CreateDiscreteAlarm(hmi, "Mod_Unknown", "System",
                 "I/O module fault from an UNRECOGNISED module - Diag_DB.ModuleLaddr table may be stale.",
                 "Diag_DB_W_ModuleFault_2", 4, "I/O", "SYSTEM");
@@ -2401,6 +2404,7 @@ namespace ValveDemoHmiBuilder
                 CreateSummaryTag(hmi, "Diag_DB_W_ModuleFault_" + w, "Diag_DB.W_ModuleFault[" + w + "]", "UInt");
             CreateSummaryTag(hmi, "Diag_UnknownModuleFault", "Diag_DB.UnknownModuleFault", "Bool");
             CreateSummaryTag(hmi, "Diag_UnknownModuleLaddr", "Diag_DB.UnknownModuleLaddr", "UInt");
+            CreateSummaryTag(hmi, "Diag_ModuleFaultAck", "Diag_DB.ModuleFaultAck", "Bool");
 
             Console.WriteLine("  Creating HMI tags (Configured, OpenCmd, CloseCmd, OpenFB, ClosedFB, Healthy, LocalMode) for 89 slots...");
             for (int i = 1; i <= VALVE_COUNT; i++) {
@@ -2543,6 +2547,7 @@ namespace ValveDemoHmiBuilder
             "_TimeoutCloseAlarm",
             "_UnexpMove",
             "_DirFault",
+            "_ModuleFaultAck",    // RESET MODULE FAULTS pressed
         };
 
         static bool IsOperatorCommandTag(string tagName)

@@ -2,7 +2,7 @@
 //   DI + DQ : DiagnosticsNoSupplyVoltage
 //   DQ only : DiagnosticsShortCircuitToGround, DiagnosticsShortCircuitToLplus
 //
-// DELIBERATELY DOES NOT touch DiagnosticsWireBreak. Wire break requires a 25-45 kOhm resistor
+// DELIBERATELY DOES NOT touch DiagnosticsWireBreak. On DI modules it requires a 25-45 kOhm resistor
 // across every monitored contact (manual 6ES7131-6BH01-0BA0, p16). Enabling it without the
 // resistors makes every open channel report a permanent wire break - the manual lists
 // "channel not connected (open)" as a cause of that very fault. That is a field-wiring
@@ -104,7 +104,7 @@ namespace EnableModuleDiag
                     if (have.Contains("DiagnosticsWireBreak"))
                     {
                         object wb = null; try { wb = eo.GetAttribute("DiagnosticsWireBreak"); } catch { }
-                        notes.Add("DiagnosticsWireBreak=" + wb + " (LEFT ALONE - needs field resistors)");
+                        notes.Add("DiagnosticsWireBreak=" + wb + " (LEFT ALONE - DI needs field resistors, DQ is an open decision)");
                         skipped++;
                     }
 
