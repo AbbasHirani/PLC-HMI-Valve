@@ -152,6 +152,21 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
    hold/close/stop), PUT/GET security lockdown decision, PROFINET single-port topology question
    (largely resolved — bus adapters have 2 ports each, so daisy-chain works, but a switch is still
    arguably better for reliability on a vessel), FAT bench test before anything goes near the ship.
+   **Client raised power loss during movement, 2026-11-05 (exact requirement not yet known).** Behaviour
+   read from the code, not yet tested with power actually removed mid-stroke:
+   - Whole PLC loses power: outputs drop. `OpenValve`/`CloseValve` are `NonRetain`, so the valve does not
+     restart when power returns; `ConfiguredRet` restores the configuration; `PosLostTmr` raises Loss of
+     Position 2 s later if the valve is between limits. Sound as it stands.
+   - Actuator power only, PLC still on: the output stays on until `TravelTimeout`, then Failed to
+     Open/Close and the latch drops. If actuator power returns before the timeout, the stroke continues.
+   - **Gap: station lost, PLC still on.** `FC_IoMapper` keeps the last feedbacks and `Healthy` stays TRUE,
+     and nothing drops the run latch on `AftLost`/`MidLost`/`FwdLost`. If the station returns before
+     `TravelTimeout`, the DQ follows the still-set latch and the valve moves again on its own. A command
+     sent while the station is down is accepted the same way. Likely fix: drop the latch and discard the
+     command for a valve whose station is down. Not built; decide with the rest of item 9.
+   - Software cannot move a valve with no power. Fail-closed/fail-open needs actuator hardware (spring
+     return or stored energy), so ask the client which valves need a safe position and what the actuators
+     do on power loss. The project's working assumption is stop-in-place (see item 14).
 10. **[done 2026-08-13]** `PLC Address`/`Terminal` translation delivered — see item 5's Excel.
 
 11. **[done 2026-08-27]** **ET200SP station-failure detection built and verified live.** OB 86
