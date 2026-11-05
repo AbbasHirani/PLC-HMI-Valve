@@ -164,6 +164,11 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
      `TravelTimeout`, the DQ follows the still-set latch and the valve moves again on its own. A command
      sent while the station is down is accepted the same way. Likely fix: drop the latch and discard the
      command for a valve whose station is down. Not built; decide with the rest of item 9.
+     Checked in source 2026-11-05: the HMI does not block it either. The popup buttons
+     (`GenerateHmiLayout.cs` ~1500), table buttons (`MarineScreens.cs` ~503) and the third command script
+     (`MarineScreens.cs` ~1052) test only `_Configured`, and `AddRemoteLockStyling` does not grey out for a
+     lost station. The zone banner is the only sign. The PLC guard is the one to change, as it covers all
+     three; greying the buttons would be the HMI half. User is asking the client first.
    - Software cannot move a valve with no power. Fail-closed/fail-open needs actuator hardware (spring
      return or stored energy), so ask the client which valves need a safe position and what the actuators
      do on power loss. The project's working assumption is stop-in-place (see item 14).
