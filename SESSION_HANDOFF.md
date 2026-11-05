@@ -2659,6 +2659,16 @@ logic is otherwise the same, and the other 88 slots stay in the program, switche
 in PLCSIM, never run on the real PLC.** The laptop HMI simulation connecting to the real PLC is
 untested and is the first thing to try on the bench, along with work memory and scan time.
 
+**Local mode false alarms, found by the user on the demo bench 2026-11-05.** A normal hand stroke in
+Local raised Unexpected Movement (latched) and Loss of Position. Fixed in `temp_fb_valveloop.xml`:
+both are now blocked while `LocalMode` is on, and `CmdPos` clears in Local so the screen does not
+show an old command. Actuator fault and double indication still raise in Local. Trade-off: a broken
+limit switch wire during Local is not caught by these two alarms until the valve is back in Remote.
+
+**ACTION: the real `valveDemo2` project does NOT have this fix yet.** The source is updated and the
+demo has it, but the live real project still has the old block until the source is imported there.
+Compiles clean in the demo; bench test not yet run.
+
 ## 7. How to resume
 
 On the new laptop, once the repo is cloned and TIA has opened the `.ap20` once (to rebuild its cache

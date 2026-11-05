@@ -75,6 +75,10 @@ namespace ValveDemoHmiBuilder
                 plc.BlockGroup.Blocks.Import(new FileInfo(Path.Combine(DEMO_DIR, file)), ImportOptions.Override);
             }
 
+            // Shared logic comes from the real source, so a logic fix reaches the demo unchanged.
+            Console.WriteLine("  Importing temp_fb_valveloop.xml");
+            plc.BlockGroup.Blocks.Import(new FileInfo(Path.Combine(Path.GetDirectoryName(DEMO_DIR), "temp_fb_valveloop.xml")), ImportOptions.Override);
+
             foreach (var name in new[] { "ET200SP_AFT", "ET200SP_MID", "ET200SP_FWD" }) {
                 Device dev = project.Devices.FirstOrDefault(x => x.Name == name);
                 if (dev == null) { Console.WriteLine("  already gone: " + name); continue; }

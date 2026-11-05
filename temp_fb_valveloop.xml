@@ -497,8 +497,12 @@
             // NOT OpenValve/CloseValve added so a real valve mid-travel (both feedbacks
             // legitimately false while the run output is latched) doesn't false-trip this the
             // same way SimStep=0 already excludes a simulated valve mid-travel.
+            // NOT LocalMode: an operator moving the valve by hand has it between its limits for the
+            // whole stroke, which is normal. The timer restarts on return to Remote, so a valve left
+            // halfway still raises this 2 s later.
             &quot;Valves_DB&quot;.PosLostTmr[#i](
-                IN := (#SimStep[#i] = 0) AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenValve
+                IN := (#SimStep[#i] = 0) AND NOT &quot;Valves_DB&quot;.Valve[#i].LocalMode
+                      AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenValve
                       AND NOT &quot;Valves_DB&quot;.Valve[#i].CloseValve
                       AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB
                       AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB
@@ -515,12 +519,22 @@
             // Real valves: also require the run-latch off both before and after, same reasoning
             // as SimStep above - a real valve leaving its seat on a legitimate command is not
             // "unexplained" just because OpenValve/CloseValve doesn't happen to be SimStep.
+            // NOT LocalMode: this alarm means nobody explains the movement, and in Local the operator
+            // at the valve does. Found on the demo bench 2026-11-05: a normal hand stroke raised it
+            // and it stayed latched. Prev* below still update in Local, so returning to Remote
+            // compares against where the valve really is and raises nothing false.
             IF #simStepAtStart = 0 AND #SimStep[#i] = 0
+               AND NOT &quot;Valves_DB&quot;.Valve[#i].LocalMode
                AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenValve AND NOT &quot;Valves_DB&quot;.Valve[#i].CloseValve THEN
                 IF (&quot;Valves_DB&quot;.PrevOpenFB[#i] AND NOT &quot;Valves_DB&quot;.Valve[#i].OpenFB) OR
                    (&quot;Valves_DB&quot;.PrevClosedFB[#i] AND NOT &quot;Valves_DB&quot;.Valve[#i].ClosedFB) THEN
                     &quot;Valves_DB&quot;.UnexpMove[#i] := TRUE;
                 END_IF;
+            END_IF;
+            // A remote command stops meaning anything once the operator takes over by hand. Left set,
+            // the screen would show COMMANDED: OPEN against a valve someone closed on purpose.
+            IF &quot;Valves_DB&quot;.Valve[#i].LocalMode THEN
+                &quot;Valves_DB&quot;.CmdPos[#i] := 0;
             END_IF;
             &quot;Valves_DB&quot;.PrevOpenFB[#i] := &quot;Valves_DB&quot;.Valve[#i].OpenFB;
             &quot;Valves_DB&quot;.PrevClosedFB[#i] := &quot;Valves_DB&quot;.Valve[#i].ClosedFB;
