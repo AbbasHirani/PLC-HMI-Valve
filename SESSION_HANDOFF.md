@@ -342,6 +342,17 @@ Statuses updated 2026-08-15. Numbering kept stable so older notes referencing "i
 
 14. **[pending — confirm before the panel is wired]** Three hardware questions that follow directly
     from the maintained-output decision in item 13:
+    > **Actuator manual read 2026-11-08** (electro-hydraulic butterfly valve, terminal diagram p.5).
+    > The actuator box has only: 1 L1, 3 CLOSE, 5 OPEN (230 V AC motor, 2.3 A), 7 24V+, 8 0V DC,
+    > 10 closed feedback, 11 open feedback, 12 earth. The two feedbacks are 3-wire proximity
+    > sensors powered from 7/8. **There is no Healthy terminal and no Local/Remote terminal**, yet
+    > the I/O is sized at 4 DI per valve and the PLC refuses commands while Healthy is FALSE. If
+    > `HealthyChannel` points at an unwired DI, every valve shows actuator FAULT and will not move.
+    > Open with the client: where Healthy and Local come from (panel MCB/overload aux contact? a
+    > panel selector?), or set those channels to 0 and give Healthy a TRUE default. Also confirm:
+    > sensors PNP (fits 1M to 0V) or NPN; relay contacts rated for the 230 V AC motor (2.3 A, AC-3);
+    > and fail position on power loss - the text says single-acting with a spring, but the
+    > hydraulic schematic (reversible pump, two pilot check valves) looks like stay-put. Not built.
     - **Continuous-duty coils.** Maintained means the coil is held for the whole stroke, and the
       8 s → 60 s change in item 13 lengthens that hold ~7×. Confirm the Phoenix relay coils and the
       Pleiger solenoids are continuous-duty rated. They almost certainly are, but this is the one
