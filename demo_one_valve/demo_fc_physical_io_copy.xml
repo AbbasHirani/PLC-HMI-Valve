@@ -82,8 +82,8 @@
     // CPU's own I/O. FC_IoMapper and FB_ValveLoop are unchanged and still use channels 81-84, 41-42.
     &quot;IO_Buffer_DB&quot;.DI[81] := %I0.0;   // Open limit switch
     &quot;IO_Buffer_DB&quot;.DI[82] := %I0.1;   // Closed limit switch
-    &quot;IO_Buffer_DB&quot;.DI[83] := %I0.2;   // Healthy
-    &quot;IO_Buffer_DB&quot;.DI[84] := %I0.3;   // Local mode
+    &quot;IO_Buffer_DB&quot;.DI[83] := %I0.3;   // Healthy (0.2 left free: wiring room)
+    &quot;IO_Buffer_DB&quot;.DI[84] := %I0.4;   // Local mode
     %Q0.0 := &quot;IO_Buffer_DB&quot;.DQ[41];   // OPEN command
     %Q0.1 := &quot;IO_Buffer_DB&quot;.DQ[42];   // CLOSE command
 
