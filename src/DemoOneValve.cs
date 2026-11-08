@@ -281,8 +281,8 @@ namespace ValveDemoHmiBuilder
             var sig = new[] {
                 new { L = "OPEN LIMIT",    A = "%I0.0", T = "_OpenFB",     On = "0xFF32C785", Off = "0xFF6B7280" },
                 new { L = "CLOSED LIMIT",  A = "%I0.1", T = "_ClosedFB",   On = "0xFF32C785", Off = "0xFF6B7280" },
-                new { L = "HEALTHY",       A = "%I0.3", T = "_Healthy",    On = "0xFF32C785", Off = "0xFFFF0000" },
-                new { L = "LOCAL MODE",    A = "%I0.4", T = "_LocalMode",  On = "0xFFFF9F0A", Off = "0xFF6B7280" },
+                new { L = "HEALTHY",       A = "%I0.2", T = "_Healthy",    On = "0xFF32C785", Off = "0xFFFF0000" },
+                new { L = "LOCAL MODE",    A = "%I0.3", T = "_LocalMode",  On = "0xFFFF9F0A", Off = "0xFF6B7280" },
                 new { L = "OPEN COMMAND",  A = "%Q0.0", T = "_OpenValve",  On = "0xFF00A2FF", Off = "0xFF6B7280" },
                 new { L = "CLOSE COMMAND", A = "%Q0.1", T = "_CloseValve", On = "0xFF00A2FF", Off = "0xFF6B7280" },
             };

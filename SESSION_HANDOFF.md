@@ -2671,7 +2671,7 @@ outside this repo, so back it up separately. Sources are in `demo_one_valve/` an
 `--demo-one-valve=hmi`. That mode refuses any other project name. **Never run a normal HmiBuilder
 pass on the demo:** ImportPlcBlocks would put the real I/O block back.
 
-What differs from the real project: CM79 (slot 21) on `%I0.0`, `%I0.1`, `%I0.3`, `%I0.4` (0.2 left free, the ferrules were too big side by side) and `%Q0.0-0.1`, stations removed,
+What differs from the real project: CM79 (slot 21) on `%I0.0-0.3` and `%Q0.0-0.1`, stations removed,
 `TravelTimeout[21]` 20 s, `ConfiguredRet[21]` and `SelIdx` preset, 4 screens, 8 alarms, 657 tags. PLC
 logic is otherwise the same, and the other 88 slots stay in the program, switched off.
 
