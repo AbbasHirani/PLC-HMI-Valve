@@ -2682,13 +2682,28 @@ outside this repo, so back it up separately. Sources are in `demo_one_valve/` an
 `--demo-one-valve=hmi`. That mode refuses any other project name. **Never run a normal HmiBuilder
 pass on the demo:** ImportPlcBlocks would put the real I/O block back.
 
-What differs from the real project: CM79 (slot 21) on `%I0.0-0.3` and `%Q0.0-0.1`, stations removed,
-`TravelTimeout[21]` 20 s, `ConfiguredRet[21]` and `SelIdx` preset, 4 screens, 8 alarms, 657 tags. PLC
-logic is otherwise the same, and the other 88 slots stay in the program, switched off.
+What differs from the real project: CM79 (slot 21) on **2 inputs and 2 outputs** - Open limit
+`%I0.2`, Closed limit `%I0.3` (`%I0.0`/`%I0.1` left empty at the user's request), OPEN `%Q0.0`, CLOSE
+`%Q0.1` - stations removed, `TravelTimeout[21]` 20 s, `ConfiguredRet[21]` and `SelIdx` preset,
+4 screens, 6 alarms, 651 tags. PLC logic is otherwise the same, and the other 88 slots stay in the
+program, switched off.
 
-**Status:** compiles (PLC 0/0, HMI 0 errors) and `demo_one_valve/VerifyDemo.cs` passes. **Not yet run
-in PLCSIM, never run on the real PLC.** The laptop HMI simulation connecting to the real PLC is
-untested and is the first thing to try on the bench, along with work memory and scan time.
+**No Healthy and no Local in the demo (2026-11-09, user's call).** The actuator manual's terminal
+diagram has only the two limit feedbacks (see item 14). `HealthyChannel[21]`/`LocalModeChannel[21]`
+are 0, and the demo's `FC_PhysicalIoCopy` pins `Valve[21].Healthy := TRUE` and `LocalMode := FALSE`
+(Healthy must be pinned, or the command guard refuses everything). The Unhealthy and Local alarms,
+their HMI tags, `SelHealthy`/`SelLocalMode`, and the Home lamps are gone; the buttons use a demo-only
+`DemoLockStyling` without those terms. `temp_fb_valveloop.xml` and `FC_IoMapper` are NOT forked: the
+shared logic still contains the Healthy/Local checks, which simply cannot trip in the demo. That keeps
+the demo proving the real logic. The real project is unchanged; the same decision there is still open.
+
+`VerifyDemo` reads the I/O block back from TIA: SCL exports as tokens, and TIA swaps bare `%I`/`%Q`
+for auto-created `Tag__<number>` PLC tags, so the checker resolves those through the tag tables.
+
+**Status (2026-11-09):** compiles (PLC 0/0, HMI 0 errors, 1 old language warning) and `VerifyDemo`
+passes. **Downloaded once to the real bench PLC before this change** (first download worked, PLC in
+RUN, laptop HMI connected after a fix the user made). This version still needs a download and a
+bench test with the switches on `.2`/`.3`. Clear the old `%I0.2:P` force first: `.2` is now Open limit.
 
 **Local mode false alarms, found by the user on the demo bench 2026-11-05.** A normal hand stroke in
 Local raised Unexpected Movement (latched) and Loss of Position. Fixed in `temp_fb_valveloop.xml`:

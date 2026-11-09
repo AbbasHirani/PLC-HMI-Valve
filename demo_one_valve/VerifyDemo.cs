@@ -12,6 +12,7 @@ using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.HmiUnified;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Tags;
 
 namespace VerifyDemo
 {
@@ -105,9 +106,35 @@ namespace VerifyDemo
             Check("ConfiguredRet[21] starts TRUE", Regex.IsMatch(vdb, "Name=\"ConfiguredRet\".*?<Subelement Path=\"21\">\\s*<StartValue>true</StartValue>", RegexOptions.Singleline));
             var cdb = export("Valve_Channels_DB");
             Check("TravelTimeout[21] is 20 s", Regex.IsMatch(cdb, "Name=\"TravelTimeout\".*?<Subelement Path=\"21\">\\s*<StartValue>T#20s</StartValue>", RegexOptions.Singleline));
-            Check("CM79 channels still 81/82/83/84/41/42",
-                  new[] { "OpenFbChannel|81", "ClosedFbChannel|82", "HealthyChannel|83", "LocalModeChannel|84", "OpenCmdChannel|41", "CloseCmdChannel|42" }
+            Check("CM79 channels 81/82, no Healthy/Local (0/0), outputs 41/42",
+                  new[] { "OpenFbChannel|81", "ClosedFbChannel|82", "HealthyChannel|0", "LocalModeChannel|0", "OpenCmdChannel|41", "CloseCmdChannel|42" }
                   .All(x => Regex.IsMatch(cdb, "Name=\"" + x.Split('|')[0] + "\".*?<Subelement Path=\"21\">\\s*<StartValue>" + x.Split('|')[1] + "</StartValue>", RegexOptions.Singleline)));
+
+            // TIA exports SCL as tokens, and it replaces a bare %I/%Q address with a PLC tag it creates
+            // (named Tag__<number>), so the address never appears as text. Rebuild the statements from
+            // the tokens and swap each tag name for its real address from the PLC tag tables.
+            var addr = new Dictionary<string, string>();
+            Action<PlcTagTableGroup> walk = null;
+            walk = g => {
+                foreach (PlcTagTable t in g.TagTables) foreach (PlcTag tag in t.Tags) addr[tag.Name] = tag.LogicalAddress;
+                foreach (PlcTagTableUserGroup u in g.Groups) walk(u);
+            };
+            walk(plc.TagTableGroup);
+            var io = export("FC_PhysicalIoCopy");
+            var code = string.Concat(Regex.Matches(io, "<Component Name=\"([^\"]+)\"|<Token Text=\"([^\"]+)\"|<ConstantValue[^>]*>([^<]+)<")
+                .Cast<Match>().Select(m => {
+                    string n = m.Groups[1].Value;
+                    if (n != "") return addr.ContainsKey(n) && n.StartsWith("Tag__") ? addr[n] : n;
+                    return m.Groups[2].Value != "" ? System.Net.WebUtility.HtmlDecode(m.Groups[2].Value) : m.Groups[3].Value;
+                }));
+            Console.WriteLine("  FC_PhysicalIoCopy: " + code);
+            Check("Open limit from %I0.2, Closed limit from %I0.3",
+                  code.Contains("IO_Buffer_DB.DI[81]:=%I0.2;") && code.Contains("IO_Buffer_DB.DI[82]:=%I0.3;"));
+            Check("%I0.0 and %I0.1 not read", !code.Contains("%I0.0") && !code.Contains("%I0.1"));
+            Check("OPEN to %Q0.0, CLOSE to %Q0.1",
+                  code.Contains("%Q0.0:=IO_Buffer_DB.DQ[41];") && code.Contains("%Q0.1:=IO_Buffer_DB.DQ[42];"));
+            Check("Healthy pinned TRUE, Local pinned FALSE",
+                  code.Contains("Valves_DB.Valve[21].Healthy:=TRUE;") && code.Contains("Valves_DB.Valve[21].LocalMode:=FALSE;"));
 
             Console.WriteLine("Screens");
             var screens = hmi.Screens.Select(s => s.Name).OrderBy(s => s).ToList();
@@ -134,7 +161,8 @@ namespace VerifyDemo
             Console.WriteLine("Alarms");
             var table = hmi.TagTables.Find("ValveTags");
             var alarms = hmi.DiscreteAlarms.ToList();
-            Check("8 alarms, all CM79", alarms.Count == 8 && alarms.All(a => a.Name.StartsWith("V021_")), alarms.Count.ToString());
+            Check("6 alarms, all CM79", alarms.Count == 6 && alarms.All(a => a.Name.StartsWith("V021_")), alarms.Count.ToString());
+            Check("no Unhealthy or Local alarm", !alarms.Any(a => a.Name == "V021_Unhealthy" || a.Name == "V021_Local"));
             foreach (var a in alarms)
             {
                 var t = table.Tags.Find(a.RaisedStateTag);
@@ -143,12 +171,16 @@ namespace VerifyDemo
             }
 
             Console.WriteLine("Tags");
-            var wanted = new[] { "_OpenCmd|.OpenCmd", "_CloseCmd|.CloseCmd", "_OpenFB|.OpenFB", "_ClosedFB|.ClosedFB", "_Healthy|.Healthy", "_LocalMode|.LocalMode", "_OpenValve|.OpenValve", "_CloseValve|.CloseValve" };
+            var wanted = new[] { "_OpenCmd|.OpenCmd", "_CloseCmd|.CloseCmd", "_OpenFB|.OpenFB", "_ClosedFB|.ClosedFB", "_OpenValve|.OpenValve", "_CloseValve|.CloseValve" };
             foreach (var w in wanted)
             {
                 var t = table.Tags.Find("V021" + w.Split('|')[0]);
                 Check("V021" + w.Split('|')[0], t != null && P(t, "PlcTag") == "Valves_DB.Valve[21]" + w.Split('|')[1] && !string.IsNullOrEmpty(P(t, "Connection")), t == null ? "missing" : P(t, "PlcTag"));
             }
+            foreach (var g in new[] { "V021_Healthy", "V021_LocalMode", "Valves_DB_SelHealthy", "Valves_DB_SelLocalMode", "Valves_DB_W_Unhealthy_1", "Valves_DB_W_Local_1" })
+                Check(g + " removed", table.Tags.Find(g) == null);
+            Console.WriteLine("Home live signals");
+            Check("4 signal lamps", home.ScreenItems.Find("D_Sig3") != null && home.ScreenItems.Find("D_Sig4") == null);
             var other = table.Tags.Count(t => Regex.IsMatch(t.Name, "^V\\d{3}_") && !t.Name.StartsWith("V021_"));
             Check("no other valve tags left", other == 0, other.ToString());
             Console.WriteLine("  tags in table: " + table.Tags.Count());

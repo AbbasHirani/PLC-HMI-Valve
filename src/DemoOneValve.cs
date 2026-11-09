@@ -130,7 +130,8 @@ namespace ValveDemoHmiBuilder
             }
 
             // Keep only this valve's alarms. Module and station alarms cannot occur without stations.
-            var doomed = hmi.DiscreteAlarms.Where(a => !a.Name.StartsWith(DEMO_V + "_", StringComparison.Ordinal)).Select(a => a.Name).ToList();
+            var doomed = hmi.DiscreteAlarms.Where(a => !a.Name.StartsWith(DEMO_V + "_", StringComparison.Ordinal)
+                                                       || DEMO_GONE_ALARMS.Contains(a.Name)).Select(a => a.Name).ToList();
             Console.WriteLine("  Deleting " + doomed.Count + " alarms...");
             foreach (var n in doomed) hmi.DiscreteAlarms.Find(n).Delete();
             Console.WriteLine("  Alarms left: " + hmi.DiscreteAlarms.Count());
@@ -152,6 +153,7 @@ namespace ValveDemoHmiBuilder
 
         static bool IsDemoTagToDelete(string n)
         {
+            if (DEMO_GONE_TAGS.Contains(n)) return true;
             if (n.Length > 4 && n[0] == 'V' && char.IsDigit(n[1]) && char.IsDigit(n[2]) && char.IsDigit(n[3]) && n[4] == '_')
                 return !n.StartsWith(DEMO_V + "_", StringComparison.Ordinal);
             if (n.StartsWith("Diag_", StringComparison.Ordinal)) return true;
@@ -160,7 +162,27 @@ namespace ValveDemoHmiBuilder
             return false;
         }
 
-        const string DEMO_TITLE = "MV WESTERLY  &#xB7;  VALVE REMOTE CONTROL  &#xB7;  ONE-VALVE DEMO";
+        // The demo's own copy of AddRemoteLockStyling, without the Local and Healthy terms: this
+        // actuator reports neither. Colour only, like the original - the PLC still decides.
+        static void DemoLockStyling(HmiButton btn, uint activeBackColor)
+        {
+            string guard = JS_READ +
+                "var cfg = r(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
+                "var posfault = r(Tags(\"Valves_DB_SelPositionFault\").Read());\n" +
+                "var locked = !cfg || posfault;\n";
+            Dyn(btn, "BackColor", guard + "return locked ? 0xFF2A2E38 : " + string.Format("0x{0:X8}", activeBackColor) + ";\n", "AutomaticTags");
+            Dyn(btn, "ForeColor", guard + "return locked ? 0xFF6B7280 : 0xFFFFFFFF;\n", "AutomaticTags");
+        }
+
+        // Healthy and Local are gone from the demo, so are their alarms, tags and alarm words.
+        static readonly string[] DEMO_GONE_ALARMS = { DEMO_V + "_Unhealthy", DEMO_V + "_Local" };
+        static readonly string[] DEMO_GONE_TAGS = {
+            DEMO_V + "_Healthy", DEMO_V + "_LocalMode",
+            "Valves_DB_SelHealthy", "Valves_DB_SelLocalMode",
+            "Valves_DB_W_Unhealthy_1", "Valves_DB_W_Local_1",
+        };
+
+        const string DEMO_TITLE ="MV WESTERLY  &#xB7;  VALVE REMOTE CONTROL  &#xB7;  ONE-VALVE DEMO";
 
         static void BuildDemoNav(HmiScreen sc, string activeTarget)
         {
@@ -200,14 +222,12 @@ namespace ValveDemoHmiBuilder
             Dyn(dot, "BackColor", JS_READ +
                 "var code = r(Tags(\"Valves_DB_SelPosCode\").Read());\n" +
                 "var flt = r(Tags(\"Valves_DB_SelFaultCode\").Read());\n" +
-                "var local = r(Tags(\"Valves_DB_SelLocalMode\").Read());\n" +
                 "var flash = r(Tags(\"Valves_DB_Clock1Hz\").Read());\n" +
                 "if (code === 0) return 0xFF8E8E93;\n" +
                 "var pos = 0xFF00A2FF;\n" +
                 "if (code === 3) pos = 0xFF32C785;\n" +
                 "if (code === 4) pos = 0xFF4B5563;\n" +
                 "if (flt > 0) return flash ? 0xFFFF0000 : pos;\n" +
-                "if (local) return 0xFFFF9F0A;\n" +
                 "return pos;\n", "AutomaticTags");
 
             var pos2 = MakeTb(sc, "D_PosText", 290, 272, 1000, 80, "", BG_CARD, Color.White, 0, "Left", 54, true);
@@ -238,29 +258,27 @@ namespace ValveDemoHmiBuilder
                 "if (!flt) return \"\";\n" +
                 "return \"\\u26A0  \" + (f[flt] || \"FAULT\");\n", "AutomaticTags");
 
+            // No Local signal on this actuator, so the only mode left to show is in or out of service.
             var mode = MakeTb(sc, "D_Mode", 290, 460, 1000, 44, "", BG_CARD, TXT_MUTED, 0, "Left", 24, true);
             Dyn(mode, "Text", JS_READ +
-                "var local = r(Tags(\"Valves_DB_SelLocalMode\").Read());\n" +
                 "var cfg = r(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
-                "if (!cfg) return \"OUT OF SERVICE \\u2014 NOT CONFIGURED\";\n" +
-                "return local ? \"LOCAL \\u2014 REMOTE COMMANDS LOCKED\" : \"REMOTE\";\n", "AutomaticTags");
+                "return cfg ? \"\" : \"OUT OF SERVICE \\u2014 NOT CONFIGURED\";\n", "AutomaticTags");
             Dyn(mode, "ForeColor", JS_READ +
-                "var local = r(Tags(\"Valves_DB_SelLocalMode\").Read());\n" +
                 "var cfg = r(Tags(\"Valves_DB_SelConfigured\").Read());\n" +
-                "return (local || !cfg) ? 0xFFE2A800 : 0xFF9AA3B0;\n", "AutomaticTags");
+                "return cfg ? 0xFF9AA3B0 : 0xFFE2A800;\n", "AutomaticTags");
 
             // Commands
             var open = MakeBtn(sc, "Btn_Open", 1340, 272, 260, 120, "OPEN", Color.FromArgb(255, 16, 185, 129), Color.White,
                                Color.FromArgb(255, 52, 211, 153), 2, 30, true);
             SetStr(open, "Authorization", "Operate");
             AddScriptEvent(open, "Tags(\"" + DEMO_V + "_CloseCmd\").Write(false);\nTags(\"" + DEMO_V + "_OpenCmd\").Write(true);\n");
-            AddRemoteLockStyling(open, 0xFF10B981);
+            DemoLockStyling(open, 0xFF10B981);
 
             var close = MakeBtn(sc, "Btn_Close", 1620, 272, 260, 120, "CLOSE", Color.FromArgb(255, 55, 65, 81), Color.White,
                                 Color.FromArgb(255, 107, 114, 128), 2, 30, true);
             SetStr(close, "Authorization", "Operate");
             AddScriptEvent(close, "Tags(\"" + DEMO_V + "_OpenCmd\").Write(false);\nTags(\"" + DEMO_V + "_CloseCmd\").Write(true);\n");
-            AddRemoteLockStyling(close, 0xFF374151);
+            DemoLockStyling(close, 0xFF374151);
 
             // Same four latched faults as the real popup's RESET FAULT. It must never write the
             // valve-owned signals: see the ResetFault notes in AddPopupActionButton.
@@ -278,16 +296,15 @@ namespace ValveDemoHmiBuilder
             MakeTb(sc, "D_SigTtl", 40, 570, 1800, 34, "LIVE SIGNALS", M_TRANS, M_HDRTXT, 0, "Left", 20, true);
             MakeRect(sc, "D_SigCard", 16, 610, 1888, 300, M_BOX, M_LINE, 1);
             // label, address, tag suffix, colour when on, colour when off
+            // 2 inputs and 2 outputs: the actuator has no Healthy or Local terminal.
             var sig = new[] {
-                new { L = "OPEN LIMIT",    A = "%I0.0", T = "_OpenFB",     On = "0xFF32C785", Off = "0xFF6B7280" },
-                new { L = "CLOSED LIMIT",  A = "%I0.1", T = "_ClosedFB",   On = "0xFF32C785", Off = "0xFF6B7280" },
-                new { L = "HEALTHY",       A = "%I0.2", T = "_Healthy",    On = "0xFF32C785", Off = "0xFFFF0000" },
-                new { L = "LOCAL MODE",    A = "%I0.3", T = "_LocalMode",  On = "0xFFFF9F0A", Off = "0xFF6B7280" },
+                new { L = "OPEN LIMIT",    A = "%I0.2", T = "_OpenFB",     On = "0xFF32C785", Off = "0xFF6B7280" },
+                new { L = "CLOSED LIMIT",  A = "%I0.3", T = "_ClosedFB",   On = "0xFF32C785", Off = "0xFF6B7280" },
                 new { L = "OPEN COMMAND",  A = "%Q0.0", T = "_OpenValve",  On = "0xFF00A2FF", Off = "0xFF6B7280" },
                 new { L = "CLOSE COMMAND", A = "%Q0.1", T = "_CloseValve", On = "0xFF00A2FF", Off = "0xFF6B7280" },
             };
             for (int i = 0; i < sig.Length; i++) {
-                int cx = 176 + i * 314;
+                int cx = 252 + i * 472;   // four equal columns across the 1888-wide card
                 var s = sc.ScreenItems.Create<HmiEllipse>("D_Sig" + i);
                 s.CenterX = SX(cx); s.CenterY = SY(700); s.RadiusX = (uint)SX(46); s.RadiusY = (uint)SY(46);
                 s.BackColor = Color.Gray; s.BorderColor = M_BORDER;

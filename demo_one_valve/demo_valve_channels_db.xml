@@ -663,7 +663,7 @@
         <StartValue>79</StartValue>
       </Subelement>
       <Subelement Path="21">
-        <StartValue>83</StartValue>
+        <StartValue>0</StartValue>
       </Subelement>
       <Subelement Path="22">
         <StartValue>87</StartValue>
@@ -937,7 +937,7 @@
         <StartValue>80</StartValue>
       </Subelement>
       <Subelement Path="21">
-        <StartValue>84</StartValue>
+        <StartValue>0</StartValue>
       </Subelement>
       <Subelement Path="22">
         <StartValue>88</StartValue>

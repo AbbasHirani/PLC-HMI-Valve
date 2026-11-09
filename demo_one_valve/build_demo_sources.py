@@ -23,13 +23,19 @@ def write(name, text):
 # ---------- FC_PhysicalIoCopy: one valve on the CPU's own I/O ----------
 BODY = '''    // ONE-VALVE DEMO ONLY. The real block copies 368 inputs and 208 outputs from the ET200SP
     // stations. This demo has no stations, so only CM79 (slot 21) is connected, and it uses the
-    // CPU's own I/O. FC_IoMapper and FB_ValveLoop are unchanged and still use channels 81-84, 41-42.
-    &quot;IO_Buffer_DB&quot;.DI[81] := %I0.0;   // Open limit switch
-    &quot;IO_Buffer_DB&quot;.DI[82] := %I0.1;   // Closed limit switch
-    &quot;IO_Buffer_DB&quot;.DI[83] := %I0.2;   // Healthy
-    &quot;IO_Buffer_DB&quot;.DI[84] := %I0.3;   // Local mode
+    // CPU's own I/O: 2 inputs (I0.2, I0.3; I0.0 and I0.1 left empty) and 2 outputs.
+    // FC_IoMapper and FB_ValveLoop are unchanged and still use channels 81-82 and 41-42.
+    &quot;IO_Buffer_DB&quot;.DI[81] := %I0.2;   // Open limit switch
+    &quot;IO_Buffer_DB&quot;.DI[82] := %I0.3;   // Closed limit switch
     %Q0.0 := &quot;IO_Buffer_DB&quot;.DQ[41];   // OPEN command
     %Q0.1 := &quot;IO_Buffer_DB&quot;.DQ[42];   // CLOSE command
+
+    // No Healthy and no Local signal. The actuator's manual (terminal diagram) has neither, only the
+    // two limit feedbacks, so the demo drops both. Their channels are 0 in Valve_Channels_DB, which
+    // makes FC_IoMapper leave the two values alone, and they are pinned here instead. Healthy has
+    // to be pinned TRUE: left at its FALSE default, FB_ValveLoop would refuse every command.
+    &quot;Valves_DB&quot;.Valve[21].Healthy := TRUE;
+    &quot;Valves_DB&quot;.Valve[21].LocalMode := FALSE;
 '''
 fc = read('temp_fc_physical_io_copy.xml')
 fc, n = re.subn(r'(<Text UId="1">\n).*?(\s*</Text>)', lambda m: m.group(1) + BODY + m.group(2), fc, count=1, flags=re.S)
@@ -56,4 +62,10 @@ ch, n = re.subn(r'(<Member Name="TravelTimeout".*?<Subelement Path="21">\s*<Star
                 lambda m: m.group(1) + 'T#20s' + m.group(2), ch, count=1, flags=re.S)
 if n != 1:
     sys.exit('TravelTimeout[21] not found')
+# No Healthy or Local wire on this actuator: 0 means "not assigned" to FC_IoMapper.
+for name, was in (('HealthyChannel', '83'), ('LocalModeChannel', '84')):
+    ch, n = re.subn(r'(<Member Name="' + name + r'".*?<Subelement Path="21">\s*<StartValue>)' + was + r'(</StartValue>)',
+                    lambda m: m.group(1) + '0' + m.group(2), ch, count=1, flags=re.S)
+    if n != 1:
+        sys.exit(name + '[21] not found')
 write('demo_valve_channels_db.xml', ch)
